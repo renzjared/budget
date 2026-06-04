@@ -65,6 +65,7 @@ nav { display: flex; flex-direction: column; gap: 0.5rem; }
 /* Quick Actions */
 .quick-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 16px; margin-bottom: 32px; max-width: 500px; }
 .action-card { background: transparent; border: none; display: flex; flex-direction: column; align-items: center; gap: 12px; cursor: pointer; }
+.action-card span { color: var(--text); font-weight: 600; font-size: 14px; }
 .action-icon { background-color: var(--surface); width: 64px; height: 64px; border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-soft); color: var(--text); transition: var(--transition); }
 .action-card:hover .action-icon { background-color: var(--border); transform: scale(1.05); }
 
@@ -219,4 +220,47 @@ input:checked + .slider:before { transform: translateX(22px); }
     max-width: 200px;
     height: auto;
     display: block;
+}
+
+/* --- DASHBOARD REDESIGN --- */
+.dashboard-hero-card {
+    background-color: rgba(150, 150, 150, 0.08); /* Light gray transparent */
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    padding: 40px 24px;
+    text-align: center;
+    margin-bottom: 32px;
+}
+
+.user-greeting-container {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.user-avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--border);
+}
+
+.greeting-text {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--text); /* Safe for both light and dark modes */
+}
+
+.header-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin-bottom: 32px;
+}
+
+/* Override Quick actions to center them inside the hero card */
+.dashboard-hero-card .quick-actions {
+    margin: 32px auto 0;
+    justify-content: center;
 }

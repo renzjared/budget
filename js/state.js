@@ -8,16 +8,22 @@ window.appData = [];
 window.accountsData = [];
 window.userSettings = { 
     name: 'User', balance: 0, currency: '₱', metric: 'running', theme: 'light',
-    budgetCycle: 'monthly', categories: [{ name: 'SAVINGS', percent: 100, isAuto: true }] 
+    budgetCycle: 'monthly', categories: [{ name: 'SAVINGS', percent: 100, isAuto: true }],
+    incomeCategories: ['SALARY', 'ALLOWANCE', 'BONUS'] 
 };
 
-window.formatMoney = (amount) => `${window.userSettings.currency}${Math.abs(amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+window.formatMoney = (amount) => {
+    let sym = window.userSettings?.currency;
+    if (!sym || sym === 'undefined') sym = '₱'; // Hard fallback
+    return `${sym}${Math.abs(amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+};
 
 window.formatReceiptDateTime = (dateStr) => {
     if (!dateStr) return 'Unknown Date';
     try {
         const d = new Date(dateStr);
-        return isNaN(d) ? dateStr.toString() : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+        if (isNaN(d)) return dateStr.toString();
+        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
     } catch(e) { return 'Invalid Date'; }
 };
 
@@ -41,7 +47,6 @@ window.initApp = async () => {
         }
     });
 
-    // check for returning users who already have a session active
     const { data: { session } } = await window.supabase.auth.getSession();
     
     if (session) {
@@ -53,7 +58,6 @@ window.initApp = async () => {
     }
 };
 
-// Helper function to handle routing to username setup or dashboard
 async function handleUserRouting() {
     const { data: profile } = await window.supabase.from('profiles').select('*').eq('id', window.currentUser.id).single();
         
@@ -70,10 +74,7 @@ async function handleUserRouting() {
 
 window.loginWithDiscord = async () => {
     const exactRedirectUrl = window.location.origin + window.location.pathname;
-    await window.supabase.auth.signInWithOAuth({ 
-        provider: 'discord', 
-        options: { redirectTo: exactRedirectUrl } 
-    });
+    await window.supabase.auth.signInWithOAuth({ provider: 'discord', options: { redirectTo: exactRedirectUrl } });
 };
 
 window.logout = async () => {
@@ -91,18 +92,22 @@ window.claimUsername = async (username) => {
         throw error;
     }
     
-    // Create default settings row
     await window.supabase.from('settings').insert({ user_id: window.currentUser.id });
     location.reload();
 };
 
 async function loadCloudData() {
     const uid = window.currentUser.id;
+
+    // Load Settings
     const { data: set } = await window.supabase.from('settings').select('*').eq('user_id', uid).single();
     if (set) {
         window.userSettings = {
-            name: set.name || 'User', balance: parseFloat(set.balance) || 0, currency: set.currency,
-            metric: set.metric, theme: set.theme, budgetCycle: set.budget_cycle, categories: set.categories || []
+            name: set.name || 'User', balance: parseFloat(set.balance) || 0, 
+            currency: (set.currency && set.currency !== 'undefined') ? set.currency : '₱',
+            metric: set.metric || 'running', theme: set.theme || 'light', 
+            budgetCycle: set.budget_cycle || 'monthly', categories: set.categories || [],
+            incomeCategories: set.income_categories || ['SALARY', 'ALLOWANCE', 'BONUS'] // <-- Add this
         };
     }
     if (!window.userSettings.categories.find(c => c.name.toUpperCase() === 'SAVINGS')) {
@@ -113,10 +118,39 @@ async function loadCloudData() {
     const { data: accs } = await window.supabase.from('accounts').select('*').eq('user_id', uid);
     window.accountsData = accs || [];
 
-    // Load Transactions
-    const { data: txs } = await window.supabase.from('transactions').select('*').eq('user_id', uid).order('timestamp', { ascending: false });
-    window.appData = txs || [];
-    window.appData.forEach((item, idx) => item._id = idx); 
+    // Load Transactions (with batching for >1000 records)
+    let allTxs = [];
+    let offset = 0;
+    const batchSize = 1000;
+    let hasMore = true;
+    
+    while (hasMore) {
+        const { data: batch, error } = await window.supabase
+            .from('transactions')
+            .select('*')
+            .eq('user_id', uid)
+            .order('timestamp', { ascending: false })
+            .range(offset, offset + batchSize - 1);
+        
+        if (error) {
+            console.error('Error loading transaction batch:', error);
+            break;
+        }
+        
+        if (!batch || batch.length === 0) {
+            hasMore = false;
+        } else {
+            allTxs = allTxs.concat(batch);
+            if (batch.length < batchSize) {
+                hasMore = false;
+            } else {
+                offset += batchSize;
+            }
+        }
+    }
+    
+    window.appData = allTxs;
+    window.appData.forEach((item, idx) => item._id = idx);
 }
 
 window.saveSettingsToCloud = async () => {
@@ -128,7 +162,8 @@ window.saveSettingsToCloud = async () => {
         metric: window.userSettings.metric,
         theme: window.userSettings.theme,
         budget_cycle: window.userSettings.budgetCycle,
-        categories: window.userSettings.categories
+        categories: window.userSettings.categories,
+        income_categories: window.userSettings.incomeCategories // <-- Add this
     };
     await window.supabase.from('settings').upsert(payload);
 };
@@ -142,13 +177,29 @@ window.saveAccountsToCloud = async () => {
 };
 
 window.bulkUpsertTransactions = async (parsedData) => {
+    if (parsedData.length === 0) return;
+    
     const payload = parsedData.map(p => ({
         ...p, user_id: window.currentUser.id, fingerprint: `${p.timestamp}_${p.name}_${p.amount}`
     }));
     
-    const { error } = await window.supabase.from('transactions').upsert(payload, { onConflict: 'user_id, fingerprint' });
-    if(error) console.error("Sync Error:", error);
-    await loadCloudData(); // Refresh appData
+    try {
+        // Use upsert with explicit conflict resolution on the unique constraint
+        // This will insert new records and update existing ones based on (user_id, fingerprint)
+        const { data, error } = await window.supabase
+            .from('transactions')
+            .upsert(payload, { onConflict: 'user_id,fingerprint' });
+        
+        if(error) {
+            console.error("Upsert Error:", error);
+            throw error;
+        }
+        
+        console.log(`Upserted ${payload.length} transactions`);
+        await loadCloudData();
+    } catch (err) {
+        console.error("Transaction sync failed:", err);
+    }
 };
 
 document.addEventListener('DOMContentLoaded', window.initApp);

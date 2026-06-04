@@ -11,7 +11,7 @@
         
         <aside class="sidebar" id="main-sidebar" style="display: none;">
             <div class="logo">
-                <img src="logo.png" alt="Renz-bot Logo" class="app-logo">
+                <img src="logo.png" alt="Renz-bot Finance Logo" class="app-logo" style="max-width: 140px; height: auto;">
             </div>
             <nav>
                 <button class="nav-btn active" data-target="dashboard">
@@ -35,78 +35,127 @@
             </nav>
         </aside>
 
-
         <main class="content">
-            <section id="landing" class="view active" style="display: flex; flex-direction: column; min-height: 100vh;">
-                <div class="landing-container" style="text-align: center; max-width: 800px; margin: 10vh auto; flex: 1;">
-                    <div style="display:flex; justify-content:center; margin-bottom: 24px;">
-                        <img src="logo.png" alt="Renz-bot Logo" class="landing-logo">
-                    </div>
-                    <h1 style="font-size: 56px; font-weight: 700; letter-spacing: -2px; margin-bottom: 16px;">new renzbot thing idk.</h1>
-                    <p class="text-muted" style="font-size: 18px; margin-bottom: 48px; line-height: 1.6;">An intelligent financial management tool. Track budgets, analyze cash flow, and manage multiple accounts with seamless cloud sync.</p>
-                    
-                    <button id="discord-login-btn" class="primary-btn" style="font-size: 18px; padding: 16px 40px; background-color: #5865F2; color: white;">
-                        Login with Discord
-                    </button>
 
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 80px; text-align: left;">
-                        <div class="card"><h3 style="margin-bottom:8px">Visual Insights</h3><p class="text-muted">Interactive bar charts and trend analyses for your cash flow.</p></div>
-                        <div class="card"><h3 style="margin-bottom:8px">Smart Budgets</h3><p class="text-muted">Income-based automatic category budgeting and savings.</p></div>
-                        <div class="card"><h3 style="margin-bottom:8px">Cloud Sync</h3><p class="text-muted">Powered by Supabase. Your data is secure and available everywhere.</p></div>
-                    </div>
-                </div>
+            <section id="landing" class="view active">
+                <div style="display: flex; flex-direction: column; min-height: 100vh;">
+                    <div class="landing-container" style="text-align: center; max-width: 800px; margin: 10vh auto; flex: 1;">
+                        <div style="display:flex; justify-content:center; margin-bottom: 24px;">
+                            <img src="logo.png" alt="Renz-bot Finance Logo" class="landing-logo" style="max-width: 200px; height: auto;">
+                        </div>
+                        <h1 style="font-size: 56px; font-weight: 700; letter-spacing: -2px; margin-bottom: 16px;">Master your wealth.</h1>
+                        <p class="text-muted" style="font-size: 18px; margin-bottom: 48px; line-height: 1.6;">A modern, intelligent financial operating system. Track budgets, analyze cash flow, and manage multiple accounts with seamless cloud sync.</p>
+                        
+                        <button id="discord-login-btn" class="primary-btn" style="font-size: 18px; padding: 16px 40px; background-color: #5865F2; color: white;">
+                            Login with Discord
+                        </button>
 
-                <footer class="landing-footer">
-                    <div class="footer-grid">
-                        <div class="footer-brand">
-                            <div style="display:flex; align-items:center; gap: 8px; font-weight: 700; font-size: 16px;">
-                                <img src="logo.png" alt="Logo" style="width: 16px; height: auto;"> Part of the Renz-bot Project.
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 80px; text-align: left;">
+                            <div class="card"><h3 style="margin-bottom:8px">Visual Insights</h3><p class="text-muted">Interactive bar charts and trend analyses for your cash flow.</p></div>
+                            <div class="card"><h3 style="margin-bottom:8px">Smart Budgets</h3><p class="text-muted">Income-based automatic category budgeting and savings.</p></div>
+                            <div class="card"><h3 style="margin-bottom:8px">Cloud Sync</h3><p class="text-muted">Powered by Supabase. Your data is secure and available everywhere.</p></div>
+                        </div>
+                    </div>
+
+                    <footer class="landing-footer">
+                        <div class="footer-grid">
+                            <div class="footer-brand">
+                                <div style="display:flex; align-items:center; gap: 8px; font-weight: 700; font-size: 16px;">
+                                    <img src="logo.png" alt="Logo" style="max-width: 140px; height: auto;">
+                                </div>
+                                <p class="text-muted" style="font-size: 13px; margin-top: 8px;">Developed by Renz Jared Rolle.<br>Part of the Renz-bot Project.</p>
                             </div>
-                            <p class="text-muted" style="font-size: 13px; margin-top: 8px;">Developed by Renz Jared Rolle.</p>
+                            <div class="footer-links">
+                                <h4>Projects</h4>
+                                <a href="https://renzjared.github.io/recipes/" target="_blank">Recipes</a>
+                                <a href="https://renzjared.github.io/grades/" target="_blank">Grades</a>
+                                <a href="https://bit.ly/renz-bot" target="_blank">Discord Bot</a>
+                            </div>
+                            <div class="footer-links">
+                                <h4>Games</h4>
+                                <a href="https://renzjared.github.io/chainlink/" target="_blank">Chainlink</a>
+                                <a href="https://renzjared.github.io/morph/" target="_blank">Morph</a>
+                            </div>
+                            <div class="footer-links">
+                                <h4>Support</h4>
+                                <a href="#" class="nav-proxy" data-target="contact-us">Contact Us</a>
+                                <a href="#" onclick="window.loadLegal('tos.md', 'Terms of Service')">Terms of Service</a>
+                                <a href="#" onclick="window.loadLegal('privacy.md', 'Privacy Policy')">Privacy Policy</a>
+                            </div>
                         </div>
-                        <div class="footer-links">
-                            <h4>Projects</h4>
-                            <a href="https://renzjared.github.io/recipes/" target="_blank">Recipes</a>
-                            <a href="https://renzjared.github.io/grades/" target="_blank">Grades</a>
-                            <a href="https://bit.ly/renz-bot" target="_blank">Discord Bot</a>
-                        </div>
-                        <div class="footer-links">
-                            <h4>Games</h4>
-                            <a href="https://renzjared.github.io/chainlink/" target="_blank">Chainlink</a>
-                            <a href="https://renzjared.github.io/morph/" target="_blank">Morph</a>
-                        </div>
-                        <div class="footer-links">
-                            <h4>Support</h4>
-                            <a href="#" class="nav-proxy" data-target="contact-us">Contact Us</a>
-                            <a href="#" onclick="window.loadLegal('tos.md', 'Terms of Service')">Terms of Service</a>
-                            <a href="#" onclick="window.loadLegal('privacy.md', 'Privacy Policy')">Privacy Policy</a>
-                        </div>
-                    </div>
-                </footer>
-            </section> 
+                    </footer>
+                </div>
+            </section>
 
-            <section id="username-setup" class="view" style="display: flex; flex-direction: column; min-height: 100vh; justify-content: center;">
-                <div class="card" style="max-width: 400px; margin: 0 auto; text-align: center; width: 100%;">
-                    <h2 style="margin-bottom: 8px;">Claim your Username</h2>
-                    <p class="text-muted" style="margin-bottom: 24px;">Letters and numbers only. This cannot be changed later.</p>
-                    <input type="text" id="new-username-input" class="form-input" placeholder="e.g. Renz2026" style="margin-bottom: 16px;">
-                    <button id="submit-username-btn" class="primary-btn" style="width: 100%;">Create Account</button>
-                    <p id="username-error" style="color: var(--accent-red); margin-top: 12px; font-size: 14px;"></p>
+            <section id="username-setup" class="view">
+                <div style="display: flex; flex-direction: column; min-height: 100vh; justify-content: center;">
+                    <div class="card" style="max-width: 400px; margin: 0 auto; text-align: center; width: 100%;">
+                        <h2 style="margin-bottom: 8px;">Claim your Username</h2>
+                        <p class="text-muted" style="margin-bottom: 24px;">Letters and numbers only. This cannot be changed later.</p>
+                        <input type="text" id="new-username-input" class="form-input" placeholder="e.g. Renz2026" style="margin-bottom: 16px;">
+                        <button id="submit-username-btn" class="primary-btn" style="width: 100%;">Create Account</button>
+                        <p id="username-error" style="color: var(--accent-red); margin-top: 12px; font-size: 14px;"></p>
+                    </div>
                 </div>
             </section>
 
             <section id="dashboard" class="view">
                 <header class="top-header">
-                    <p class="text-muted" id="dashboard-greeting">Hello 👋</p>
-                    <p class="text-muted" id="dashboard-subtitle" style="margin-top: 16px;">Running Balance</p>
-                    <h1 id="display-balance" class="massive-balance">₱0.00</h1>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 16px;">
+                            <img id="dashboard-avatar" src="" alt="Avatar" style="display: none; width: 56px; height: 56px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border);">
+                            <h2 id="dashboard-greeting" style="font-size: 28px; font-weight: 700; margin: 0; color: var(--text);">Hello</h2>
+                        </div>
+                        <select id="dashboard-metric-selector" class="form-input" style="padding: 8px 12px; width: auto; font-size: 13px; max-width: 180px;">
+                            <option value="running">Running Balance</option>
+                            <option value="net_worth">Net Worth (Accounts)</option>
+                            <option value="remaining_daily">Remaining Budget (Daily)</option>
+                            <option value="remaining_weekly">Remaining Budget (Weekly)</option>
+                            <option value="remaining_monthly">Remaining Budget (Monthly)</option>
+                        </select>
+                    </div>
+                    <hr style="border: none; border-top: 1px solid var(--border); margin-top: 24px; margin-bottom: 24px;">
                 </header>
 
-                <div class="quick-actions">
-                    <button class="action-card"><div class="action-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></div><span>Expense</span></button>
-                    <button class="action-card"><div class="action-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></div><span>Income</span></button>
-                    <button class="action-card nav-proxy" data-target="statistics"><div class="action-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg></div><span>Reports</span></button>
-                    <button class="action-card nav-proxy" data-target="settings"><div class="action-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg></div><span>More</span></button>
+                <!-- New Transparent Hero Card -->
+                <div style="background-color: rgba(150, 150, 150, 0.08); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 40px 24px; text-align: center; margin-bottom: 32px;">
+                    <div style="margin-bottom: 32px;">
+                        <h1 id="display-balance" class="massive-balance" style="font-size: 48px; margin-bottom: 4px;">₱0.00</h1>
+                        <p class="text-muted" id="dashboard-subtitle">Running Balance</p>
+                    </div>
+
+                    <!-- Centered Quick Actions Inside the Card -->
+                    <div class="quick-actions" style="margin: 0 auto; display: flex; flex-wrap: wrap; justify-content: center; gap: 16px;">
+                        <button class="action-card" id="add-expense-btn">
+                            <div class="action-icon" style="color: var(--primary);">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                            </div>
+                            <span>Add Expense</span>
+                        </button>
+                        <button class="action-card" id="add-income-btn">
+                            <div class="action-icon" style="color: var(--primary);">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M7 6h6a4 4 0 0 1 0 8H7z"></path>
+                                    <path d="M7 6v14"></path>
+                                    <path d="M5 10h12"></path>
+                                    <path d="M5 14h12"></path>
+                                </svg>
+                            </div>
+                            <span>Add Income</span>
+                        </button>
+                        <button class="action-card nav-proxy" data-target="statistics">
+                            <div class="action-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                            </div>
+                            <span>Reports</span>
+                        </button>
+                        <button class="action-card nav-proxy" data-target="settings">
+                            <div class="action-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+                            </div>
+                            <span>More</span>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="card">
@@ -129,6 +178,8 @@
                 </header>
                 <h3 style="margin: 24px 0 16px; font-size: 16px; color: var(--text-secondary);">Banks & E-Wallets</h3>
                 <div id="bank-accounts-grid" class="accounts-grid"></div>
+                <h3 style="margin: 32px 0 16px; font-size: 16px; color: var(--text-secondary);">On-hand Cash</h3>
+                <div id="onhand-accounts-grid" class="accounts-grid"></div>
                 <h3 style="margin: 32px 0 16px; font-size: 16px; color: var(--text-secondary);">Investments</h3>
                 <div id="investment-accounts-grid" class="accounts-grid"></div>
             </section>
@@ -191,7 +242,8 @@
                             </select>
                         </div>
                         <div style="position: relative; height: 250px; width: 100%; display: flex; justify-content: center;">
-                            <canvas id="doughnutChart"></canvas> </div>
+                            <canvas id="doughnutChart"></canvas> 
+                        </div>
                     </div>
 
                     <div class="card">
@@ -217,21 +269,43 @@
             </section>
 
             <section id="logs" class="view">
-                <header class="top-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-                    <h2>Transactions</h2>
-                    <button id="toggle-filters-btn" class="secondary-btn" style="padding: 8px 16px;">🔍 Advanced Filters</button>
+                <header class="top-header">
+                    <h2>Activity</h2>
                 </header>
                 
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 16px; gap: 12px;">
+                    <input type="text" id="search-input" class="form-input" placeholder="Search Item, Merchant, Notes, or Category..." style="max-width: 350px; flex: 1; max-width: none;">
+                    <button id="toggle-filters-btn" class="text-btn" style="color: var(--primary); font-size: 14px; font-weight: 700; padding: 8px 0;">Advanced Filters</button>
+                </div>
+                
                 <div id="advanced-filters-panel" class="card" style="display: none; margin-bottom: 24px; padding: 20px;">
-                    <input type="text" id="search-input" class="form-input" placeholder="Search by name, category, notes, amount, or date...">
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin-top: 16px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px;">
                         <div><label class="text-muted" style="font-size: 12px; margin-bottom: 4px; display: block;">Start Date</label><input type="date" id="filter-date-start" class="form-input"></div>
                         <div><label class="text-muted" style="font-size: 12px; margin-bottom: 4px; display: block;">End Date</label><input type="date" id="filter-date-end" class="form-input"></div>
                         <div><label class="text-muted" style="font-size: 12px; margin-bottom: 4px; display: block;">Min Amount</label><input type="number" id="filter-amount-min" class="form-input" placeholder="0.00"></div>
                         <div><label class="text-muted" style="font-size: 12px; margin-bottom: 4px; display: block;">Max Amount</label><input type="number" id="filter-amount-max" class="form-input" placeholder="0.00"></div>
                     </div>
-                    <label class="text-muted" style="font-size: 12px; margin-top: 16px; display: block;">Filter Categories</label>
+                    <label class="text-muted" style="font-size: 12px; margin-top: 16px; display: block;">Filter by Category</label>
                     <div id="filter-categories-container" class="chip-group" style="margin-top: 8px;"></div>
+                </div>
+
+                <div class="card" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; margin-bottom: 24px; padding: 16px;">
+                    <div style="text-align: center;">
+                        <p class="text-muted" style="font-size: 12px; margin-bottom: 4px;">Total Amount</p>
+                        <p id="insights-total" style="font-size: 20px; font-weight: 700; color: var(--primary);">₱0.00</p>
+                    </div>
+                    <div style="text-align: center;">
+                        <p class="text-muted" style="font-size: 12px; margin-bottom: 4px;">Maximum</p>
+                        <p id="insights-max" style="font-size: 20px; font-weight: 700; color: var(--primary);">₱0.00</p>
+                    </div>
+                    <div style="text-align: center;">
+                        <p class="text-muted" style="font-size: 12px; margin-bottom: 4px;">Minimum</p>
+                        <p id="insights-min" style="font-size: 20px; font-weight: 700; color: var(--accent-red);">₱0.00</p>
+                    </div>
+                    <div style="text-align: center;">
+                        <p class="text-muted" style="font-size: 12px; margin-bottom: 4px;">Count</p>
+                        <p id="insights-count" style="font-size: 20px; font-weight: 700;">0</p>
+                    </div>
                 </div>
 
                 <div class="card"><ul id="logs-list-view" class="minimal-list interactive-list"></ul></div>
@@ -244,41 +318,11 @@
                     <div class="upload-area">
                         <input type="file" id="csv-file-input" accept=".csv" class="file-input" />
                         <button id="import-btn" class="primary-btn">Sync to Cloud</button>
+                        <button id="export-data-btn" class="secondary-btn" style="margin-left: 8px;">Export Data (Debug)</button>
                     </div>
                     <p id="import-status" class="status-msg"></p>
                 </div>
             </section>
-
-            <!-- Contact Us View -->
-            <section id="contact-us" class="view">
-                <header class="top-header">
-                    <h2>Contact Us</h2>
-                </header>
-                <div class="card" style="max-width: 600px;">
-                    <p class="text-muted" style="margin-bottom: 24px;">Need help, found a bug, or want to suggest a feature? Reach out directly.</p>
-                    
-                    <div style="display: flex; flex-direction: column; gap: 16px;">
-                        <div style="padding: 16px; border: 1px solid var(--border); border-radius: 12px;">
-                            <h3 style="font-size: 16px; margin-bottom: 4px;">Email Support</h3>
-                            <a href="mailto:posh-refill-deny@duck.com" style="color: var(--primary); text-decoration: none; font-weight: 500;">posh-refill-deny@duck.com</a>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Legal Document View (ToS & Privacy) -->
-            <section id="legal" class="view">
-                <header class="top-header" style="display: flex; justify-content: space-between; align-items: center;">
-                    <h2 id="legal-title">Document</h2>
-                    <button class="secondary-btn nav-proxy" data-target="landing" style="padding: 8px 16px;">← Back</button>
-                </header>
-                <div class="card">
-                    <div id="legal-content" class="markdown-body text-muted">
-                        Loading document...
-                    </div>
-                </div>
-            </section>
-
 
             <section id="settings" class="view">
                 <header class="top-header">
@@ -288,7 +332,6 @@
                     </div>
                 </header>
                 <div class="card" style="max-width: 600px;">
-                    <div class="form-group"><label class="text-muted" style="display: block; margin-bottom: 8px;">Display Name</label><input type="text" id="setting-name" class="form-input" placeholder="e.g., Renz"></div>
                     <div class="form-group" style="margin-top: 24px;"><label class="text-muted" style="display: block; margin-bottom: 8px;">Starting Balance</label><input type="number" id="setting-balance" class="form-input" placeholder="0.00" step="0.01"></div>
                     
                     <div class="form-group" style="margin-top: 32px; padding: 24px; border: 1px solid var(--border); border-radius: 16px; background-color: var(--bg);">
@@ -307,6 +350,17 @@
                         <ul id="settings-categories-list" class="minimal-list"></ul>
                     </div>
 
+                    <div class="form-group" style="margin-top: 32px; padding: 24px; border: 1px solid var(--border); border-radius: 16px; background-color: var(--bg);">
+                        <h3 style="margin-bottom: 8px;">Income Categories</h3>
+                        <p class="text-muted" style="font-size: 13px; margin-bottom: 16px;">Set custom categories for incoming cash flow (appears in your Add Income dropdown).</p>
+                        
+                        <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                            <input type="text" id="new-inc-cat-name" class="form-input" placeholder="Category (e.g. SALARY)">
+                            <button id="add-inc-cat-btn" class="primary-btn">Add</button>
+                        </div>
+                        <ul id="settings-inc-categories-list" class="minimal-list"></ul>
+                    </div>
+
                     <div class="form-group" style="margin-top: 32px; display: flex; align-items: center; justify-content: space-between;">
                         <div><h3 style="font-size: 16px;">Dark Theme</h3><p class="text-muted" style="font-size: 13px;">Toggle dark mode aesthetics.</p></div>
                         <label class="switch"><input type="checkbox" id="setting-theme"><span class="slider round"></span></label>
@@ -314,9 +368,101 @@
                     
                     <button id="save-settings-btn" class="primary-btn" style="margin-top: 32px; width: 100%;">Save Cloud Settings</button>
                     <p id="settings-status" class="status-msg" style="margin-top: 16px; text-align: center;"></p>
+
+                    <div style="margin-top: 40px; padding: 24px; border: 2px solid var(--accent-red); border-radius: 16px; background-color: var(--bg);">
+                        <h3 style="color: var(--accent-red); margin-bottom: 8px;">⚠️ Danger Zone</h3>
+                        <p class="text-muted" style="font-size: 13px; margin-bottom: 16px;">This action is irreversible. All transactions, accounts, and settings will be permanently deleted.</p>
+                        <button id="clear-all-data-btn" class="secondary-btn" style="border-color: var(--accent-red); color: var(--accent-red); width: 100%;">Clear All Data</button>
+                    </div>
                 </div>
             </section>
+
+            <section id="contact-us" class="view">
+                <header class="top-header">
+                    <h2>Contact Us</h2>
+                </header>
+                <div class="card" style="max-width: 600px;">
+                    <p class="text-muted" style="margin-bottom: 24px;">Need help, found a bug, or want to suggest a feature? Reach out directly.</p>
+                    <div style="display: flex; flex-direction: column; gap: 16px;">
+                        <div style="padding: 16px; border: 1px solid var(--border); border-radius: 12px;">
+                            <h3 style="font-size: 16px; margin-bottom: 4px;">Email Support</h3>
+                            <a href="mailto:your-email@example.com" style="color: var(--primary); text-decoration: none; font-weight: 500;">your-email@example.com</a>
+                        </div>
+                        <div style="padding: 16px; border: 1px solid var(--border); border-radius: 12px;">
+                            <h3 style="font-size: 16px; margin-bottom: 4px;">Discord Community</h3>
+                            <p class="text-muted" style="font-size: 13px; margin-bottom: 8px;">Join the server for real-time support and updates.</p>
+                            <a href="https://bit.ly/renz-bot" target="_blank" class="secondary-btn" style="display: inline-block; text-decoration: none;">Join Discord</a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="legal" class="view">
+                <header class="top-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2 id="legal-title">Document</h2>
+                    <button class="secondary-btn nav-proxy" data-target="landing" style="padding: 8px 16px;">← Back</button>
+                </header>
+                <div class="card">
+                    <div id="legal-content" class="markdown-body text-muted">
+                        Loading document...
+                    </div>
+                </div>
+            </section>
+
         </main>
+    </div>
+
+    <!-- Clear Data Confirmation Modal -->
+    <div id="clear-data-modal" class="modal-overlay">
+        <div class="card" style="max-width: 500px; margin: auto;">
+            <h2 style="color: var(--accent-red); margin-bottom: 12px;">⚠️ Delete All Data</h2>
+            <p class="text-muted" style="margin-bottom: 24px; line-height: 1.6;">This action is <strong>permanent and irreversible</strong>. All transactions, accounts, and settings will be permanently deleted from your account.</p>
+            
+            <div style="background-color: var(--bg); padding: 16px; border-radius: 12px; margin-bottom: 24px; border: 1px solid var(--accent-red);">
+                <p style="color: var(--accent-red); font-weight: 500; margin-bottom: 8px;">Type the following to confirm:</p>
+                <input type="text" id="clear-data-confirmation-input" class="form-input" placeholder="Type here..." style="font-family: monospace;">
+                <p class="text-muted" style="font-size: 12px; margin-top: 8px; text-align: center;">I understand this is permanent</p>
+            </div>
+            
+            <div style="display: flex; gap: 12px;">
+                <button id="clear-data-cancel-btn" class="secondary-btn" style="flex: 1;">Cancel</button>
+                <button id="clear-data-confirm-btn" class="secondary-btn" style="flex: 1; border-color: var(--accent-red); color: var(--accent-red); cursor: not-allowed;" disabled>Delete Everything</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="expense-overlay" class="modal-overlay">
+        <div class="account-modal-content card">
+            <header style="display: flex; justify-content: space-between; margin-bottom: 24px;"><h3>Add Expense</h3><button class="close-modal-btn" onclick="closeExpenseModal()">✕</button></header>
+            <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Description</label><input type="text" id="exp-name" class="form-input" placeholder="e.g., Grocery"></div>
+            <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Amount</label><input type="number" id="exp-amount" class="form-input" placeholder="0.00" step="0.01"></div>
+            <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Category</label><select id="exp-category" class="form-input"></select></div>
+            <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Merchant</label><input type="text" id="exp-merchant" class="form-input" placeholder="e.g., SM Mall"></div>
+            <div class="form-group" style="margin-bottom: 24px;"><label class="text-muted">Notes</label><input type="text" id="exp-notes" class="form-input" placeholder="Additional notes..."></div>
+            <button id="save-expense-btn" class="primary-btn" style="width: 100%;">Save Expense</button>
+        </div>
+    </div>
+
+    <div id="income-overlay" class="modal-overlay">
+        <div class="account-modal-content card">
+            <header style="display: flex; justify-content: space-between; margin-bottom: 24px;"><h3>Add Income</h3><button class="close-modal-btn" onclick="closeIncomeModal()">✕</button></header>
+            <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Description</label><input type="text" id="inc-name" class="form-input" placeholder="e.g., Salary"></div>
+            <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Amount</label><input type="number" id="inc-amount" class="form-input" placeholder="0.00" step="0.01"></div>
+            <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Category</label><select id="inc-category" class="form-input"><option value="INCOME">General Income</option><option value="SALARY">Salary</option><option value="BONUS">Bonus</option><option value="FREELANCE">Freelance</option><option value="INVESTMENT">Investment Returns</option></select></div>
+            <div class="form-group" style="margin-bottom: 24px;"><label class="text-muted">Notes</label><input type="text" id="inc-notes" class="form-input" placeholder="Additional notes..."></div>
+            <button id="save-income-btn" class="primary-btn" style="width: 100%;">Save Income</button>
+        </div>
+    </div>
+
+    <div id="delete-account-overlay" class="modal-overlay">
+        <div class="account-modal-content card">
+            <header style="display: flex; justify-content: space-between; margin-bottom: 24px;"><h3>Delete Account?</h3><button class="close-modal-btn" onclick="window.cancelDeleteAccount()">✕</button></header>
+            <p class="text-muted" style="margin-bottom: 24px;">This will permanently remove this account. This action cannot be undone.</p>
+            <div style="display: flex; gap: 12px;">
+                <button onclick="window.cancelDeleteAccount()" class="secondary-btn" style="flex: 1;">Cancel</button>
+                <button onclick="window.confirmDeleteAccount()" class="primary-btn" style="flex: 1; background-color: var(--accent-red);">Delete</button>
+            </div>
+        </div>
     </div>
 
     <div id="receipt-overlay" class="modal-overlay">
@@ -343,8 +489,9 @@
     <div id="account-overlay" class="modal-overlay">
         <div class="account-modal-content card">
             <header style="display: flex; justify-content: space-between; margin-bottom: 24px;"><h3>Add Account</h3><button class="close-modal-btn" onclick="closeAccountModal()">✕</button></header>
-            <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Account Name</label><input type="text" id="acc-name" class="form-input" placeholder="e.g., BPI Savings"></div>
-            <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Type</label><select id="acc-type" class="form-input"><option value="bank">Bank / E-Wallet</option><option value="investment">Investment</option></select></div>
+            <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Account Name</label><input type="text" id="acc-name" class="form-input" placeholder="e.g., MariBank"></div>
+            <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Type</label><select id="acc-type" class="form-input"><option value="bank">Bank / E-Wallet</option><option value="onhand">On-hand Cash</option><option value="investment">Investment</option><option value="custom">Custom</option></select></div>
+            <div class="form-group" style="margin-bottom: 16px; display: none;" id="custom-type-group"><label class="text-muted">Custom Type</label><input type="text" id="acc-custom-type" class="form-input" placeholder="e.g., Crypto Wallet"></div>
             <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Balance</label><input type="number" id="acc-balance" class="form-input" placeholder="0.00"></div>
             <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Theme Color</label><input type="color" id="acc-color" class="form-input" value="#00D26A" style="height: 48px; padding: 4px;"></div>
             <div class="form-group" style="margin-bottom: 24px;"><label class="text-muted">Note</label><input type="text" id="acc-note" class="form-input" placeholder="e.g., Emergency Fund"></div>
@@ -355,8 +502,8 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
-    
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" defer></script>
+    
     <script src="js/state.js" defer></script>
     <script src="js/charts.js" defer></script>
     <script src="js/app.js" defer></script>

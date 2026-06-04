@@ -154,6 +154,109 @@ window.setupReceiptListeners = () => {
     });
 };
 
+window.dashboardChartInst = null;
+
+window.renderDashboardInsights = () => {
+    if (typeof Chart === 'undefined') {
+        setTimeout(window.renderDashboardInsights, 500);
+        return;
+    }
+
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+    
+    // --- 1. Expense Distribution (Doughnut Chart) ---
+    const recentExpenses = window.appData.filter(e => new Date(e.timestamp) >= thirtyDaysAgo && e.amount < 0);
+    const categoryTotals = {};
+    
+    recentExpenses.forEach(e => {
+        const cat = e.category || 'Uncategorized';
+        categoryTotals[cat] = (categoryTotals[cat] || 0) + Math.abs(e.amount);
+    });
+
+    const ctx = document.getElementById('dashboardExpenseChart');
+    if (ctx) {
+        if (window.dashboardChartInst) window.dashboardChartInst.destroy();
+        
+        const sortedCats = Object.keys(categoryTotals).sort((a,b) => categoryTotals[b] - categoryTotals[a]);
+        const sortedData = sortedCats.map(c => categoryTotals[c]);
+        const isDark = document.body.classList.contains('dark-theme');
+        const textColor = isDark ? '#FFFFFF' : '#111111';
+        const palette = ['#FF4A4A', '#FFA800', '#FFCD00', '#3A5DFF', '#6E4BFF', '#26D9B0', '#9FA1A6'];
+
+        window.dashboardChartInst = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: sortedCats.length ? sortedCats : ['No Data'],
+                datasets: [{
+                    data: sortedData.length ? sortedData : [1],
+                    backgroundColor: sortedData.length ? palette : [isDark ? '#2C2C2C' : '#ECECEC'],
+                    borderWidth: 0,
+                    cutout: '70%'
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right', labels: { color: textColor, font: { family: "'DM Sans', sans-serif", size: 11 }, boxWidth: 12 } },
+                    tooltip: { callbacks: { label: function(c) { return sortedData.length ? ` ${window.formatMoney(c.raw)}` : ' No Data'; } } }
+                }
+            }
+        });
+    }
+
+    // --- 2. Weekly Budget Briefer ---
+    const budgetContainer = document.getElementById('dashboard-weekly-budget-container');
+    if (!budgetContainer) return;
+
+    // Calculate start of current week (Monday)
+    const day = now.getDay() || 7; 
+    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day + 1);
+    weekStart.setHours(0,0,0,0);
+
+    let weeklyIncome = 0;
+    const weeklySpent = {};
+    
+    window.appData.filter(e => new Date(e.timestamp) >= weekStart).forEach(e => {
+        if (e.amount > 0) weeklyIncome += e.amount;
+        else if (e.amount < 0) {
+            const cat = (e.category || 'Uncategorized').toUpperCase();
+            weeklySpent[cat] = (weeklySpent[cat] || 0) + Math.abs(e.amount);
+        }
+    });
+
+    if (weeklyIncome === 0) {
+        budgetContainer.innerHTML = '<p class="text-muted" style="text-align:center; padding: 24px 0; font-size: 13px;">No income recorded this week to budget against.</p>';
+        return;
+    }
+
+    budgetContainer.innerHTML = window.userSettings.categories.map(cat => {
+        const allocated = weeklyIncome * (cat.percent / 100);
+        if (allocated === 0) return ''; 
+        
+        const spent = weeklySpent[cat.name.toUpperCase()] || 0;
+        const pct = (spent / allocated) * 100;
+        const over = pct > 100;
+        const color = over ? 'var(--accent-red)' : 'var(--primary)';
+        
+        const remaining = allocated - spent;
+        const remainingText = remaining >= 0 
+            ? `<span style="font-weight:400; color:var(--text-secondary)">left:</span> ${window.formatMoney(remaining)}` 
+            : `<span style="font-weight:400; color:var(--text-secondary)">over:</span> ${window.formatMoney(Math.abs(remaining))}`;
+        
+        return `
+            <div style="margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px;">
+                    <span style="font-weight: 600;">${cat.name} <span style="color:var(--text-secondary); font-weight:400">(${cat.percent}%)</span></span>
+                    <span style="font-weight: 700; color: ${color};">${remainingText}</span>
+                </div>
+                <div style="width: 100%; height: 6px; background-color: var(--border); border-radius: 4px; overflow: hidden;">
+                    <div style="height: 100%; width: ${Math.min(pct, 100)}%; background-color: ${color}; transition: width 0.3s ease;"></div>
+                </div>
+            </div>`;
+    }).join('');
+};
+
 window.updateDashboard = () => {
     const recentLogs = document.getElementById('recent-logs-list');
     if(!recentLogs) return;
@@ -205,6 +308,9 @@ window.updateDashboard = () => {
     if(balEl) balEl.innerText = `${displayTotal < 0 ? '-' : ''}${window.formatMoney(displayTotal)}`;
     
     recentLogs.innerHTML = sortedData.slice(0, 5).map(window.generateTxHTML).join('');
+    
+    // NEW: Trigger Dashboard Widgets
+    if (window.renderDashboardInsights) window.renderDashboardInsights();
 };
 
 window.activeCategoryFilters = new Set();

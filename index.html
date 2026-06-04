@@ -43,8 +43,8 @@
                         <div style="display:flex; justify-content:center; margin-bottom: 24px;">
                             <img src="logo.png" alt="Renz-bot Finance Logo" class="landing-logo" style="max-width: 200px; height: auto;">
                         </div>
-                        <h1 style="font-size: 56px; font-weight: 700; letter-spacing: -2px; margin-bottom: 16px;">Master your wealth.</h1>
-                        <p class="text-muted" style="font-size: 18px; margin-bottom: 48px; line-height: 1.6;">A modern, intelligent financial operating system. Track budgets, analyze cash flow, and manage multiple accounts with seamless cloud sync.</p>
+                        <h1 style="font-size: 56px; font-weight: 700; letter-spacing: -2px; margin-bottom: 16px;">sum random renzbot shi.</h1>
+                        <p class="text-muted" style="font-size: 18px; margin-bottom: 48px; line-height: 1.6;">A financial management tool. Track budgets, analyze cash flow, and manage multiple accounts with seamless cloud sync.</p>
                         
                         <button id="discord-login-btn" class="primary-btn" style="font-size: 18px; padding: 16px 40px; background-color: #5865F2; color: white;">
                             Login with Discord
@@ -156,6 +156,32 @@
                             <span>More</span>
                         </button>
                     </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; margin-bottom: 24px;">
+                    
+                    <!-- 1. Expense Distribution -->
+                    <div class="card">
+                        <div class="card-header" style="margin-bottom: 8px;">
+                            <h3>Expense Distribution</h3>
+                            <p class="text-muted" style="font-size: 12px;">Last 30 Days</p>
+                        </div>
+                        <div style="position: relative; height: 220px; width: 100%; display: flex; justify-content: center;">
+                            <canvas id="dashboardExpenseChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- 2. Weekly Budget Briefer -->
+                    <div class="card">
+                        <div class="card-header" style="margin-bottom: 16px;">
+                            <h3>Weekly Budget</h3>
+                            <p class="text-muted" style="font-size: 12px;">Current Week</p>
+                        </div>
+                        <div id="dashboard-weekly-budget-container" style="max-height: 200px; overflow-y: auto; padding-right: 8px;">
+                            <p class="text-muted" style="font-size: 13px;">Loading budget...</p>
+                        </div>
+                    </div>
+
                 </div>
 
                 <div class="card">

@@ -30,31 +30,50 @@ window.formatListDate = (dateStr) => {
 };
 
 window.initApp = async () => {
+    window.supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+            window.currentUser = session.user;
+            await handleUserRouting();
+        } else if (event === 'SIGNED_OUT') {
+            window.currentUser = null;
+            document.getElementById('main-sidebar').style.display = 'none';
+            window.switchView('landing');
+        }
+    });
+
+    // check for returning users who already have a session active
     const { data: { session } } = await window.supabase.auth.getSession();
     
     if (session) {
         window.currentUser = session.user;
-        
-        // Check if user has claimed a username
-        const { data: profile } = await window.supabase.from('profiles').select('*').eq('id', window.currentUser.id).single();
-        
-        if (!profile || !profile.username) {
-            window.switchView('username-setup');
-        } else {
-            window.userProfile = profile;
-            document.getElementById('main-sidebar').style.display = 'flex';
-            await loadCloudData();
-            window.switchView('dashboard');
-            if (window.bootUI) window.bootUI();
-        }
+        await handleUserRouting();
     } else {
         document.getElementById('main-sidebar').style.display = 'none';
         window.switchView('landing');
     }
 };
 
+// Helper function to handle routing to username setup or dashboard
+async function handleUserRouting() {
+    const { data: profile } = await window.supabase.from('profiles').select('*').eq('id', window.currentUser.id).single();
+        
+    if (!profile || !profile.username) {
+        window.switchView('username-setup');
+    } else {
+        window.userProfile = profile;
+        document.getElementById('main-sidebar').style.display = 'flex';
+        await loadCloudData();
+        window.switchView('dashboard');
+        if (window.bootUI) window.bootUI();
+    }
+}
+
 window.loginWithDiscord = async () => {
-    await window.supabase.auth.signInWithOAuth({ provider: 'discord', options: { redirectTo: window.location.origin } });
+    const exactRedirectUrl = window.location.origin + window.location.pathname;
+    await window.supabase.auth.signInWithOAuth({ 
+        provider: 'discord', 
+        options: { redirectTo: exactRedirectUrl } 
+    });
 };
 
 window.logout = async () => {

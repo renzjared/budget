@@ -261,12 +261,16 @@ async function loadCloudData() {
     const { data: set } = await window.supabase.from('settings').select('*').eq('user_id', uid).single();
     if (set) {
         window.userSettings = {
-            name: set.name || 'User', balance: parseFloat(set.balance) || 0, 
+            balance: parseFloat(set.balance) || 0, 
             currency: (set.currency && set.currency !== 'undefined') ? set.currency : '₱',
-            metric: set.metric || 'running', theme: set.theme || 'light', 
-            budgetCycle: set.budget_cycle || 'monthly', categories: set.categories || [],
+            metric: set.metric || 'running', 
+            theme: set.theme || 'light', 
+            budgetCycle: set.budget_cycle || 'monthly', 
+            categories: set.categories || [],
             incomeCategories: set.income_categories || ['SALARY', 'ALLOWANCE', 'BONUS'],
-            typeOrder: set.type_order || [],
+            
+            // THIS UNPACKS IT ON REFRESH:
+            typeOrder: set.type_order || [], 
             goalAllocations: set.goal_allocations || {}
         };
     }
@@ -275,7 +279,17 @@ async function loadCloudData() {
     }
 
     // Load Accounts
-    const { data: accs } = await window.supabase.from('accounts').select('*').eq('user_id', uid);
+    // const { data: accs } = await window.supabase.from('accounts').select('*').eq('user_id', uid);
+    // window.accountsData = (accs || []).map(acc => ({
+    //     ...acc,
+    //     customType: acc.custom_type || undefined
+    // }));
+    const { data: accs } = await window.supabase
+        .from('accounts')
+        .select('*')
+        .eq('user_id', uid)
+        .order('sort_order', { ascending: true }); // <-- Add this sorting rule
+
     window.accountsData = (accs || []).map(acc => ({
         ...acc,
         customType: acc.custom_type || undefined
@@ -324,7 +338,6 @@ async function loadCloudData() {
 window.saveSettingsToCloud = async () => {
     const payload = {
         user_id: window.currentUser.id,
-        name: window.userSettings.name,
         balance: window.userSettings.balance,
         currency: window.userSettings.currency,
         metric: window.userSettings.metric,
@@ -332,10 +345,17 @@ window.saveSettingsToCloud = async () => {
         budget_cycle: window.userSettings.budgetCycle,
         categories: window.userSettings.categories,
         income_categories: window.userSettings.incomeCategories,
-        type_order: window.userSettings.typeOrder || [],
-        goal_allocations: window.userSettings.goalAllocations || {}
+        type_order: window.userSettings.typeOrder, 
+        goal_allocations: window.userSettings.goalAllocations
     };
-    await window.supabase.from('settings').upsert(payload);
+    
+    const { error } = await window.supabase.from('settings').upsert(payload, { onConflict: 'user_id' });
+    
+    if (error) {
+        console.error("Cloud Save Error:", error);
+    } else {
+        console.log("Settings successfully saved to cloud!", payload.type_order);
+    }
 };
 
 window.generateUUID = () => {
@@ -374,7 +394,7 @@ window.saveAccountsToCloud = async () => {
         }
         
         // Upsert remaining accounts
-        const payload = window.accountsData.map(a => ({
+        const payload = window.accountsData.map((a, index) => ({ // <-- Add 'index' here
             id: a.id || window.generateUUID(),
             user_id: window.currentUser.id,
             name: a.name,
@@ -384,7 +404,8 @@ window.saveAccountsToCloud = async () => {
             note: a.note,
             favorite: a.favorite || false,
             currency: a.currency || '',
-            custom_type: a.customType || null
+            custom_type: a.customType || null,
+            sort_order: index
         }));
         
         const { error } = await window.supabase

@@ -566,153 +566,137 @@ window.closeEditTransactionModal = () => {
 };
 
 window.setupAccountDragDrop = () => {
-    const container = document.getElementById('accounts-container');
-    if (!container) return;
-
-    let draggedItem = null;
-    let draggedType = null; // Will be either 'section' or 'card'
-
-    // ==========================================
-    // 1. Setup Section Dragging (Reordering Categories)
-    // ==========================================
-    const sections = container.querySelectorAll('.account-type-section');
-    sections.forEach(section => {
-        // Only allow dragging by the header to prevent accidental drags
-        const header = section.querySelector('.type-header-drag');
-        if (header) {
-            header.addEventListener('mousedown', () => section.setAttribute('draggable', 'true'));
-            header.addEventListener('mouseup', () => section.setAttribute('draggable', 'false'));
-            header.addEventListener('mouseleave', () => section.setAttribute('draggable', 'false'));
-        }
-
-        section.addEventListener('dragstart', (e) => {
-            // Ignore if the user is actually dragging a card inside the section
-            if (e.target.classList.contains('account-card')) return; 
-            
-            draggedItem = section;
-            draggedType = 'section';
+    let draggedElement = null;
+    let draggedType = null;
+    
+    const handleDragStart = (e) => {
+        draggedElement = e.target.closest('[draggable="true"]');
+        if (!draggedElement) return;
+        
+        e.stopPropagation(); // Prevent card drags from dragging the section
+        
+        draggedType = draggedElement.getAttribute('data-type');
+        const accountIndex = draggedElement.getAttribute('data-account-index');
+        
+        if (accountIndex !== null) {
             e.dataTransfer.effectAllowed = 'move';
-            // Slight delay prevents the browser drag ghost from being transparent
-            setTimeout(() => section.style.opacity = '0.4', 0); 
-            e.stopPropagation();
-        });
-
-        section.addEventListener('dragend', async (e) => {
-            if (draggedType !== 'section' || !draggedItem) return;
-            draggedItem.style.opacity = '1';
-            section.setAttribute('draggable', 'false');
-
-            // Map the new DOM order to your settings array
-            const currentSections = Array.from(container.querySelectorAll('.account-type-section'));
-            const newOrder = currentSections.map(sec => sec.getAttribute('data-type'));
-            
-            window.userSettings.typeOrder = newOrder;
-            await window.saveSettingsToCloud();
-            
-            draggedItem = null;
-            draggedType = null;
-        });
-    });
-
-    // Drop zone for sections (the main container)
-    container.addEventListener('dragover', (e) => {
-        if (draggedType === 'section') {
-            e.preventDefault();
-            const afterElement = getDragAfterElement(container, e.clientY, '.account-type-section');
-            if (afterElement == null) {
-                container.appendChild(draggedItem);
-            } else {
-                container.insertBefore(draggedItem, afterElement);
-            }
-        }
-    });
-
-    // ==========================================
-    // 2. Setup Card Dragging (Reordering & Moving Accounts)
-    // ==========================================
-    const cards = container.querySelectorAll('.account-card');
-    cards.forEach(card => {
-        card.addEventListener('dragstart', (e) => {
-            draggedItem = card;
-            draggedType = 'card';
+            e.dataTransfer.setData('accountIndex', accountIndex);
+            draggedElement.style.opacity = '0.5';
+        } else {
             e.dataTransfer.effectAllowed = 'move';
-            setTimeout(() => card.style.opacity = '0.4', 0);
-            e.stopPropagation(); // Prevents triggering the section drag
-        });
-
-        card.addEventListener('dragend', async (e) => {
-            if (draggedType !== 'card' || !draggedItem) return;
-            draggedItem.style.opacity = '1';
-
-            const targetGrid = draggedItem.closest('.account-type-grid');
-            if (targetGrid) {
-                const newTypeRaw = targetGrid.getAttribute('data-type');
-                const originalIndex = parseInt(draggedItem.getAttribute('data-account-index'));
+            e.dataTransfer.setData('typeSection', draggedType);
+            draggedElement.style.opacity = '0.5';
+        }
+    };
+    
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const overElement = e.target.closest('[draggable="true"]');
+        if (overElement && overElement !== draggedElement) {
+            overElement.style.opacity = '0.6';
+        }
+    };
+    
+    const handleDragLeave = (e) => {
+        const overElement = e.target.closest('[draggable="true"]');
+        if (overElement && overElement !== draggedElement) {
+            overElement.style.opacity = '1';
+        }
+    };
+    
+    const handleDrop = async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const dropTarget = e.target.closest('[draggable="true"]');
+        if (!dropTarget || dropTarget === draggedElement) return;
+        
+        dropTarget.style.opacity = '1';
+        
+        const accountIndex = e.dataTransfer.getData('accountIndex');
+        const typeSection = e.dataTransfer.getData('typeSection');
+        
+        const targetAccountIndex = dropTarget.getAttribute('data-account-index');
+        const targetType = dropTarget.getAttribute('data-type') || dropTarget.closest('.account-type-section')?.getAttribute('data-type');
+        
+        // --- 1. Handle Account Card Drag ---
+        if (accountIndex) {
+            const draggedIdx = parseInt(accountIndex);
+            const targetIdx = parseInt(targetAccountIndex);
+            
+            if (!isNaN(draggedIdx)) {
+                const draggedAcc = window.accountsData[draggedIdx];
                 
-                // 1. Update the account's type if it was moved to a new section
-                if (newTypeRaw) {
-                    let parsedType = newTypeRaw;
+                if (targetType) {
+                    let parsedType = targetType;
                     let parsedCustom = '';
-                    if (newTypeRaw.startsWith('custom:')) {
+                    if (targetType.startsWith('custom:')) {
                         parsedType = 'custom';
-                        parsedCustom = newTypeRaw.substring(7);
+                        parsedCustom = targetType.substring(7);
                     }
-                    window.accountsData[originalIndex].type = parsedType;
-                    if (parsedCustom) window.accountsData[originalIndex].customType = parsedCustom;
+                    draggedAcc.type = parsedType;
+                    draggedAcc.customType = parsedCustom || null;
                 }
-                
-                // 2. Rebuild the accountsData array based on the new DOM order
-                const allDomCards = Array.from(document.querySelectorAll('.account-card'));
-                const orderedIndexes = allDomCards.map(c => parseInt(c.getAttribute('data-account-index')));
-                
-                const newAccountsData = orderedIndexes.map(idx => window.accountsData[idx]);
-                window.accountsData = newAccountsData;
-                
-                // 3. Save and re-render
-                await window.saveAccountsToCloud();
-                window.renderAccounts(); // Re-render to cleanly reset all the data-account-indexes
-            }
-            
-            draggedItem = null;
-            draggedType = null;
-        });
-    });
 
-    // Drop zones for cards (the individual grids inside sections)
-    const grids = container.querySelectorAll('.account-type-grid');
-    grids.forEach(grid => {
-        grid.addEventListener('dragover', (e) => {
-            if (draggedType === 'card') {
-                e.preventDefault();
-                const afterElement = getDragAfterElement(grid, e.clientY, '.account-card');
-                if (afterElement == null) {
-                    grid.appendChild(draggedItem);
+                window.accountsData.splice(draggedIdx, 1);
+                
+                if (!isNaN(targetIdx)) {
+                    // Fixes the off-by-one bug when dragging downwards
+                    const insertIdx = draggedIdx < targetIdx ? targetIdx - 1 : targetIdx;
+                    window.accountsData.splice(insertIdx, 0, draggedAcc);
                 } else {
-                    grid.insertBefore(draggedItem, afterElement);
+                    window.accountsData.push(draggedAcc); 
                 }
+                
+                await window.saveAccountsToCloud();
+                await window.renderAccounts();
             }
-        });
-    });
-
-    // ==========================================
-    // 3. Math Helper for Drop Placement
-    // ==========================================
-    function getDragAfterElement(parentContainer, y, selector) {
-        // Select all draggable elements that are NOT currently being dragged
-        const draggableElements = [...parentContainer.querySelectorAll(`${selector}:not([style*="opacity: 0.4"])`)];
-
-        return draggableElements.reduce((closest, child) => {
-            const box = child.getBoundingClientRect();
-            // Calculate distance between mouse cursor and center of the element
-            const offset = y - box.top - box.height / 2;
+        }
+        // --- 2. Handle Type Section Drag ---
+        else if (typeSection && targetType) {
+            // Read the absolute DOM order to avoid array-splicing mistakes
+            const currentDOMOrder = Array.from(document.querySelectorAll('.account-type-section')).map(el => el.getAttribute('data-type'));
+            const draggedTypeIdx = currentDOMOrder.indexOf(typeSection);
+            const targetTypeIdx = currentDOMOrder.indexOf(targetType);
             
-            if (offset < 0 && offset > closest.offset) {
-                return { offset: offset, element: child };
-            } else {
-                return closest;
+            if (draggedTypeIdx !== -1 && targetTypeIdx !== -1 && draggedTypeIdx !== targetTypeIdx) {
+                // Move visually in the DOM first
+                const draggedNode = document.querySelector(`.account-type-section[data-type="${typeSection}"]`);
+                const targetNode = document.querySelector(`.account-type-section[data-type="${targetType}"]`);
+                
+                if (draggedNode && targetNode) {
+                    const parent = targetNode.parentNode;
+                    if (draggedTypeIdx < targetTypeIdx) {
+                        parent.insertBefore(draggedNode, targetNode.nextSibling);
+                    } else {
+                        parent.insertBefore(draggedNode, targetNode);
+                    }
+                }
+                
+                // Record the final exact visual order and save to cloud
+                window.userSettings.typeOrder = Array.from(document.querySelectorAll('.account-type-section')).map(el => el.getAttribute('data-type'));
+                
+                await window.saveSettingsToCloud();
+                await window.renderAccounts();
             }
-        }, { offset: Number.NEGATIVE_INFINITY }).element;
-    }
+        }
+    };
+    
+    const handleDragEnd = (e) => {
+        document.querySelectorAll('[draggable="true"]').forEach(el => {
+            el.style.opacity = '1';
+        });
+        draggedElement = null;
+    };
+    
+    document.querySelectorAll('[draggable="true"]').forEach(el => {
+        el.addEventListener('dragstart', handleDragStart, false);
+        el.addEventListener('dragover', handleDragOver, false);
+        el.addEventListener('dragleave', handleDragLeave, false);
+        el.addEventListener('drop', handleDrop, false);
+        el.addEventListener('dragend', handleDragEnd, false);
+    });
 };
 
 window.saveTransactionEdit = async () => {
@@ -922,9 +906,16 @@ window.renderAccounts = async () => {
     const defaultOrder = ['bank', 'onhand', 'investment'];
     const allTypes = Object.keys(groupedByType);
     const customTypes = allTypes.filter(t => t.startsWith('custom:') || (!defaultOrder.includes(t) && !['bank', 'onhand', 'investment'].includes(t)));
-    
-    // Initialize typeOrder if not set
-    if (!window.userSettings.typeOrder || window.userSettings.typeOrder.length === 0) {
+    if (typeof window.userSettings.typeOrder === 'string') {
+        try {
+            window.userSettings.typeOrder = JSON.parse(window.userSettings.typeOrder);
+        } catch (e) {
+            window.userSettings.typeOrder = []; // fallback if parsing fails
+        }
+    }
+
+    // 2. Fallback: if it is still not a valid array, or is empty, generate the default order
+    if (!Array.isArray(window.userSettings.typeOrder) || window.userSettings.typeOrder.length === 0) {
         window.userSettings.typeOrder = [...defaultOrder.filter(t => allTypes.includes(t)), ...customTypes.sort()];
     }
     
@@ -1196,6 +1187,9 @@ window.setupAccountDragDrop = () => {
         draggedElement = e.target.closest('[draggable="true"]');
         if (!draggedElement) return;
         
+        // Prevent the drag event from bubbling up to the parent section
+        e.stopPropagation(); 
+        
         draggedType = draggedElement.getAttribute('data-type');
         const accountIndex = draggedElement.getAttribute('data-account-index');
         
@@ -1215,7 +1209,7 @@ window.setupAccountDragDrop = () => {
         e.dataTransfer.dropEffect = 'move';
         const overElement = e.target.closest('[draggable="true"]');
         if (overElement && overElement !== draggedElement) {
-            overElement.style.opacity = '0.8';
+            overElement.style.opacity = '0.6';
         }
     };
     
@@ -1233,37 +1227,59 @@ window.setupAccountDragDrop = () => {
         const dropTarget = e.target.closest('[draggable="true"]');
         if (!dropTarget || dropTarget === draggedElement) return;
         
+        dropTarget.style.opacity = '1';
+        
         const accountIndex = e.dataTransfer.getData('accountIndex');
         const typeSection = e.dataTransfer.getData('typeSection');
-        const targetAccountIndex = dropTarget.getAttribute('data-account-index');
-        const targetType = dropTarget.getAttribute('data-account-type');
         
-        // Handle account card drag (reorder within or between types)
+        const targetAccountIndex = dropTarget.getAttribute('data-account-index');
+        
+        // Safely get the type of the section, whether we dropped on a card or the section header
+        const targetType = dropTarget.getAttribute('data-type') || dropTarget.closest('.account-type-section')?.getAttribute('data-type');
+        
+        // --- 1. Handle Account Card Drag ---
         if (accountIndex) {
             const draggedIdx = parseInt(accountIndex);
             const targetIdx = parseInt(targetAccountIndex);
             
-            if (!isNaN(draggedIdx) && !isNaN(targetIdx) && draggedIdx !== targetIdx) {
+            if (!isNaN(draggedIdx)) {
                 const draggedAcc = window.accountsData[draggedIdx];
+                
+                // If dragged to a different type section, update the account's type
+                if (targetType) {
+                    let parsedType = targetType;
+                    let parsedCustom = '';
+                    if (targetType.startsWith('custom:')) {
+                        parsedType = 'custom';
+                        parsedCustom = targetType.substring(7);
+                    }
+                    draggedAcc.type = parsedType;
+                    draggedAcc.customType = parsedCustom || null;
+                }
+
+                // Remove from original position
                 window.accountsData.splice(draggedIdx, 1);
-                const insertIdx = draggedIdx < targetIdx ? targetIdx - 1 : targetIdx;
-                window.accountsData.splice(insertIdx, 0, draggedAcc);
+                
+                // Insert at new position
+                if (!isNaN(targetIdx)) {
+                    window.accountsData.splice(targetIdx, 0, draggedAcc);
+                } else {
+                    window.accountsData.push(draggedAcc); // Appended if dropped directly on a section header
+                }
                 
                 await window.saveAccountsToCloud();
                 await window.renderAccounts();
             }
         }
-        // Handle type section drag (reorder types)
+        // --- 2. Handle Type Section Drag ---
         else if (typeSection && targetType) {
             const draggedTypeIdx = window.userSettings.typeOrder.indexOf(typeSection);
             const targetTypeIdx = window.userSettings.typeOrder.indexOf(targetType);
             
             if (draggedTypeIdx !== -1 && targetTypeIdx !== -1 && draggedTypeIdx !== targetTypeIdx) {
-                // Remove dragged type
+                // Remove the section and insert it exactly at the target index
                 const draggedTypeValue = window.userSettings.typeOrder.splice(draggedTypeIdx, 1)[0];
-                // Insert at target position
-                const insertIdx = draggedTypeIdx < targetTypeIdx ? targetTypeIdx - 1 : targetTypeIdx;
-                window.userSettings.typeOrder.splice(insertIdx, 0, draggedTypeValue);
+                window.userSettings.typeOrder.splice(targetTypeIdx, 0, draggedTypeValue);
                 
                 await window.saveSettingsToCloud();
                 await window.renderAccounts();

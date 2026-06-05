@@ -451,6 +451,31 @@ window.saveGoalsToCloud = async () => {
     if (!window.currentUser?.id) return;
     
     try {
+        // Get all existing goals from Supabase
+        const { data: existingGoals } = await window.supabase
+            .from('goals')
+            .select('id')
+            .eq('user_id', window.currentUser.id);
+        
+        const existingIds = new Set(existingGoals?.map(g => g.id) || []);
+        const localIds = new Set(window.userGoals.map(g => g.id).filter(Boolean));
+        
+        // Delete goals that exist in Supabase but not in local array
+        const idsToDelete = Array.from(existingIds).filter(id => !localIds.has(id));
+        if (idsToDelete.length > 0) {
+            await window.supabase
+                .from('goals')
+                .delete()
+                .in('id', idsToDelete);
+        }
+        
+        // If no goals left, delete all
+        if (window.userGoals.length === 0) {
+            await window.supabase.from('goals').delete().eq('user_id', window.currentUser.id);
+            return;
+        }
+        
+        // Upsert remaining goals
         const goalsToSave = window.userGoals.map(g => ({
             id: g.id,
             user_id: window.currentUser.id,
@@ -461,12 +486,12 @@ window.saveGoalsToCloud = async () => {
             theme_color: g.theme_color,
             status: g.status
         }));
-        
+
         // Use upsert to handle both inserts and updates
         const { error } = await window.supabase
             .from('goals')
             .upsert(goalsToSave);
-        
+
         if (error) throw error;
         console.log('Goals saved successfully');
     } catch (err) {
@@ -603,6 +628,31 @@ window.saveSubscriptionsToCloud = async () => {
     if (!window.currentUser?.id) return;
     
     try {
+        // Get all existing subscriptions from Supabase
+        const { data: existingSubs } = await window.supabase
+            .from('subscriptions')
+            .select('id')
+            .eq('user_id', window.currentUser.id);
+        
+        const existingIds = new Set(existingSubs?.map(s => s.id) || []);
+        const localIds = new Set(window.userSubscriptions.map(s => s.id).filter(Boolean));
+        
+        // Delete subscriptions that exist in Supabase but not in local array
+        const idsToDelete = Array.from(existingIds).filter(id => !localIds.has(id));
+        if (idsToDelete.length > 0) {
+            await window.supabase
+                .from('subscriptions')
+                .delete()
+                .in('id', idsToDelete);
+        }
+        
+        // If no subscriptions left, delete all
+        if (window.userSubscriptions.length === 0) {
+            await window.supabase.from('subscriptions').delete().eq('user_id', window.currentUser.id);
+            return;
+        }
+        
+        // Upsert remaining subscriptions
         const subsToSave = window.userSubscriptions.map(s => ({
             id: s.id,
             user_id: window.currentUser.id,

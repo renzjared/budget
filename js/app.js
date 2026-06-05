@@ -1015,6 +1015,7 @@ window.renderSubscriptions = async () => {
                     <div>
                         <h3 style="margin: 0 0 4px 0;">${sub.name}</h3>
                         <span style="font-size: 12px; color: var(--text-secondary);">${sub.category}</span>
+                        ${sub.notes ? `<div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">📝 ${sub.notes}</div>` : ''}
                     </div>
                     <span style="font-weight: 600; color: ${statusColor}; font-size: 12px;">${statusText}</span>
                 </div>
@@ -1358,6 +1359,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('sub-category').value = sub.category;
                 document.getElementById('sub-cycle').value = sub.billing_cycle;
                 document.getElementById('sub-next-date').value = sub.next_billing_date;
+                document.getElementById('sub-notes').value = sub.notes || '';
                 document.getElementById('sub-auto-log').checked = sub.auto_log;
                 deleteBtn.style.display = 'block';
                 deleteBtn.onclick = () => window.deleteSubscription(subId);
@@ -1369,6 +1371,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('sub-category').value = '';
             document.getElementById('sub-cycle').value = 'Monthly';
             document.getElementById('sub-next-date').value = '';
+            document.getElementById('sub-notes').value = '';
             document.getElementById('sub-auto-log').checked = false;
             deleteBtn.style.display = 'none';
         }
@@ -1960,6 +1963,7 @@ document.addEventListener('DOMContentLoaded', () => {
             category: document.getElementById('sub-category').value,
             billing_cycle: document.getElementById('sub-cycle').value,
             next_billing_date: document.getElementById('sub-next-date').value,
+            notes: document.getElementById('sub-notes').value,
             auto_log: document.getElementById('sub-auto-log').checked
         };
         

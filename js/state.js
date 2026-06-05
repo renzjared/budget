@@ -611,6 +611,7 @@ window.saveSubscriptionsToCloud = async () => {
             category: s.category,
             billing_cycle: s.billing_cycle,
             next_billing_date: s.next_billing_date,
+            notes: s.notes || '',
             auto_log: s.auto_log
         }));
         

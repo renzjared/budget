@@ -26,6 +26,12 @@
                 <button class="nav-btn" data-target="logs">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg> Activity
                 </button>
+                <button class="nav-btn" data-target="goals">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="1"></circle><path d="M12 9v6m-3-3h6"></path><circle cx="12" cy="12" r="9"></circle></svg> Goals
+                </button>
+                <button class="nav-btn" data-target="subscriptions">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M2 10h20"></path></svg> Subscriptions
+                </button>
                 <button class="nav-btn" data-target="import">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg> Sync Data
                 </button>
@@ -182,6 +188,34 @@
                         </div>
                     </div>
 
+                    <!-- 3. Goals Progress Widget -->
+                    <div class="card" id="dashboard-goals-widget" style="display: none;">
+                        <div class="card-header" style="margin-bottom: 16px; display: flex; justify-content: space-between;">
+                            <div>
+                                <h3>Savings Goals</h3>
+                                <p class="text-muted" style="font-size: 12px;">Your Progress</p>
+                            </div>
+                            <button onclick="window.switchView('goals')" class="text-btn" style="font-size: 12px; padding: 4px 8px;">View All →</button>
+                        </div>
+                        <div id="dashboard-goals-list" style="max-height: 240px; overflow-y: auto; padding-right: 8px;">
+                            <!-- Goals render here -->
+                        </div>
+                    </div>
+
+                    <!-- 4. Upcoming Subscriptions Timeline Widget -->
+                    <div class="card" id="dashboard-upcoming-subs-widget" style="display: none;">
+                        <div class="card-header" style="margin-bottom: 16px; display: flex; justify-content: space-between;">
+                            <div>
+                                <h3>Upcoming Subscriptions</h3>
+                                <p class="text-muted" style="font-size: 12px;">Next 14 Days</p>
+                            </div>
+                            <button onclick="window.switchView('subscriptions')" class="text-btn" style="font-size: 12px; padding: 4px 8px;">View All →</button>
+                        </div>
+                        <div id="dashboard-upcoming-subs-timeline" style="max-height: 240px; overflow-y: auto; padding-right: 8px;">
+                            <!-- Timeline renders here -->
+                        </div>
+                    </div>
+
                 </div>
 
                 <div class="card">
@@ -194,14 +228,14 @@
             </section>
 
             <section id="accounts" class="view">
-                <header class="top-header" style="display: flex; justify-content: space-between; align-items: flex-end;">
+                <h2 style="margin-bottom: 24px;">My Accounts</h2>
+                <div class="dashboard-hero-card" style="text-align: left; padding: 32px 24px; display: flex; justify-content: space-between; align-items: center;">
                     <div>
-                        <h2 style="margin-bottom: 8px;">My Accounts</h2>
-                        <h1 id="accounts-total-balance" class="massive-balance" style="font-size: 32px;">₱0.00</h1>
-                        <p class="text-muted">Total Balance</p>
+                        <p class="text-muted" style="font-size: 14px; margin-bottom: 8px;">Total Balance</p>
+                        <h1 id="accounts-total-balance" class="massive-balance" style="font-size: 44px;">₱0.00</h1>
                     </div>
                     <button id="add-account-btn" class="primary-btn">+ Add Account</button>
-                </header>
+                </div>
                 <div id="accounts-container"></div>
             </section>
 
@@ -391,6 +425,12 @@
                         <label class="switch"><input type="checkbox" id="setting-theme"><span class="slider round"></span></label>
                     </div>
                     
+                    <div class="form-group" style="margin-top: 32px; padding: 24px; border: 1px solid var(--border); border-radius: 16px; background-color: var(--bg);">
+                        <h3 style="margin-bottom: 8px;">Savings Goals Allocation</h3>
+                        <p class="text-muted" style="font-size: 13px; margin-bottom: 16px;">Distribute your monthly savings across your goals.</p>
+                        <button id="allocate-goals-btn" class="primary-btn" style="width: 100%;">Allocate Savings to Goals</button>
+                    </div>
+
                     <button id="save-settings-btn" class="primary-btn" style="margin-top: 32px; width: 100%;">Save Cloud Settings</button>
                     <p id="settings-status" class="status-msg" style="margin-top: 16px; text-align: center;"></p>
 
@@ -399,6 +439,32 @@
                         <p class="text-muted" style="font-size: 13px; margin-bottom: 16px;">This action is irreversible. All transactions, accounts, and settings will be permanently deleted.</p>
                         <button id="clear-all-data-btn" class="secondary-btn" style="border-color: var(--accent-red); color: var(--accent-red); width: 100%;">Clear All Data</button>
                     </div>
+                </div>
+            </section>
+
+            <!-- Goals / Sinking Funds View -->
+            <section id="goals" class="view">
+                <header class="top-header">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h2>Savings Goals</h2>
+                        <button id="add-goal-btn" class="primary-btn" style="padding: 8px 16px; font-size: 14px;">+ New Goal</button>
+                    </div>
+                </header>
+                <div id="goals-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
+                    <!-- Goal cards render here -->
+                </div>
+            </section>
+
+            <!-- Subscriptions Manager View -->
+            <section id="subscriptions" class="view">
+                <header class="top-header">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h2>Subscriptions</h2>
+                        <button id="add-subscription-btn" class="primary-btn" style="padding: 8px 16px; font-size: 14px;">+ New Subscription</button>
+                    </div>
+                </header>
+                <div id="subscriptions-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px;">
+                    <!-- Subscription cards render here -->
                 </div>
             </section>
 
@@ -532,9 +598,73 @@
             <div class="form-group" style="margin-bottom: 16px; display: none;" id="custom-type-group"><label class="text-muted">Custom Type</label><input type="text" id="acc-custom-type" class="form-input" placeholder="e.g., Crypto Wallet"></div>
             <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Balance</label><input type="number" id="acc-balance" class="form-input" placeholder="0.00"></div>
             <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Theme Color</label><input type="color" id="acc-color" class="form-input" value="#00D26A" style="height: 48px; padding: 4px;"></div>
-            <div class="form-group" style="margin-bottom: 16px; display: flex; align-items: center;"><label class="text-muted" style="margin-bottom: 0; margin-right: 8px;">Favorite</label><input type="checkbox" id="acc-favorite" style="width: 18px; height: 18px; cursor: pointer;"></div>
-            <div class="form-group" style="margin-bottom: 24px;"><label class="text-muted">Note</label><input type="text" id="acc-note" class="form-input" placeholder="e.g., Emergency Fund"></div>
+            
+            <button id="acc-expand-btn" class="text-btn" style="margin-bottom: 16px; padding: 0; font-size: 14px;">+ More Options</button>
+            <div id="acc-expand-section" style="display: none; margin-bottom: 24px;">
+                <div class="form-group" style="margin-bottom: 16px; display: flex; align-items: center;"><label class="text-muted" style="margin-bottom: 0; margin-right: 8px;">Favorite</label><input type="checkbox" id="acc-favorite" style="width: 18px; height: 18px; cursor: pointer;"></div>
+                <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Currency (e.g., USD, EUR, BTC, GOOG)</label><input type="text" id="acc-currency" class="form-input" placeholder="Default: User currency" maxlength="10"></div>
+                <div class="form-group" style="margin-bottom: 0;"><label class="text-muted">Note</label><input type="text" id="acc-note" class="form-input" placeholder="e.g., Emergency Fund"></div>
+            </div>
+            
             <button id="save-account-btn" class="primary-btn" style="width: 100%;">Save Account</button>
+        </div>
+    </div>
+
+    <!-- Goal Modal -->
+    <div id="goal-overlay" class="modal-overlay">
+        <div class="account-modal-content card">
+            <header style="display: flex; justify-content: space-between; margin-bottom: 24px;"><h3 id="goal-modal-title">New Goal</h3><button class="close-modal-btn" onclick="closeGoalModal()">✕</button></header>
+            <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Goal Name</label><input type="text" id="goal-name" class="form-input" placeholder="e.g., Balcony Extension"></div>
+            <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Target Amount</label><input type="number" id="goal-target" class="form-input" placeholder="0.00" step="0.01"></div>
+            <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Current Amount</label><input type="number" id="goal-current" class="form-input" placeholder="0.00" step="0.01"></div>
+            <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Deadline (Optional)</label><input type="date" id="goal-deadline" class="form-input"></div>
+            <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Status</label><select id="goal-status" class="form-input"><option value="Active">Active</option><option value="Paused">Paused</option><option value="Completed">Completed</option></select></div>
+            <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Theme Color</label><input type="color" id="goal-color" class="form-input" value="#00D26A" style="height: 48px; padding: 4px;"></div>
+            <div style="display: flex; gap: 12px;">
+                <button id="delete-goal-btn" class="secondary-btn" style="flex: 1; border-color: var(--accent-red); color: var(--accent-red); display: none;">Delete</button>
+                <button id="save-goal-btn" class="primary-btn" style="flex: 1;">Save Goal</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Subscription Modal -->
+    <div id="subscription-overlay" class="modal-overlay">
+        <div class="account-modal-content card">
+            <header style="display: flex; justify-content: space-between; margin-bottom: 24px;"><h3 id="subscription-modal-title">New Subscription</h3><button class="close-modal-btn" onclick="closeSubscriptionModal()">✕</button></header>
+            <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Subscription Name</label><input type="text" id="sub-name" class="form-input" placeholder="e.g., AWS Hosting"></div>
+            <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Amount</label><input type="number" id="sub-amount" class="form-input" placeholder="0.00" step="0.01"></div>
+            <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Category</label><input type="text" id="sub-category" class="form-input" placeholder="e.g., Software"></div>
+            <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Billing Cycle</label><select id="sub-cycle" class="form-input"><option value="Monthly">Monthly</option><option value="Quarterly">Quarterly</option><option value="Yearly">Yearly</option></select></div>
+            <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Next Billing Date</label><input type="date" id="sub-next-date" class="form-input"></div>
+            <div class="form-group" style="margin-bottom: 16px; display: flex; align-items: center;"><label class="text-muted" style="margin-bottom: 0; margin-right: 8px;">Auto-log to Transactions</label><input type="checkbox" id="sub-auto-log" style="width: 18px; height: 18px; cursor: pointer;"></div>
+            <div style="display: flex; gap: 12px;">
+                <button id="delete-sub-btn" class="secondary-btn" style="flex: 1; border-color: var(--accent-red); color: var(--accent-red); display: none;">Delete</button>
+                <button id="save-sub-btn" class="primary-btn" style="flex: 1;">Save Subscription</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Goal Allocation Modal (for savings distribution) -->
+    <div id="goal-allocation-overlay" class="modal-overlay">
+        <div class="account-modal-content card">
+            <header style="display: flex; justify-content: space-between; margin-bottom: 24px;"><h3>Allocate Savings Across Goals</h3><button class="close-modal-btn" onclick="window.closeGoalAllocationModal()">✕</button></header>
+            <p class="text-muted" style="margin-bottom: 24px;">Distribute your monthly savings across your active goals. Set a percentage for each goal, and your savings will be automatically allocated.</p>
+            <div id="goal-allocation-list" style="margin-bottom: 24px;">
+                <!-- Goal allocation sliders render here -->
+            </div>
+            <div style="padding: 12px; background: var(--border); border-radius: 8px; margin-bottom: 24px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                    <span style="font-size: 14px;">Total Allocated</span>
+                    <span id="total-allocated-percent" style="font-weight: 600;">0%</span>
+                </div>
+                <div style="width: 100%; height: 6px; background: var(--text-secondary); border-radius: 3px; overflow: hidden; opacity: 0.3;">
+                    <div id="total-allocated-bar" style="height: 100%; width: 0%; background: var(--primary); transition: width 0.2s;"></div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 12px;">
+                <button onclick="window.equalSplitGoals()" class="secondary-btn" style="flex: 1;">Equal Split</button>
+                <button onclick="window.saveGoalAllocations()" class="primary-btn" style="flex: 1;">Save Allocations</button>
+            </div>
         </div>
     </div>
 

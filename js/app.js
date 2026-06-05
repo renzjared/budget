@@ -156,6 +156,136 @@ window.setupReceiptListeners = () => {
 
 window.dashboardChartInst = null;
 
+window.renderGoalsWidget = () => {
+    const container = document.getElementById('dashboard-goals-list');
+    const widget = document.getElementById('dashboard-goals-widget');
+    
+    console.log('renderGoalsWidget called');
+    console.log('userGoals:', window.userGoals);
+    console.log('Container found:', container ? 'YES' : 'NO');
+    console.log('Widget found:', widget ? 'YES' : 'NO');
+    
+    if (!container) return;
+    
+    if (!window.userGoals || window.userGoals.length === 0) {
+        console.log('No goals, hiding widget');
+        if (widget) widget.style.display = 'none';
+        return;
+    }
+    
+    const activeGoals = window.userGoals.filter(g => g.status === 'Active').slice(0, 3);
+    console.log('Active goals:', activeGoals.length);
+    
+    if (activeGoals.length === 0) {
+        console.log('No active goals, hiding widget');
+        if (widget) widget.style.display = 'none';
+        return;
+    }
+    
+    console.log('Showing widget with', activeGoals.length, 'goals');
+    if (widget) widget.style.display = 'block';
+    
+    container.innerHTML = activeGoals.map(goal => {
+        const progress = Math.min(100, (goal.current_amount / goal.target_amount) * 100);
+        const remaining = goal.target_amount - goal.current_amount;
+        return `
+            <div style="padding: 12px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.2s;" onclick="window.switchView('goals')" onmouseover="this.style.background='var(--border)'" onmouseout="this.style.background='transparent'">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-size: 13px; font-weight: 500;">${goal.name}</span>
+                    <span style="font-size: 12px; color: var(--text-secondary);">${Math.round(progress)}%</span>
+                </div>
+                <div style="width: 100%; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; margin-bottom: 6px;">
+                    <div style="height: 100%; width: ${progress}%; background: ${goal.theme_color}; transition: width 0.3s;"></div>
+                </div>
+                <div style="font-size: 11px; color: var(--text-secondary);">${window.formatMoney(goal.current_amount)} / ${window.formatMoney(goal.target_amount)}</div>
+            </div>
+        `;
+    }).join('');
+};
+
+// Phase 4: Upcoming Subscriptions Timeline Widget
+window.renderUpcomingSubscriptions = () => {
+    const container = document.getElementById('dashboard-upcoming-subs-timeline');
+    const widget = document.getElementById('dashboard-upcoming-subs-widget');
+    
+    console.log('renderUpcomingSubscriptions called');
+    console.log('userSubscriptions:', window.userSubscriptions);
+    console.log('Container found:', container ? 'YES' : 'NO');
+    console.log('Widget found:', widget ? 'YES' : 'NO');
+    
+    if (!container) return;
+    
+    if (!window.userSubscriptions || window.userSubscriptions.length === 0) {
+        console.log('No subscriptions, hiding widget');
+        if (widget) widget.style.display = 'none';
+        return;
+    }
+    
+    const today = new Date();
+    const twoWeeksFromNow = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000);
+    
+    const upcoming = window.userSubscriptions
+        .filter(sub => {
+            const billingDate = new Date(sub.next_billing_date);
+            return billingDate >= today && billingDate <= twoWeeksFromNow;
+        })
+        .sort((a, b) => new Date(a.next_billing_date) - new Date(b.next_billing_date));
+    
+    console.log('Upcoming subscriptions:', upcoming.length);
+    
+    if (upcoming.length === 0) {
+        console.log('No upcoming subscriptions, hiding widget');
+        if (widget) widget.style.display = 'none';
+        return;
+    }
+    
+    console.log('Showing widget with', upcoming.length, 'upcoming subs');
+    if (widget) widget.style.display = 'block';
+    
+    // Group by date
+    const grouped = {};
+    upcoming.forEach(sub => {
+        const date = sub.next_billing_date;
+        if (!grouped[date]) grouped[date] = [];
+        grouped[date].push(sub);
+    });
+    
+    let totalUpcoming = 0;
+    
+    container.innerHTML = Object.entries(grouped)
+        .map(([date, subs]) => {
+            const dateObj = new Date(date);
+            const daysUntil = Math.floor((dateObj - today) / (1000 * 60 * 60 * 24));
+            const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const dayLabel = daysUntil === 0 ? 'Today' : daysUntil === 1 ? 'Tomorrow' : `${daysUntil} days`;
+            
+            const dayTotal = subs.reduce((sum, s) => sum + Math.abs(s.amount), 0);
+            totalUpcoming += dayTotal;
+            
+            return `
+                <div style="padding: 12px; border-bottom: 1px solid var(--border);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 12px; font-weight: 600;">${dateStr} - ${dayLabel}</span>
+                        <span style="font-size: 12px; font-weight: 600; color: #f8715d;">${window.formatMoney(dayTotal)}</span>
+                    </div>
+                    <div style="font-size: 11px; color: var(--text-secondary);">
+                        ${subs.map(s => `<div style="padding: 2px 0; display: flex; justify-content: space-between;">
+                            <span>${s.name}</span>
+                            <span style="margin-left: 8px;">${s.auto_log ? '🔄' : '⏸'}</span>
+                        </div>`).join('')}
+                    </div>
+                </div>
+            `;
+        })
+        .join('');
+    
+    // Add total upcoming spend footer
+    const footer = document.createElement('div');
+    footer.style.cssText = 'padding: 12px; background: rgba(248, 113, 93, 0.05); border-radius: 6px; margin-top: 8px; text-align: center;';
+    footer.innerHTML = `<div style="font-size: 11px; color: var(--text-secondary);">Total upcoming (14 days): ${window.formatMoney(totalUpcoming)}</div>`;
+    container.appendChild(footer);
+};
+
 window.renderDashboardInsights = () => {
     if (typeof Chart === 'undefined') {
         setTimeout(window.renderDashboardInsights, 500);
@@ -308,6 +438,12 @@ window.updateDashboard = () => {
     if(balEl) balEl.innerText = `${displayTotal < 0 ? '-' : ''}${window.formatMoney(displayTotal)}`;
     
     recentLogs.innerHTML = sortedData.slice(0, 5).map(window.generateTxHTML).join('');
+    
+    // Render Goals Widget
+    if (window.renderGoalsWidget) window.renderGoalsWidget();
+    
+    // Render Upcoming Subscriptions Widget
+    if (window.renderUpcomingSubscriptions) window.renderUpcomingSubscriptions();
     
     // NEW: Trigger Dashboard Widgets
     if (window.renderDashboardInsights) window.renderDashboardInsights();
@@ -609,11 +745,18 @@ window.renderBudgetTracking = () => {
     }).join('');
 };
 
-window.renderAccounts = () => {
+window.renderAccounts = async () => {
     const container = document.getElementById('accounts-container');
     if (!container) return;
     
     let grandTotal = 0;
+    const userCurrency = (window.userSettings?.currency || '₱').replace('₱', 'PHP');
+    
+    // Pre-fetch all unique currencies to cache prices
+    const uniqueCurrencies = [...new Set(window.accountsData.map(acc => acc.currency || userCurrency).filter(c => c !== userCurrency))];
+    for (const curr of uniqueCurrencies) {
+        await window.getPrice(curr);
+    }
     
     // Group accounts by type
     const groupedByType = {};
@@ -630,7 +773,6 @@ window.renderAccounts = () => {
             groupedByType[groupKey] = [];
         }
         groupedByType[groupKey].push({ ...acc, _index: index });
-        grandTotal += parseFloat(acc.balance || 0);
     });
     
     // Get type labels
@@ -641,23 +783,45 @@ window.renderAccounts = () => {
         'custom': 'Custom'
     };
     
-    // Define default type order
+    // Use saved typeOrder or generate default order
     const defaultOrder = ['bank', 'onhand', 'investment'];
     const allTypes = Object.keys(groupedByType);
     const customTypes = allTypes.filter(t => t.startsWith('custom:') || (!defaultOrder.includes(t) && !['bank', 'onhand', 'investment'].includes(t)));
-    const orderedTypes = [...defaultOrder.filter(t => allTypes.includes(t)), ...customTypes.sort()];
+    
+    // Initialize typeOrder if not set
+    if (!window.userSettings.typeOrder || window.userSettings.typeOrder.length === 0) {
+        window.userSettings.typeOrder = [...defaultOrder.filter(t => allTypes.includes(t)), ...customTypes.sort()];
+    }
+    
+    // Use saved order, but include any new types that weren't in the saved order
+    const orderedTypes = [
+        ...window.userSettings.typeOrder.filter(t => allTypes.includes(t)),
+        ...allTypes.filter(t => !window.userSettings.typeOrder.includes(t))
+    ];
     
     // Render each type section
     let html = '';
-    orderedTypes.forEach(type => {
+    for (const type of orderedTypes) {
         const accounts = groupedByType[type];
-        if (!accounts || accounts.length === 0) return;
+        if (!accounts || accounts.length === 0) continue;
         
         const typeLabel = typeLabels[type] || (type.startsWith('custom:') ? type.substring(7) : type.charAt(0).toUpperCase() + type.slice(1));
         let typeTotal = 0;
-        accounts.forEach(acc => {
-            typeTotal += parseFloat(acc.balance || 0);
-        });
+        
+        // Calculate type total (converting all to user's currency using cached prices)
+        const cache = window.getPriceCache();
+        for (const acc of accounts) {
+            const balance = parseFloat(acc.balance || 0);
+            const accCurrency = acc.currency || userCurrency;
+            
+            if (accCurrency === userCurrency) {
+                typeTotal += balance;
+            } else {
+                // Use cached price
+                const rate = cache[accCurrency]?.rate || 1;
+                typeTotal += balance * rate;
+            }
+        }
         
         const typeSign = typeTotal < 0 ? '-' : typeTotal > 0 ? '+' : '';
         const typeTotalColor = typeTotal < 0 ? 'var(--accent-red)' : typeTotal > 0 ? 'var(--primary)' : 'var(--text-secondary)';
@@ -677,6 +841,19 @@ window.renderAccounts = () => {
                         const favIcon = isFavorite ? '★' : '☆';
                         const favColor = isFavorite ? '#FFD700' : 'var(--text-secondary)';
                         const balanceColor = acc.balance < 0 ? 'var(--accent-red)' : 'var(--text)';
+                        const accCurrency = acc.currency || userCurrency;
+                        
+                        // Get cached price to calculate converted amount
+                        const cache = window.getPriceCache();
+                        let convertedAmount = acc.balance;
+                        let originalDisplay = '';
+                        const userCurrencySymbol = window.userSettings?.currency || '₱';
+                        
+                        if (accCurrency !== userCurrency) {
+                            const rate = cache[accCurrency]?.rate || 1;
+                            convertedAmount = acc.balance * rate;
+                            originalDisplay = `${acc.balance < 0 ? '-' : ''}${window.formatMoneyWithSymbol(Math.abs(acc.balance), accCurrency)}`;
+                        }
                         
                         return `
                             <div class="account-card" draggable="true" data-account-index="${acc._index}" style="--acc-color: ${acc.color}; cursor: grab;" data-account-type="${type}">
@@ -692,7 +869,8 @@ window.renderAccounts = () => {
                                 </div>
                                 <div style="cursor:pointer;" onclick="window.editAccount(${acc._index})">
                                     <p class="text-muted" style="font-size: 13px;">${acc.name || 'Unnamed'}</p>
-                                    <h2 class="acc-balance" style="color: ${balanceColor};">${acc.balance < 0 ? '-' : ''}${window.formatMoney(Math.abs(acc.balance))}</h2>
+                                    <h2 class="acc-balance" style="color: ${balanceColor};">${convertedAmount < 0 ? '-' : ''}${window.formatMoneyWithSymbol(Math.abs(convertedAmount), userCurrencySymbol)}</h2>
+                                    ${originalDisplay ? `<p class="text-muted" style="font-size: 11px; margin-top: 4px;">${originalDisplay}</p>` : ''}
                                     <p class="text-muted" style="font-size: 12px; margin-top: 8px;">${acc.note || ''}</p>
                                     ${acc.balance < 0 ? '<p class="text-muted" style="font-size: 11px; color: var(--accent-red);">Liability</p>' : ''}
                                 </div>
@@ -702,12 +880,26 @@ window.renderAccounts = () => {
                 </div>
             </div>
         `;
-    });
+    }
     
     container.innerHTML = html;
     
     // Setup drag and drop
     window.setupAccountDragDrop();
+    
+    // Calculate grand total in user's currency using cached prices
+    const cache = window.getPriceCache();
+    for (const acc of window.accountsData) {
+        const balance = parseFloat(acc.balance || 0);
+        const accCurrency = acc.currency || userCurrency;
+        
+        if (accCurrency === userCurrency) {
+            grandTotal += balance;
+        } else {
+            const rate = cache[accCurrency]?.rate || 1;
+            grandTotal += balance * rate;
+        }
+    }
     
     const totalBalEl = document.getElementById('accounts-total-balance');
     if(totalBalEl) {
@@ -716,6 +908,145 @@ window.renderAccounts = () => {
         totalBalEl.innerText = window.formatMoney(grandTotal);
         totalBalEl.style.color = color;
     }
+};
+
+window.renderGoals = async () => {
+    const container = document.getElementById('goals-container');
+    if (!container) return;
+    
+    if (!window.userGoals || window.userGoals.length === 0) {
+        container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-secondary);">No goals yet. Create one to start tracking!</div>';
+        return;
+    }
+    
+    container.innerHTML = window.userGoals.map(goal => {
+        const progress = Math.min(100, (goal.current_amount / goal.target_amount) * 100);
+        const remaining = goal.target_amount - goal.current_amount;
+        const daysUntil = goal.deadline ? Math.ceil((new Date(goal.deadline) - new Date()) / (1000 * 60 * 60 * 24)) : null;
+        const isOverdue = daysUntil !== null && daysUntil < 0;
+        const pacing = goal.deadline ? window.calculatePacing(goal) : null;
+        
+        let paceIndicator = '';
+        let paceColor = 'var(--text-secondary)';
+        
+        if (pacing) {
+            if (pacing.status === 'on-pace') {
+                paceIndicator = `<div style="color: var(--primary); font-weight: 600;">✓ On pace</div>`;
+                paceColor = 'var(--primary)';
+            } else {
+                paceIndicator = `<div style="color: var(--accent-red); font-weight: 600;">⚠ Behind pace</div>`;
+                paceColor = 'var(--accent-red)';
+            }
+            paceIndicator += `<div style="font-size: 12px; color: var(--text-secondary);">Need ${window.formatMoney(pacing.requiredDaily)}/day</div>`;
+        }
+        
+        return `
+            <div class="card" style="padding: 20px; cursor: pointer; transition: transform 0.2s; border-top: 3px solid ${goal.theme_color};" onclick="window.openGoalModal('${goal.id}')">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px;">
+                    <div>
+                        <h3 style="margin: 0 0 4px 0;">${goal.name}</h3>
+                        <span style="font-size: 12px; color: ${paceColor};">${goal.status}</span>
+                    </div>
+                    <div style="width: 24px; height: 24px; border-radius: 50%; background: ${goal.theme_color};"></div>
+                </div>
+                
+                <div style="margin-bottom: 16px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px;">
+                        <span>${window.formatMoney(goal.current_amount)}</span>
+                        <span style="color: var(--text-secondary);">${window.formatMoney(goal.target_amount)}</span>
+                    </div>
+                    <div style="width: 100%; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden;">
+                        <div style="height: 100%; width: ${progress}%; background: ${goal.theme_color}; transition: width 0.3s;"></div>
+                    </div>
+                </div>
+                
+                <div style="font-size: 13px; color: var(--text-secondary);">
+                    ${remaining > 0 ? `<div>${window.formatMoney(remaining)} to go</div>` : '<div style="color: var(--primary);">✓ Completed</div>'}
+                    ${goal.deadline ? `<div style="color: ${isOverdue ? 'var(--accent-red)' : 'var(--text-secondary)'};">${isOverdue ? 'Overdue by ' + Math.abs(daysUntil) + ' days' : daysUntil + ' days left'}</div>` : ''}
+                    ${paceIndicator}
+                </div>
+            </div>
+        `;
+    }).join('');
+};
+
+window.renderSubscriptions = async () => {
+    const container = document.getElementById('subscriptions-container');
+    if (!container) return;
+    
+    if (!window.userSubscriptions || window.userSubscriptions.length === 0) {
+        container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-secondary);">No subscriptions tracked yet. Add one to start monitoring!</div>';
+        return;
+    }
+    
+    const upcoming14Days = [];
+    const upcoming = [];
+    const overdue = [];
+    const future = [];
+    
+    window.userSubscriptions.forEach(sub => {
+        const nextDate = new Date(sub.next_billing_date);
+        const today = new Date();
+        const daysUntil = Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24));
+        
+        if (daysUntil < 0) overdue.push({ ...sub, daysUntil });
+        else if (daysUntil <= 14) upcoming14Days.push({ ...sub, daysUntil });
+        else future.push({ ...sub, daysUntil });
+    });
+    
+    const allSubs = [...overdue, ...upcoming14Days, ...future];
+    
+    container.innerHTML = allSubs.map(sub => {
+        const nextDate = new Date(sub.next_billing_date);
+        const today = new Date();
+        const daysUntil = Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24));
+        const isOverdue = daysUntil < 0;
+        const isUpcoming = daysUntil >= 0 && daysUntil <= 14;
+        
+        let statusColor = 'var(--text-secondary)';
+        let statusText = '';
+        if (isOverdue) { statusColor = 'var(--accent-red)'; statusText = 'Overdue'; }
+        else if (isUpcoming) { statusColor = 'var(--primary)'; statusText = 'Due soon'; }
+        else { statusText = 'Upcoming'; }
+        
+        return `
+            <div class="card" style="padding: 20px; cursor: pointer; border-left: 4px solid ${statusColor};" onclick="window.openSubscriptionModal('${sub.id}')">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                    <div>
+                        <h3 style="margin: 0 0 4px 0;">${sub.name}</h3>
+                        <span style="font-size: 12px; color: var(--text-secondary);">${sub.category}</span>
+                    </div>
+                    <span style="font-weight: 600; color: ${statusColor}; font-size: 12px;">${statusText}</span>
+                </div>
+                
+                <div style="margin-bottom: 12px;">
+                    <h2 style="margin: 0; font-size: 24px;">${window.formatMoney(sub.amount)}</h2>
+                    <span style="font-size: 12px; color: var(--text-secondary);">/ ${sub.billing_cycle}</span>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--text-secondary);">
+                    <span>Next: ${new Date(sub.next_billing_date).toLocaleDateString()}</span>
+                    ${sub.auto_log ? '<span style="color: var(--primary);">Auto-log ✓</span>' : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+};
+
+window.deleteGoal = async (goalId) => {
+    if (!confirm('Delete this goal?')) return;
+    window.userGoals = window.userGoals.filter(g => g.id !== goalId);
+    await window.saveGoalsToCloud();
+    await window.renderGoals();
+    window.closeGoalModal();
+};
+
+window.deleteSubscription = async (subId) => {
+    if (!confirm('Delete this subscription?')) return;
+    window.userSubscriptions = window.userSubscriptions.filter(s => s.id !== subId);
+    await window.saveSubscriptionsToCloud();
+    await window.renderSubscriptions();
+    window.closeSubscriptionModal();
 };
 
 window.toggleAccountFavorite = async (index) => {
@@ -737,6 +1068,8 @@ window.setupAccountDragDrop = () => {
         draggedType = draggedElement.getAttribute('data-type');
         const accountIndex = draggedElement.getAttribute('data-account-index');
         
+        console.log('Drag start:', { accountIndex, draggedType });
+        
         if (accountIndex !== null) {
             e.dataTransfer.effectAllowed = 'move';
             e.dataTransfer.setData('accountIndex', accountIndex);
@@ -752,7 +1085,7 @@ window.setupAccountDragDrop = () => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         const overElement = e.target.closest('[draggable="true"]');
-        if (overElement) {
+        if (overElement && overElement !== draggedElement) {
             overElement.style.opacity = '0.8';
         }
     };
@@ -766,6 +1099,8 @@ window.setupAccountDragDrop = () => {
     
     const handleDrop = async (e) => {
         e.preventDefault();
+        e.stopPropagation();
+        
         const dropTarget = e.target.closest('[draggable="true"]');
         if (!dropTarget || dropTarget === draggedElement) return;
         
@@ -774,17 +1109,41 @@ window.setupAccountDragDrop = () => {
         const targetAccountIndex = dropTarget.getAttribute('data-account-index');
         const targetType = dropTarget.getAttribute('data-account-type');
         
+        console.log('Drop:', { accountIndex, typeSection, targetAccountIndex, targetType });
+        
+        // Handle account card drag (reorder within or between types)
         if (accountIndex) {
             const draggedIdx = parseInt(accountIndex);
-            const targetIdx = targetAccountIndex ? parseInt(targetAccountIndex) : draggedIdx;
+            const targetIdx = parseInt(targetAccountIndex);
             
-            if (draggedIdx !== targetIdx) {
+            if (!isNaN(draggedIdx) && !isNaN(targetIdx) && draggedIdx !== targetIdx) {
                 const draggedAcc = window.accountsData[draggedIdx];
                 window.accountsData.splice(draggedIdx, 1);
                 const insertIdx = draggedIdx < targetIdx ? targetIdx - 1 : targetIdx;
                 window.accountsData.splice(insertIdx, 0, draggedAcc);
+                
+                console.log('Reordered accounts:', window.accountsData.map(a => a.name));
+                
                 await window.saveAccountsToCloud();
-                window.renderAccounts();
+                await window.renderAccounts();
+            }
+        }
+        // Handle type section drag (reorder types)
+        else if (typeSection && targetType) {
+            const draggedTypeIdx = window.userSettings.typeOrder.indexOf(typeSection);
+            const targetTypeIdx = window.userSettings.typeOrder.indexOf(targetType);
+            
+            if (draggedTypeIdx !== -1 && targetTypeIdx !== -1 && draggedTypeIdx !== targetTypeIdx) {
+                // Remove dragged type
+                const draggedTypeValue = window.userSettings.typeOrder.splice(draggedTypeIdx, 1)[0];
+                // Insert at target position
+                const insertIdx = draggedTypeIdx < targetTypeIdx ? targetTypeIdx - 1 : targetTypeIdx;
+                window.userSettings.typeOrder.splice(insertIdx, 0, draggedTypeValue);
+                
+                console.log('Reordered types:', window.userSettings.typeOrder);
+                
+                await window.saveSettingsToCloud();
+                await window.renderAccounts();
             }
         }
     };
@@ -793,6 +1152,7 @@ window.setupAccountDragDrop = () => {
         document.querySelectorAll('[draggable="true"]').forEach(el => {
             el.style.opacity = '1';
         });
+        draggedElement = null;
     };
     
     document.querySelectorAll('[draggable="true"]').forEach(el => {
@@ -846,6 +1206,7 @@ window.editAccount = (index) => {
     document.getElementById('acc-color').value = acc.color || '#00D26A';
     document.getElementById('acc-note').value = acc.note || '';
     document.getElementById('acc-favorite').checked = acc.favorite || false;
+    document.getElementById('acc-currency').value = acc.currency || '';
     
     // Handle custom type
     const customGroup = document.getElementById('custom-type-group');
@@ -941,6 +1302,84 @@ window.bootUI = () => {
 
 document.addEventListener('DOMContentLoaded', () => {
 
+    // ==========================================
+    // DEFINE MODAL FUNCTIONS EARLY
+    // ==========================================
+    
+    window.openGoalModal = (goalId = null) => {
+        const modal = document.getElementById('goal-overlay');
+        const title = document.getElementById('goal-modal-title');
+        const deleteBtn = document.getElementById('delete-goal-btn');
+        if (!modal) return;
+        
+        if (goalId) {
+            title.innerText = 'Edit Goal';
+            const goal = window.userGoals.find(g => g.id === goalId);
+            if (goal) {
+                document.getElementById('goal-name').value = goal.name;
+                document.getElementById('goal-target').value = goal.target_amount;
+                document.getElementById('goal-current').value = goal.current_amount;
+                document.getElementById('goal-deadline').value = goal.deadline || '';
+                document.getElementById('goal-status').value = goal.status;
+                document.getElementById('goal-color').value = goal.theme_color;
+                deleteBtn.style.display = 'block';
+                deleteBtn.onclick = () => window.deleteGoal(goalId);
+            }
+        } else {
+            title.innerText = 'New Goal';
+            document.getElementById('goal-name').value = '';
+            document.getElementById('goal-target').value = '';
+            document.getElementById('goal-current').value = '';
+            document.getElementById('goal-deadline').value = '';
+            document.getElementById('goal-status').value = 'Active';
+            document.getElementById('goal-color').value = '#00D26A';
+            deleteBtn.style.display = 'none';
+        }
+        modal.classList.add('active');
+    };
+    
+    window.closeGoalModal = () => {
+        const modal = document.getElementById('goal-overlay');
+        if (modal) modal.classList.remove('active');
+    };
+    
+    window.openSubscriptionModal = (subId = null) => {
+        const modal = document.getElementById('subscription-overlay');
+        const title = document.getElementById('subscription-modal-title');
+        const deleteBtn = document.getElementById('delete-sub-btn');
+        if (!modal) return;
+        
+        if (subId) {
+            title.innerText = 'Edit Subscription';
+            const sub = window.userSubscriptions.find(s => s.id === subId);
+            if (sub) {
+                document.getElementById('sub-name').value = sub.name;
+                document.getElementById('sub-amount').value = sub.amount;
+                document.getElementById('sub-category').value = sub.category;
+                document.getElementById('sub-cycle').value = sub.billing_cycle;
+                document.getElementById('sub-next-date').value = sub.next_billing_date;
+                document.getElementById('sub-auto-log').checked = sub.auto_log;
+                deleteBtn.style.display = 'block';
+                deleteBtn.onclick = () => window.deleteSubscription(subId);
+            }
+        } else {
+            title.innerText = 'New Subscription';
+            document.getElementById('sub-name').value = '';
+            document.getElementById('sub-amount').value = '';
+            document.getElementById('sub-category').value = '';
+            document.getElementById('sub-cycle').value = 'Monthly';
+            document.getElementById('sub-next-date').value = '';
+            document.getElementById('sub-auto-log').checked = false;
+            deleteBtn.style.display = 'none';
+        }
+        modal.classList.add('active');
+    };
+    
+    window.closeSubscriptionModal = () => {
+        const modal = document.getElementById('subscription-overlay');
+        if (modal) modal.classList.remove('active');
+    };
+
     const discordBtn = document.getElementById('discord-login-btn');
     if(discordBtn) discordBtn.addEventListener('click', window.loginWithDiscord);
 
@@ -1022,6 +1461,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    document.getElementById('allocate-goals-btn')?.addEventListener('click', () => window.openGoalAllocationModal());
+
     const clearAllDataBtn = document.getElementById('clear-all-data-btn');
     if (clearAllDataBtn) {
         clearAllDataBtn.addEventListener('click', () => {
@@ -1088,7 +1529,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    document.querySelectorAll('.nav-btn, .nav-proxy').forEach(btn => btn.addEventListener('click', () => window.switchView(btn.getAttribute('data-target'))));
+    document.querySelectorAll('.nav-btn, .nav-proxy').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const target = btn.getAttribute('data-target');
+            window.switchView(target);
+            
+            // Render specific views when opened
+            if (target === 'goals') {
+                await window.renderGoals();
+            } else if (target === 'subscriptions') {
+                await window.renderSubscriptions();
+            }
+        });
+    });
 
     const toggleFiltersBtn = document.getElementById('toggle-filters-btn');
     if (toggleFiltersBtn) {
@@ -1135,6 +1588,18 @@ document.addEventListener('DOMContentLoaded', () => {
         deleteBtn.addEventListener('click', window.deleteTransaction);
     }
 
+    // Toggle More Options in account modal
+    const expandBtn = document.getElementById('acc-expand-btn');
+    if (expandBtn) {
+        expandBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const section = document.getElementById('acc-expand-section');
+            const isVisible = section.style.display !== 'none';
+            section.style.display = isVisible ? 'none' : 'block';
+            expandBtn.innerText = isVisible ? '+ More Options' : '- Less Options';
+        });
+    }
+
     document.querySelectorAll('#stats-filters .chip').forEach(chip => {
         chip.addEventListener('click', (e) => {
             document.querySelectorAll('#stats-filters .chip').forEach(c => c.classList.remove('active'));
@@ -1157,9 +1622,14 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('acc-color').value = '#00D26A';
         document.getElementById('acc-note').value = '';
         document.getElementById('acc-favorite').checked = false;
+        document.getElementById('acc-currency').value = '';
         document.getElementById('acc-custom-type').value = '';
         const customGroup = document.getElementById('custom-type-group');
         if (customGroup) customGroup.style.display = 'none';
+        const expandSection = document.getElementById('acc-expand-section');
+        if (expandSection) expandSection.style.display = 'none';
+        const expandBtn = document.getElementById('acc-expand-btn');
+        if (expandBtn) expandBtn.innerText = '+ More Options';
         const saveBtn = document.getElementById('save-account-btn');
         if (saveBtn) saveBtn.innerText = 'Save Account';
         const overlay = document.getElementById('account-overlay');
@@ -1175,7 +1645,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 balance: parseFloat(document.getElementById('acc-balance')?.value) || 0,
                 color: document.getElementById('acc-color')?.value || '#00D26A',
                 note: document.getElementById('acc-note')?.value || '',
-                favorite: document.getElementById('acc-favorite')?.checked || false
+                favorite: document.getElementById('acc-favorite')?.checked || false,
+                currency: document.getElementById('acc-currency')?.value?.toUpperCase() || ''
             };
             
             if (window.editingAccountIndex !== undefined) {
@@ -1190,7 +1661,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             await window.saveAccountsToCloud();
-            ['acc-name','acc-balance','acc-note','acc-custom-type'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+            ['acc-name','acc-balance','acc-note','acc-custom-type','acc-currency'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
             document.getElementById('acc-favorite').checked = false;
             window.closeAccountModal();
             window.renderAccounts();
@@ -1441,4 +1912,179 @@ document.addEventListener('DOMContentLoaded', () => {
             reader.readAsText(file);
         });
     }
+
+    // Save Goal Handler
+    document.getElementById('save-goal-btn')?.addEventListener('click', async () => {
+        const goalId = document.getElementById('goal-modal-title').innerText.includes('Edit') 
+            ? window.userGoals.find(g => g.name === document.getElementById('goal-name').value)?.id
+            : null;
+        
+        const goalData = {
+            name: document.getElementById('goal-name').value,
+            target_amount: parseFloat(document.getElementById('goal-target').value) || 0,
+            current_amount: parseFloat(document.getElementById('goal-current').value) || 0,
+            deadline: document.getElementById('goal-deadline').value || null,
+            status: document.getElementById('goal-status').value,
+            theme_color: document.getElementById('goal-color').value
+        };
+        
+        if (!goalData.name.trim()) { alert('Goal name is required'); return; }
+        if (goalData.target_amount <= 0) { alert('Target amount must be greater than 0'); return; }
+        
+        if (goalId) {
+            const idx = window.userGoals.findIndex(g => g.id === goalId);
+            if (idx >= 0) window.userGoals[idx] = { ...window.userGoals[idx], ...goalData };
+        } else {
+            window.userGoals.push({
+                id: crypto.randomUUID?.() || 'goal-' + Date.now(),
+                user_id: window.currentUser?.id,
+                ...goalData,
+                created_at: new Date().toISOString()
+            });
+        }
+        
+        await window.saveGoalsToCloud();
+        await window.renderGoals();
+        window.closeGoalModal();
+    });
+    
+    // Save Subscription Handler
+    document.getElementById('save-sub-btn')?.addEventListener('click', async () => {
+        const subId = document.getElementById('subscription-modal-title').innerText.includes('Edit')
+            ? window.userSubscriptions.find(s => s.name === document.getElementById('sub-name').value)?.id
+            : null;
+        
+        const subData = {
+            name: document.getElementById('sub-name').value,
+            amount: parseFloat(document.getElementById('sub-amount').value) || 0,
+            category: document.getElementById('sub-category').value,
+            billing_cycle: document.getElementById('sub-cycle').value,
+            next_billing_date: document.getElementById('sub-next-date').value,
+            auto_log: document.getElementById('sub-auto-log').checked
+        };
+        
+        if (!subData.name.trim()) { alert('Subscription name is required'); return; }
+        if (subData.amount <= 0) { alert('Amount must be greater than 0'); return; }
+        if (!subData.next_billing_date) { alert('Next billing date is required'); return; }
+        
+        if (subId) {
+            const idx = window.userSubscriptions.findIndex(s => s.id === subId);
+            if (idx >= 0) window.userSubscriptions[idx] = { ...window.userSubscriptions[idx], ...subData };
+        } else {
+            window.userSubscriptions.push({
+                id: crypto.randomUUID?.() || 'sub-' + Date.now(),
+                user_id: window.currentUser?.id,
+                ...subData,
+                created_at: new Date().toISOString()
+            });
+        }
+        
+        await window.saveSubscriptionsToCloud();
+        await window.renderSubscriptions();
+        window.closeSubscriptionModal();
+    });
+    
+    // Add Goal/Subscription Button Handlers
+    const addGoalBtn = document.getElementById('add-goal-btn');
+    const addSubBtn = document.getElementById('add-subscription-btn');
+    
+    if (addGoalBtn) {
+        addGoalBtn.addEventListener('click', () => window.openGoalModal());
+    }
+    if (addSubBtn) {
+        addSubBtn.addEventListener('click', () => window.openSubscriptionModal());
+    }
+    
+    // Close modals when clicking outside
+    document.getElementById('goal-overlay')?.addEventListener('click', (e) => {
+        if (e.target.id === 'goal-overlay') window.closeGoalModal();
+    });
+    document.getElementById('subscription-overlay')?.addEventListener('click', (e) => {
+        if (e.target.id === 'subscription-overlay') window.closeSubscriptionModal();
+    });
+    document.getElementById('goal-allocation-overlay')?.addEventListener('click', (e) => {
+        if (e.target.id === 'goal-allocation-overlay') window.closeGoalAllocationModal();
+    });
+    
+    // ==========================================
+    // GOAL ALLOCATION FUNCTIONS
+    // ==========================================
+    
+    window.openGoalAllocationModal = async () => {
+        const modal = document.getElementById('goal-allocation-overlay');
+        if (!modal || !window.userGoals || window.userGoals.length === 0) {
+            alert('Create at least one goal first!');
+            return;
+        }
+        
+        const activeGoals = window.userGoals.filter(g => g.status === 'Active');
+        if (activeGoals.length === 0) {
+            alert('No active goals. Create or activate a goal first!');
+            return;
+        }
+        
+        const list = document.getElementById('goal-allocation-list');
+        list.innerHTML = activeGoals.map(goal => {
+            const currentPercent = window.getAllocationPercentForGoal(goal.id) || 0;
+            return `
+                <div style="margin-bottom: 20px; padding: 16px; background: var(--border); border-radius: 8px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                        <label style="font-weight: 500;">${goal.name}</label>
+                        <input type="number" value="${currentPercent}" min="0" max="100" class="goal-allocation-input" data-goal-id="${goal.id}" style="width: 60px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; text-align: right;" onchange="window.updateGoalAllocationDisplay()">
+                        <span style="width: 40px; text-align: right; font-weight: 600;" class="goal-allocation-display">${currentPercent}%</span>
+                    </div>
+                    <div style="width: 100%; height: 8px; background: var(--text-secondary); border-radius: 4px; overflow: hidden; opacity: 0.3;">
+                        <div class="goal-allocation-bar" style="height: 100%; width: ${currentPercent}%; background: ${goal.theme_color}; transition: width 0.2s;"></div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        modal.classList.add('active');
+        window.updateGoalAllocationDisplay();
+    };
+    
+    window.closeGoalAllocationModal = () => {
+        const modal = document.getElementById('goal-allocation-overlay');
+        if (modal) modal.classList.remove('active');
+    };
+    
+    window.updateGoalAllocationDisplay = () => {
+        let total = 0;
+        document.querySelectorAll('.goal-allocation-input').forEach(input => {
+            const percent = parseInt(input.value) || 0;
+            input.parentElement.querySelector('.goal-allocation-display').innerText = `${percent}%`;
+            input.parentElement.querySelector('.goal-allocation-bar').style.width = `${percent}%`;
+            total += percent;
+        });
+        
+        document.getElementById('total-allocated-percent').innerText = `${total}%`;
+        document.getElementById('total-allocated-bar').style.width = `${Math.min(100, total)}%`;
+    };
+    
+    window.equalSplitGoals = () => {
+        const activeGoals = window.userGoals.filter(g => g.status === 'Active');
+        const equalPercent = Math.floor(100 / activeGoals.length);
+        
+        document.querySelectorAll('.goal-allocation-input').forEach((input, idx) => {
+            input.value = idx === activeGoals.length - 1 
+                ? 100 - (equalPercent * (activeGoals.length - 1))
+                : equalPercent;
+        });
+        
+        window.updateGoalAllocationDisplay();
+    };
+    
+    window.saveGoalAllocations = async () => {
+        document.querySelectorAll('.goal-allocation-input').forEach(input => {
+            const goalId = input.getAttribute('data-goal-id');
+            const percent = parseInt(input.value) || 0;
+            window.setGoalAllocation(goalId, Math.max(0, Math.min(100, percent)));
+        });
+        
+        await window.saveSettingsToCloud();
+        alert('Allocations saved! Your savings will now be distributed across these goals.');
+        window.closeGoalAllocationModal();
+    };
+
 });

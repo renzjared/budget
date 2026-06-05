@@ -8,6 +8,7 @@ window.appData = [];
 window.accountsData = [];
 window.userGoals = [];
 window.userSubscriptions = [];
+window.exchangeRates = {}; // In-memory cache
 window.userSettings = { 
     name: 'User', balance: 0, currency: '₱', metric: 'running', theme: 'light',
     budgetCycle: 'monthly', categories: [{ name: 'SAVINGS', percent: 100, isAuto: true }],
@@ -16,14 +17,163 @@ window.userSettings = {
     goalAllocations: {}
 };
 
+window.getCurrencyCodeFromSymbol = (sym) => {
+    const map = { '₱':'PHP', '$':'USD', '€':'EUR', '£':'GBP', '¥':'JPY', '₹':'INR', '₽':'RUB', '₩':'KRW' };
+    return map[sym] || 'PHP';
+};
+
+// Exchange Rate Caching with fawazahmed0 API
+window.getExchangeRates = async (requestedCurrency = 'USD') => {
+    try {
+        // --- SAFETY INTERCEPTOR ---
+        let baseCurrency = requestedCurrency;
+        if (window.getCurrencyCodeFromSymbol) {
+            baseCurrency = window.getCurrencyCodeFromSymbol(requestedCurrency);
+        } else if (requestedCurrency === '₱') {
+            baseCurrency = 'PHP';
+        }
+
+        // Check if rates exist in Supabase and are fresh (<24hrs)
+        const { data: existingRates, error } = await window.supabase
+            .from('exchange_rates')
+            .select('rates, last_updated')
+            .eq('base_currency', baseCurrency)
+            .order('last_updated', { ascending: false })
+            .limit(1);
+        
+        if (existingRates && existingRates.length > 0) {
+            const lastUpdate = new Date(existingRates[0].last_updated);
+            const now = new Date();
+            const hoursSinceUpdate = (now - lastUpdate) / (1000 * 60 * 60);
+            
+            if (hoursSinceUpdate < 24) {
+                window.exchangeRates = existingRates[0].rates;
+                return existingRates[0].rates;
+            }
+        }
+        
+        // Fetch fresh rates from the NEW API Endpoint
+        const response = await fetch(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${baseCurrency.toLowerCase()}.json`);
+        
+        if (!response.ok) throw new Error('Failed to fetch rates');
+        
+        const data = await response.json();
+        
+        // The new API nests the rates under the base currency's name
+        const rates = data[baseCurrency.toLowerCase()];
+        if (!rates) throw new Error('No rates in response');
+        
+        // Uppercase the keys for easy searching (e.g. "krw" -> "KRW")
+        const upperRates = {};
+        for (let key in rates) {
+            upperRates[key.toUpperCase()] = rates[key];
+        }
+        
+        // Save to Supabase
+        await window.supabase.from('exchange_rates').delete().eq('base_currency', baseCurrency);
+        await window.supabase.from('exchange_rates').insert({
+            base_currency: baseCurrency,
+            rates: upperRates,
+            last_updated: new Date().toISOString()
+        });
+        
+        window.exchangeRates = upperRates;
+        return upperRates;
+    } catch (error) {
+        console.error('Error fetching exchange rates:', error);
+        return window.exchangeRates || {}; 
+    }
+};
+
+// Convert amount from one currency to another
+window.convertCurrency = (amount, fromCurrency, toCurrency) => {
+    if (!amount || fromCurrency === toCurrency) return amount;
+    
+    // If rates not loaded, return as-is
+    if (!window.exchangeRates || Object.keys(window.exchangeRates).length === 0) {
+        return amount;
+    }
+    
+    // Safely uppercase the codes so they match the cached keys perfectly
+    const fromRate = window.exchangeRates[fromCurrency.toUpperCase()] || 1;
+    const toRate = window.exchangeRates[toCurrency.toUpperCase()] || 1;
+    
+    // Convert: amount / fromRate * toRate
+    return (amount / fromRate) * toRate;
+};
+
+// Get currency symbol
+window.getCurrencySymbol = (currencyCode) => {
+    const symbols = {
+        'USD': '$', 'EUR': '€', 'GBP': '£', 'JPY': '¥', 'CNY': '¥',
+        'INR': '₹', 'KRW': '₩', 'PHP': '₱', 'THB': '฿', 'VND': '₫',
+        'SGD': 'S$', 'MYR': 'RM', 'IDR': 'Rp', 'BRL': 'R$', 'AUD': 'A$'
+    };
+    return symbols[currencyCode?.toUpperCase()] || currencyCode || '₱';
+};
+
+
+// Custom Confirmation Dialog Helper
+window.showConfirmation = (title, message) => {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('confirm-modal-overlay');
+        const titleEl = document.getElementById('confirm-modal-title');
+        const messageEl = document.getElementById('confirm-modal-message');
+        const okBtn = document.getElementById('confirm-modal-ok');
+        const cancelBtn = document.getElementById('confirm-modal-cancel');
+        
+        titleEl.innerText = title;
+        messageEl.innerText = message;
+        modal.style.display = 'flex';
+        
+        const handleOk = () => {
+            cleanup();
+            resolve(true);
+        };
+        
+        const handleCancel = () => {
+            cleanup();
+            resolve(false);
+        };
+        
+        const cleanup = () => {
+            modal.style.display = 'none';
+            okBtn.removeEventListener('click', handleOk);
+            cancelBtn.removeEventListener('click', handleCancel);
+            modal.removeEventListener('click', handleBackdropClick);
+        };
+        
+        const handleBackdropClick = (e) => {
+            if (e.target.id === 'confirm-modal-overlay') {
+                handleCancel();
+            }
+        };
+        
+        okBtn.addEventListener('click', handleOk);
+        cancelBtn.addEventListener('click', handleCancel);
+        modal.addEventListener('click', handleBackdropClick);
+    });
+};
+
 window.formatMoney = (amount) => {
     let sym = window.userSettings?.currency;
-    if (!sym || sym === 'undefined') sym = '₱'; // Hard fallback
+    if (!sym || sym === 'undefined') sym = '₱';
+    // If it's a code (USD, KRW, etc), get the symbol
+    if (sym.length > 2) {
+        sym = window.getCurrencySymbol(sym);
+    }
     return `${sym}${Math.abs(amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}`;
 };
 
 window.formatMoneyWithSymbol = (amount, symbol) => {
     return `${symbol}${Math.abs(amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+};
+
+// Format money with currency conversion if needed
+window.formatMoneyConverted = (amount, fromCurrency, toCurrency) => {
+    const convertedAmount = window.convertCurrency(amount, fromCurrency, toCurrency);
+    const symbol = window.getCurrencySymbol(toCurrency);
+    return `${symbol}${Math.abs(convertedAmount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}`;
 };
 
 window.formatReceiptDateTime = (dateStr) => {
@@ -168,6 +318,7 @@ async function loadCloudData() {
     // Load Goals and Subscriptions
     await window.loadGoals();
     await window.loadSubscriptions();
+    await window.getExchangeRates(window.userSettings.currency);
 }
 
 window.saveSettingsToCloud = async () => {
@@ -359,18 +510,53 @@ window.getCryptoPrice = async (symbol) => {
 };
 
 // Get price for any symbol (crypto, stock, or forex)
+// window.getPrice = async (symbol) => {
+//     if (!symbol || symbol.length === 0) return null;
+    
+//     const upperSymbol = symbol.toUpperCase();
+    
+//     // Try crypto first
+//     const cryptoPrice = await window.getCryptoPrice(upperSymbol);
+//     if (cryptoPrice !== null) return cryptoPrice;
+    
+//     // Try stock
+//     const stockPrice = await window.getStockPrice(upperSymbol);
+//     if (stockPrice !== null) return stockPrice;
+    
+//     return null;
+// };
+// Get price for any symbol (Fiat, Crypto, or Stock)
 window.getPrice = async (symbol) => {
     if (!symbol || symbol.length === 0) return null;
     
     const upperSymbol = symbol.toUpperCase();
+    const userBase = window.getCurrencyCodeFromSymbol(window.userSettings?.currency || '₱');
     
-    // Try crypto first
+    // try standard Fiat currencies using our fawazahmed0 cache FIRST
+    if (window.exchangeRates && window.exchangeRates[upperSymbol]) {
+        // Calculate the multiplier to convert 1 unit of this currency into the user's base currency
+        const fiatRate = window.convertCurrency(1, upperSymbol, userBase);
+        window.cachePrice(upperSymbol, fiatRate);
+        return fiatRate;
+    }
+    
+    // try crypto via CoinGecko
     const cryptoPrice = await window.getCryptoPrice(upperSymbol);
-    if (cryptoPrice !== null) return cryptoPrice;
+    if (cryptoPrice !== null) {
+        // CoinGecko returns values in USD. Convert that USD value to the user's base currency.
+        const finalPrice = window.convertCurrency(cryptoPrice, 'USD', userBase);
+        window.cachePrice(upperSymbol, finalPrice);
+        return finalPrice;
+    }
     
-    // Try stock
+    // try stock via Alpha Vantage
     const stockPrice = await window.getStockPrice(upperSymbol);
-    if (stockPrice !== null) return stockPrice;
+    if (stockPrice !== null) {
+        // Alpha Vantage returns values in USD. Convert that USD value to the user's base currency.
+        const finalPrice = window.convertCurrency(stockPrice, 'USD', userBase);
+        window.cachePrice(upperSymbol, finalPrice);
+        return finalPrice;
+    }
     
     return null;
 };

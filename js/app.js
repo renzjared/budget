@@ -160,29 +160,20 @@ window.renderGoalsWidget = () => {
     const container = document.getElementById('dashboard-goals-list');
     const widget = document.getElementById('dashboard-goals-widget');
     
-    console.log('renderGoalsWidget called');
-    console.log('userGoals:', window.userGoals);
-    console.log('Container found:', container ? 'YES' : 'NO');
-    console.log('Widget found:', widget ? 'YES' : 'NO');
-    
     if (!container) return;
     
     if (!window.userGoals || window.userGoals.length === 0) {
-        console.log('No goals, hiding widget');
         if (widget) widget.style.display = 'none';
         return;
     }
     
     const activeGoals = window.userGoals.filter(g => g.status === 'Active').slice(0, 3);
-    console.log('Active goals:', activeGoals.length);
     
     if (activeGoals.length === 0) {
-        console.log('No active goals, hiding widget');
         if (widget) widget.style.display = 'none';
         return;
     }
     
-    console.log('Showing widget with', activeGoals.length, 'goals');
     if (widget) widget.style.display = 'block';
     
     container.innerHTML = activeGoals.map(goal => {
@@ -208,15 +199,9 @@ window.renderUpcomingSubscriptions = () => {
     const container = document.getElementById('dashboard-upcoming-subs-timeline');
     const widget = document.getElementById('dashboard-upcoming-subs-widget');
     
-    console.log('renderUpcomingSubscriptions called');
-    console.log('userSubscriptions:', window.userSubscriptions);
-    console.log('Container found:', container ? 'YES' : 'NO');
-    console.log('Widget found:', widget ? 'YES' : 'NO');
-    
     if (!container) return;
     
     if (!window.userSubscriptions || window.userSubscriptions.length === 0) {
-        console.log('No subscriptions, hiding widget');
         if (widget) widget.style.display = 'none';
         return;
     }
@@ -231,15 +216,11 @@ window.renderUpcomingSubscriptions = () => {
         })
         .sort((a, b) => new Date(a.next_billing_date) - new Date(b.next_billing_date));
     
-    console.log('Upcoming subscriptions:', upcoming.length);
-    
     if (upcoming.length === 0) {
-        console.log('No upcoming subscriptions, hiding widget');
         if (widget) widget.style.display = 'none';
         return;
     }
     
-    console.log('Showing widget with', upcoming.length, 'upcoming subs');
     if (widget) widget.style.display = 'block';
     
     // Group by date
@@ -400,8 +381,12 @@ window.updateDashboard = () => {
         sortedData.forEach(entry => displayTotal += (entry.amount || 0));
         subtitle = "Running Balance";
     } else if (metric === 'net_worth') {
-        subtitle = "Net Worth (All Accounts)";
-        window.accountsData.forEach(acc => displayTotal += parseFloat(acc.balance || 0));
+        subtitle = "Net Worth (Accounts)";
+        const baseCode = window.getCurrencyCodeFromSymbol(window.userSettings.currency);
+        window.accountsData.forEach(acc => {
+            let accCode = acc.currency ? acc.currency.toUpperCase() : baseCode;
+            displayTotal += window.convertCurrency(parseFloat(acc.balance || 0), accCode, baseCode);
+        });
     } else if (metric === 'remaining_daily') {
         subtitle = "Remaining Budget (Today)";
         const now = new Date(); const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -578,6 +563,156 @@ window.closeEditTransactionModal = () => {
     const overlay = document.getElementById('edit-transaction-overlay');
     if(overlay) overlay.classList.remove('active');
     window.currentEditingTransaction = null;
+};
+
+window.setupAccountDragDrop = () => {
+    const container = document.getElementById('accounts-container');
+    if (!container) return;
+
+    let draggedItem = null;
+    let draggedType = null; // Will be either 'section' or 'card'
+
+    // ==========================================
+    // 1. Setup Section Dragging (Reordering Categories)
+    // ==========================================
+    const sections = container.querySelectorAll('.account-type-section');
+    sections.forEach(section => {
+        // Only allow dragging by the header to prevent accidental drags
+        const header = section.querySelector('.type-header-drag');
+        if (header) {
+            header.addEventListener('mousedown', () => section.setAttribute('draggable', 'true'));
+            header.addEventListener('mouseup', () => section.setAttribute('draggable', 'false'));
+            header.addEventListener('mouseleave', () => section.setAttribute('draggable', 'false'));
+        }
+
+        section.addEventListener('dragstart', (e) => {
+            // Ignore if the user is actually dragging a card inside the section
+            if (e.target.classList.contains('account-card')) return; 
+            
+            draggedItem = section;
+            draggedType = 'section';
+            e.dataTransfer.effectAllowed = 'move';
+            // Slight delay prevents the browser drag ghost from being transparent
+            setTimeout(() => section.style.opacity = '0.4', 0); 
+            e.stopPropagation();
+        });
+
+        section.addEventListener('dragend', async (e) => {
+            if (draggedType !== 'section' || !draggedItem) return;
+            draggedItem.style.opacity = '1';
+            section.setAttribute('draggable', 'false');
+
+            // Map the new DOM order to your settings array
+            const currentSections = Array.from(container.querySelectorAll('.account-type-section'));
+            const newOrder = currentSections.map(sec => sec.getAttribute('data-type'));
+            
+            window.userSettings.typeOrder = newOrder;
+            await window.saveSettingsToCloud();
+            
+            draggedItem = null;
+            draggedType = null;
+        });
+    });
+
+    // Drop zone for sections (the main container)
+    container.addEventListener('dragover', (e) => {
+        if (draggedType === 'section') {
+            e.preventDefault();
+            const afterElement = getDragAfterElement(container, e.clientY, '.account-type-section');
+            if (afterElement == null) {
+                container.appendChild(draggedItem);
+            } else {
+                container.insertBefore(draggedItem, afterElement);
+            }
+        }
+    });
+
+    // ==========================================
+    // 2. Setup Card Dragging (Reordering & Moving Accounts)
+    // ==========================================
+    const cards = container.querySelectorAll('.account-card');
+    cards.forEach(card => {
+        card.addEventListener('dragstart', (e) => {
+            draggedItem = card;
+            draggedType = 'card';
+            e.dataTransfer.effectAllowed = 'move';
+            setTimeout(() => card.style.opacity = '0.4', 0);
+            e.stopPropagation(); // Prevents triggering the section drag
+        });
+
+        card.addEventListener('dragend', async (e) => {
+            if (draggedType !== 'card' || !draggedItem) return;
+            draggedItem.style.opacity = '1';
+
+            const targetGrid = draggedItem.closest('.account-type-grid');
+            if (targetGrid) {
+                const newTypeRaw = targetGrid.getAttribute('data-type');
+                const originalIndex = parseInt(draggedItem.getAttribute('data-account-index'));
+                
+                // 1. Update the account's type if it was moved to a new section
+                if (newTypeRaw) {
+                    let parsedType = newTypeRaw;
+                    let parsedCustom = '';
+                    if (newTypeRaw.startsWith('custom:')) {
+                        parsedType = 'custom';
+                        parsedCustom = newTypeRaw.substring(7);
+                    }
+                    window.accountsData[originalIndex].type = parsedType;
+                    if (parsedCustom) window.accountsData[originalIndex].customType = parsedCustom;
+                }
+                
+                // 2. Rebuild the accountsData array based on the new DOM order
+                const allDomCards = Array.from(document.querySelectorAll('.account-card'));
+                const orderedIndexes = allDomCards.map(c => parseInt(c.getAttribute('data-account-index')));
+                
+                const newAccountsData = orderedIndexes.map(idx => window.accountsData[idx]);
+                window.accountsData = newAccountsData;
+                
+                // 3. Save and re-render
+                await window.saveAccountsToCloud();
+                window.renderAccounts(); // Re-render to cleanly reset all the data-account-indexes
+            }
+            
+            draggedItem = null;
+            draggedType = null;
+        });
+    });
+
+    // Drop zones for cards (the individual grids inside sections)
+    const grids = container.querySelectorAll('.account-type-grid');
+    grids.forEach(grid => {
+        grid.addEventListener('dragover', (e) => {
+            if (draggedType === 'card') {
+                e.preventDefault();
+                const afterElement = getDragAfterElement(grid, e.clientY, '.account-card');
+                if (afterElement == null) {
+                    grid.appendChild(draggedItem);
+                } else {
+                    grid.insertBefore(draggedItem, afterElement);
+                }
+            }
+        });
+    });
+
+    // ==========================================
+    // 3. Math Helper for Drop Placement
+    // ==========================================
+    function getDragAfterElement(parentContainer, y, selector) {
+        // Select all draggable elements that are NOT currently being dragged
+        const draggableElements = [...parentContainer.querySelectorAll(`${selector}:not([style*="opacity: 0.4"])`)];
+
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            // Calculate distance between mouse cursor and center of the element
+            const offset = y - box.top - box.height / 2;
+            
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
 };
 
 window.saveTransactionEdit = async () => {
@@ -881,13 +1016,8 @@ window.renderAccounts = async () => {
             </div>
         `;
     }
-    
     container.innerHTML = html;
-    
-    // Setup drag and drop
     window.setupAccountDragDrop();
-    
-    // Calculate grand total in user's currency using cached prices
     const cache = window.getPriceCache();
     for (const acc of window.accountsData) {
         const balance = parseFloat(acc.balance || 0);
@@ -1069,8 +1199,6 @@ window.setupAccountDragDrop = () => {
         draggedType = draggedElement.getAttribute('data-type');
         const accountIndex = draggedElement.getAttribute('data-account-index');
         
-        console.log('Drag start:', { accountIndex, draggedType });
-        
         if (accountIndex !== null) {
             e.dataTransfer.effectAllowed = 'move';
             e.dataTransfer.setData('accountIndex', accountIndex);
@@ -1110,8 +1238,6 @@ window.setupAccountDragDrop = () => {
         const targetAccountIndex = dropTarget.getAttribute('data-account-index');
         const targetType = dropTarget.getAttribute('data-account-type');
         
-        console.log('Drop:', { accountIndex, typeSection, targetAccountIndex, targetType });
-        
         // Handle account card drag (reorder within or between types)
         if (accountIndex) {
             const draggedIdx = parseInt(accountIndex);
@@ -1122,8 +1248,6 @@ window.setupAccountDragDrop = () => {
                 window.accountsData.splice(draggedIdx, 1);
                 const insertIdx = draggedIdx < targetIdx ? targetIdx - 1 : targetIdx;
                 window.accountsData.splice(insertIdx, 0, draggedAcc);
-                
-                console.log('Reordered accounts:', window.accountsData.map(a => a.name));
                 
                 await window.saveAccountsToCloud();
                 await window.renderAccounts();
@@ -1140,8 +1264,6 @@ window.setupAccountDragDrop = () => {
                 // Insert at target position
                 const insertIdx = draggedTypeIdx < targetTypeIdx ? targetTypeIdx - 1 : targetTypeIdx;
                 window.userSettings.typeOrder.splice(insertIdx, 0, draggedTypeValue);
-                
-                console.log('Reordered types:', window.userSettings.typeOrder);
                 
                 await window.saveSettingsToCloud();
                 await window.renderAccounts();
@@ -1197,33 +1319,44 @@ window.cancelDeleteAccount = () => {
 };
 
 window.editAccount = (index) => {
-    const acc = window.accountsData[index];
-    if (!acc) return;
-    
-    window.editingAccountIndex = index;
-    document.getElementById('acc-name').value = acc.name || '';
-    document.getElementById('acc-type').value = acc.type || 'bank';
-    document.getElementById('acc-balance').value = acc.balance || 0;
-    document.getElementById('acc-color').value = acc.color || '#00D26A';
-    document.getElementById('acc-note').value = acc.note || '';
-    document.getElementById('acc-favorite').checked = acc.favorite || false;
-    document.getElementById('acc-currency').value = acc.currency || '';
-    
-    // Handle custom type
-    const customGroup = document.getElementById('custom-type-group');
-    if (acc.type === 'custom') {
-        document.getElementById('acc-custom-type').value = acc.customType || '';
-        if (customGroup) customGroup.style.display = 'block';
-    } else {
-        if (customGroup) customGroup.style.display = 'none';
-    }
-    
-    const saveBtn = document.getElementById('save-account-btn');
-    if (saveBtn) saveBtn.innerText = 'Update Account';
-    
-    const overlay = document.getElementById('account-overlay');
-    if (overlay) overlay.classList.add('active');
-};
+        const acc = window.accountsData[index];
+        if (!acc) return;
+        
+        window.editingAccountIndex = index;
+        document.getElementById('acc-name').value = acc.name || '';
+        document.getElementById('acc-type').value = acc.type || 'bank';
+        document.getElementById('acc-balance').value = acc.balance || 0;
+        document.getElementById('acc-color').value = acc.color || '#00D26A';
+        document.getElementById('acc-note').value = acc.note || '';
+        document.getElementById('acc-favorite').checked = acc.favorite || false;
+        document.getElementById('acc-currency').value = acc.currency || '';
+        
+        // Handle custom type visibility and population
+        const customGroup = document.getElementById('custom-type-group');
+        if (acc.type === 'custom') {
+            document.getElementById('acc-custom-type').value = acc.customType || '';
+            if (customGroup) customGroup.style.display = 'block';
+        } else {
+            if (customGroup) customGroup.style.display = 'none';
+        }
+
+        // Expand the "More Options" section if favorite or currency has data
+        const expandSection = document.getElementById('acc-expand-section');
+        const expandBtn = document.getElementById('acc-expand-btn');
+        if (acc.favorite || acc.currency) {
+            if (expandSection) expandSection.style.display = 'block';
+            if (expandBtn) expandBtn.innerText = '- Less Options';
+        } else {
+            if (expandSection) expandSection.style.display = 'none';
+            if (expandBtn) expandBtn.innerText = '+ More Options';
+        }
+        
+        const saveBtn = document.getElementById('save-account-btn');
+        if (saveBtn) saveBtn.innerText = 'Update Account';
+        
+        const overlay = document.getElementById('account-overlay');
+        if (overlay) overlay.classList.add('active');
+    };
 
 window.closeAccountModal = () => {
     const overlay = document.getElementById('account-overlay');
@@ -1627,14 +1760,19 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('acc-favorite').checked = false;
         document.getElementById('acc-currency').value = '';
         document.getElementById('acc-custom-type').value = '';
+        
         const customGroup = document.getElementById('custom-type-group');
         if (customGroup) customGroup.style.display = 'none';
+        
         const expandSection = document.getElementById('acc-expand-section');
         if (expandSection) expandSection.style.display = 'none';
+        
         const expandBtn = document.getElementById('acc-expand-btn');
         if (expandBtn) expandBtn.innerText = '+ More Options';
+        
         const saveBtn = document.getElementById('save-account-btn');
         if (saveBtn) saveBtn.innerText = 'Save Account';
+        
         const overlay = document.getElementById('account-overlay');
         if(overlay) overlay.classList.add('active');
     });
@@ -1642,9 +1780,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveAccBtn = document.getElementById('save-account-btn');
     if (saveAccBtn) {
         saveAccBtn.addEventListener('click', async () => {
+            const typeValue = document.getElementById('acc-type')?.value || 'bank';
+            
             const accData = {
                 name: document.getElementById('acc-name')?.value || 'Unnamed',
-                type: document.getElementById('acc-type')?.value || 'bank',
+                type: typeValue,
                 balance: parseFloat(document.getElementById('acc-balance')?.value) || 0,
                 color: document.getElementById('acc-color')?.value || '#00D26A',
                 note: document.getElementById('acc-note')?.value || '',
@@ -1652,20 +1792,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 currency: document.getElementById('acc-currency')?.value?.toUpperCase() || ''
             };
             
-            if (window.editingAccountIndex !== undefined) {
-                window.accountsData[window.editingAccountIndex] = { ...window.accountsData[window.editingAccountIndex], ...accData };
+            // Assign customType if applicable, otherwise clear it
+            if (typeValue === 'custom') {
+                accData.customType = document.getElementById('acc-custom-type')?.value || 'Custom';
             } else {
+                accData.customType = null; 
+            }
+            
+            if (window.editingAccountIndex !== undefined) {
+                // Preserve the existing ID when updating
+                accData.id = window.accountsData[window.editingAccountIndex].id;
+                window.accountsData[window.editingAccountIndex] = accData;
+            } else {
+                // Generate a new ID for new accounts
                 accData.id = window.generateUUID();
-                const type = document.getElementById('acc-type')?.value || 'bank';
-                if (type === 'custom') {
-                    accData.customType = document.getElementById('acc-custom-type')?.value || 'Custom';
-                }
                 window.accountsData.push(accData);
             }
             
             await window.saveAccountsToCloud();
-            ['acc-name','acc-balance','acc-note','acc-custom-type','acc-currency'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+            
+            ['acc-name','acc-balance','acc-note','acc-custom-type','acc-currency'].forEach(id => { 
+                const el = document.getElementById(id); 
+                if(el) el.value = ''; 
+            });
             document.getElementById('acc-favorite').checked = false;
+            
             window.closeAccountModal();
             window.renderAccounts();
         });
@@ -1782,139 +1933,209 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const importBtn = document.getElementById('import-btn');
     if (importBtn) {
-        importBtn.addEventListener('click', () => {
+        importBtn.addEventListener('click', async () => {
             const fileInput = document.getElementById('csv-file-input');
             const statusMsg = document.getElementById('import-status');
             if(!fileInput || !statusMsg) return;
 
             const file = fileInput.files[0];
-            if (!file) { statusMsg.innerText = "Please select a file first."; return; }
+            
+            // If file selected, import CSV; otherwise sync to cloud
+            if (file) {
+                // CSV IMPORT FLOW
+                // Show styled confirmation
+                let confirmed;
+                if (typeof window.showConfirmation === 'function') {
+                    confirmed = await window.showConfirmation(
+                        'Import Transactions?',
+                        `This will import and merge "${file.name}" with your existing activity records.\n\nContinue?`
+                    );
+                } else {
+                    confirmed = confirm(`This will import and merge "${file.name}" with your existing activity records?\n\nContinue?`);
+                }
+                
+                if (!confirmed) {
+                    statusMsg.innerText = "Import cancelled.";
+                    statusMsg.style.color = "var(--text-secondary)";
+                    return;
+                }
 
-            const reader = new FileReader();
-            reader.onload = async (e) => {
                 statusMsg.innerText = "Processing Data..."; 
                 statusMsg.style.color = "var(--text)";
                 
-                const text = e.target.result;
-                const parseCSV = (str) => {
-                    const rows = []; let row = [], current = '', inQuotes = false;
-                    for (let i = 0; i < str.length; i++) {
-                        const char = str[i];
-                        if (char === '"') inQuotes = !inQuotes; else if (char === ',' && !inQuotes) { row.push(current); current = ''; }
-                        else if ((char === '\n' || char === '\r') && !inQuotes) { if (char === '\r' && str[i+1] === '\n') i++; row.push(current); rows.push(row); row = []; current = ''; } 
-                        else current += char;
-                    }
-                    if (current || row.length > 0) { row.push(current); rows.push(row); }
-                    return rows;
-                };
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    const text = e.target.result;
+                    const parseCSV = (str) => {
+                        const rows = []; let row = [], current = '', inQuotes = false;
+                        for (let i = 0; i < str.length; i++) {
+                            const char = str[i];
+                            if (char === '"') inQuotes = !inQuotes; else if (char === ',' && !inQuotes) { row.push(current); current = ''; }
+                            else if ((char === '\n' || char === '\r') && !inQuotes) { if (char === '\r' && str[i+1] === '\n') i++; row.push(current); rows.push(row); row = []; current = ''; } 
+                            else current += char;
+                        }
+                        if (current || row.length > 0) { row.push(current); rows.push(row); }
+                        return rows;
+                    };
 
-                const rows = parseCSV(text);
-                const parsedData = [];
-                const cleanString = (str) => str ? str.toString().replace(/^"|"$/g, '').trim() : '';
+                    const rows = parseCSV(text);
+                    const parsedData = [];
+                    const cleanString = (str) => str ? str.toString().replace(/^"|"$/g, '').trim() : '';
 
-                const COL_TIMESTAMP = 1;
-                const COL_NAME = 2;
-                const COL_AMOUNT = 3;
-                const COL_TYPE = 10;
-                const COL_CATEGORY = 11;
-                const COL_NOTES = 14;
-                
-                let dataStartIdx = -1;
-                for (let i = 0; i < Math.min(rows.length, 30); i++) {
-                    if (rows[i] && rows[i].length > COL_AMOUNT) {
-                        const potentialTS = cleanString(rows[i][COL_TIMESTAMP]);
-                        if (/^\d{4}-\d{2}-\d{2}/.test(potentialTS)) {
-                            dataStartIdx = i;
-                            break;
+                    const COL_TIMESTAMP = 1;
+                    const COL_NAME = 2;
+                    const COL_AMOUNT = 3;
+                    const COL_TYPE = 10;
+                    const COL_CATEGORY = 11;
+                    const COL_NOTES = 14;
+                    
+                    let dataStartIdx = -1;
+                    for (let i = 0; i < Math.min(rows.length, 30); i++) {
+                        if (rows[i] && rows[i].length > COL_AMOUNT) {
+                            const potentialTS = cleanString(rows[i][COL_TIMESTAMP]);
+                            if (/^\d{4}-\d{2}-\d{2}/.test(potentialTS)) {
+                                dataStartIdx = i;
+                                break;
+                            }
                         }
                     }
-                }
-                
-                if (dataStartIdx === -1) { statusMsg.innerText = "Error: Could not locate data rows starting from Row 10."; statusMsg.style.color = "var(--accent-red)"; return; }
-
-                for (let i = dataStartIdx; i < rows.length; i++) {
-                    const cols = rows[i];
-                    if (!cols || cols.length <= COL_AMOUNT) continue;
-
-                    const timestampStr = cleanString(cols[COL_TIMESTAMP]);
-                    const nameStr = cleanString(cols[COL_NAME]);
-                    const rawAmountStr = cleanString(cols[COL_AMOUNT]);
-
-                    if (!timestampStr && !rawAmountStr) continue;
-
-                    const hasMinusSign = rawAmountStr.includes('-');
-                    const hasParentheses = rawAmountStr.includes('(') && rawAmountStr.includes(')');
-                    let finalAmount = parseFloat(rawAmountStr.replace(/[^0-9.]/g, '')) || 0;
                     
-                    if (hasMinusSign || hasParentheses) {
-                        finalAmount = -Math.abs(finalAmount);
-                    }
+                    if (dataStartIdx === -1) { statusMsg.innerText = "Error: Could not locate data rows starting from Row 10."; statusMsg.style.color = "var(--accent-red)"; return; }
 
-                    const typeStr = cols.length > COL_TYPE ? cleanString(cols[COL_TYPE]).toUpperCase() : '';
-                    const categoryStr = cols.length > COL_CATEGORY ? cleanString(cols[COL_CATEGORY]) : '';
-                    const notesStr = cols.length > COL_NOTES ? cleanString(cols[COL_NOTES]) : '';
+                    for (let i = dataStartIdx; i < rows.length; i++) {
+                        const cols = rows[i];
+                        if (!cols || cols.length <= COL_AMOUNT) continue;
 
-                    const isIncome = typeStr.includes('INCOM');
-                    const isExpense = typeStr.includes('EXPENDITURE');
-                    
-                    let txType = 'Expense';
-                    let txCategory = 'Uncategorized';
-                    let txNotes = notesStr;
-                    
-                    if (isIncome) {
-                        txType = 'Income';
-                        txCategory = 'Income';
-                        txNotes = nameStr; 
-                    } else if (isExpense) {
-                        txType = 'Expense';
-                        txCategory = categoryStr || 'Uncategorized';
-                        txNotes = notesStr || nameStr; 
-                    }
-                    
-                    if (timestampStr && rawAmountStr) {
-                        parsedData.push({
-                            type: txType, category: txCategory,
-                            name: nameStr || 'Unnamed', notes: txNotes, amount: finalAmount, timestamp: timestampStr.replace(' |', '').trim()
-                        });
-                    }
-                }
+                        const timestampStr = cleanString(cols[COL_TIMESTAMP]);
+                        const nameStr = cleanString(cols[COL_NAME]);
+                        const rawAmountStr = cleanString(cols[COL_AMOUNT]);
 
-                if (parsedData.length > 0) {
-                    const fingerprintMap = new Map();
-                    const resolvedData = [];
-                    
-                    parsedData.forEach((item) => {
-                        const baseFingerprint = `${item.timestamp}_${item.name}_${item.amount}`;
+                        if (!timestampStr && !rawAmountStr) continue;
+
+                        const hasMinusSign = rawAmountStr.includes('-');
+                        const hasParentheses = rawAmountStr.includes('(') && rawAmountStr.includes(')');
+                        let finalAmount = parseFloat(rawAmountStr.replace(/[^0-9.]/g, '')) || 0;
                         
-                        if (!fingerprintMap.has(baseFingerprint)) {
-                            fingerprintMap.set(baseFingerprint, 1);
-                            resolvedData.push(item);
-                        } else {
-                            const occurrenceNum = fingerprintMap.get(baseFingerprint);
-                            fingerprintMap.set(baseFingerprint, occurrenceNum + 1);
-                            let ts = new Date(item.timestamp);
-                            ts.setSeconds(ts.getSeconds() + occurrenceNum);
-                            resolvedData.push({ ...item, timestamp: ts.toISOString() });
+                        if (hasMinusSign || hasParentheses) {
+                            finalAmount = -Math.abs(finalAmount);
                         }
-                    });
+
+                        const typeStr = cols.length > COL_TYPE ? cleanString(cols[COL_TYPE]).toUpperCase() : '';
+                        const categoryStr = cols.length > COL_CATEGORY ? cleanString(cols[COL_CATEGORY]) : '';
+                        const notesStr = cols.length > COL_NOTES ? cleanString(cols[COL_NOTES]) : '';
+
+                        const isIncome = typeStr.includes('INCOM');
+                        const isExpense = typeStr.includes('EXPENDITURE');
+                        
+                        let txType = 'Expense';
+                        let txCategory = 'Uncategorized';
+                        let txNotes = notesStr;
+                        
+                        if (isIncome) {
+                            txType = 'Income';
+                            txCategory = 'Income';
+                            txNotes = nameStr; 
+                        } else if (isExpense) {
+                            txType = 'Expense';
+                            txCategory = categoryStr || 'Uncategorized';
+                            txNotes = notesStr || nameStr; 
+                        }
+                        
+                        if (timestampStr && rawAmountStr) {
+                            parsedData.push({
+                                type: txType, category: txCategory,
+                                name: nameStr || 'Unnamed', notes: txNotes, amount: finalAmount, timestamp: timestampStr.replace(' |', '').trim()
+                            });
+                        }
+                    }
+
+                    if (parsedData.length > 0) {
+                        const fingerprintMap = new Map();
+                        const resolvedData = [];
+                        
+                        parsedData.forEach((item) => {
+                            const baseFingerprint = `${item.timestamp}_${item.name}_${item.amount}`;
+                            
+                            if (!fingerprintMap.has(baseFingerprint)) {
+                                fingerprintMap.set(baseFingerprint, 1);
+                                resolvedData.push(item);
+                            } else {
+                                const occurrenceNum = fingerprintMap.get(baseFingerprint);
+                                fingerprintMap.set(baseFingerprint, occurrenceNum + 1);
+                                // Parse timestamp while preserving timezone (don't use toISOString)
+                                let ts = new Date(item.timestamp);
+                                ts.setSeconds(ts.getSeconds() + occurrenceNum);
+                                // Keep original timestamp format to avoid timezone shifts
+                                const year = ts.getFullYear();
+                                const month = String(ts.getMonth() + 1).padStart(2, '0');
+                                const day = String(ts.getDate()).padStart(2, '0');
+                                const hours = String(ts.getHours()).padStart(2, '0');
+                                const minutes = String(ts.getMinutes()).padStart(2, '0');
+                                const seconds = String(ts.getSeconds()).padStart(2, '0');
+                                const newTimestamp = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+                                resolvedData.push({ ...item, timestamp: newTimestamp });
+                            }
+                        });
+                        
+                        await window.bulkUpsertTransactions(resolvedData); 
+                        statusMsg.innerText = `Successfully synced ${resolvedData.length} records to the Cloud!`; 
+                        statusMsg.style.color = "var(--primary)";
+                        
+                        window.updateDashboard(); 
+                        window.populateCategoryFilters(); 
+                        window.renderActivity(); 
+                        window.renderBudgetTracking();
+                        window.renderStatistics(window.currentStatRange);
+                    } else { 
+                        statusMsg.innerText = `No valid data found.`; 
+                        statusMsg.style.color = "var(--accent-red)"; 
+                    }
+                };
+                reader.readAsText(file);
+            } else {
+                // SYNC TO CLOUD FLOW
+                // Show confirmation
+                let confirmed;
+                if (typeof window.showConfirmation === 'function') {
+                    confirmed = await window.showConfirmation(
+                        'Sync Data to Cloud?',
+                        'This will upload your accounts, goals, subscriptions and settings to Supabase.'
+                    );
+                } else {
+                    confirmed = confirm('Sync data to cloud? This will upload your accounts, goals, subscriptions and settings to Supabase.');
+                }
+                
+                if (!confirmed) {
+                    statusMsg.innerText = "Sync cancelled.";
+                    statusMsg.style.color = "var(--text-secondary)";
+                    return;
+                }
+
+                statusMsg.innerText = "Syncing data..."; 
+                statusMsg.style.color = "var(--text)";
+                
+                try {
+                    // Save all data to cloud
+                    await window.saveAccountsToCloud();
+                    await window.saveGoalsToCloud();
+                    await window.saveSubscriptionsToCloud();
+                    await window.saveSettingsToCloud();
                     
-                    await window.bulkUpsertTransactions(resolvedData); 
-                    statusMsg.innerText = `Successfully synced ${resolvedData.length} records to the Cloud!`; 
+                    statusMsg.innerText = "✓ All data synced to cloud successfully!";
                     statusMsg.style.color = "var(--primary)";
                     
-                    window.updateDashboard(); 
-                    window.populateCategoryFilters(); 
-                    window.renderActivity(); 
-                    window.renderBudgetTracking();
-                    window.renderStatistics(window.currentStatRange);
-                } else { 
-                    statusMsg.innerText = `No valid data found.`; 
-                    statusMsg.style.color = "var(--accent-red)"; 
+                    setTimeout(() => {
+                        statusMsg.innerText = "";
+                    }, 3000);
+                } catch (error) {
+                    console.error('Sync error:', error);
+                    statusMsg.innerText = "Error syncing data. Please try again.";
+                    statusMsg.style.color = "var(--accent-red)";
                 }
-            };
-            reader.readAsText(file);
+            }
         });
     }
+
 
     // Save Goal Handler
     document.getElementById('save-goal-btn')?.addEventListener('click', async () => {

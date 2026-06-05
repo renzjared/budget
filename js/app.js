@@ -1,9 +1,3 @@
-// js/app.js
-
-// ==========================================
-// 1. GLOBAL CORE FUNCTIONS
-// ==========================================
-
 window.switchView = (targetId) => {
     if (!targetId) return;
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -14,11 +8,19 @@ window.switchView = (targetId) => {
     
     const navMatch = document.querySelector(`.nav-btn[data-target="${targetId}"]`);
     if (navMatch) navMatch.classList.add('active');
-    
+
     const viewEl = document.getElementById(targetId);
     if (viewEl) {
         viewEl.classList.add('active');
         viewEl.style.display = 'block'; 
+    }
+
+    // close sidebar on mobile after clicking a link
+    const sidebar = document.getElementById('main-sidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    if (sidebar && sidebar.classList.contains('mobile-open')) {
+        sidebar.classList.remove('mobile-open');
+        if (backdrop) backdrop.classList.remove('active');
     }
 };
 
@@ -1451,11 +1453,6 @@ window.bootUI = () => {
 // ==========================================
 
 document.addEventListener('DOMContentLoaded', () => {
-
-    // ==========================================
-    // DEFINE MODAL FUNCTIONS EARLY
-    // ==========================================
-    
     window.openGoalModal = (goalId = null) => {
         const modal = document.getElementById('goal-overlay');
         const title = document.getElementById('goal-modal-title');
@@ -2246,6 +2243,23 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('goal-allocation-overlay')?.addEventListener('click', (e) => {
         if (e.target.id === 'goal-allocation-overlay') window.closeGoalAllocationModal();
     });
+    
+    // --- MOBILE MENU HANDLERS ---
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+    const sidebar = document.getElementById('main-sidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    
+    if (mobileMenuBtn && sidebar && backdrop) {
+        mobileMenuBtn.addEventListener('click', () => {
+            sidebar.classList.add('mobile-open');
+            backdrop.classList.add('active');
+        });
+        
+        backdrop.addEventListener('click', () => {
+            sidebar.classList.remove('mobile-open');
+            backdrop.classList.remove('active');
+        });
+    }
     
     // ==========================================
     // GOAL ALLOCATION FUNCTIONS

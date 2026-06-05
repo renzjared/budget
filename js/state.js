@@ -201,6 +201,7 @@ window.initApp = async () => {
         } else if (event === 'SIGNED_OUT') {
             window.currentUser = null;
             document.getElementById('main-sidebar').style.display = 'none';
+            if (document.getElementById('mobile-header')) document.getElementById('mobile-header').style.display = 'none';
             window.switchView('landing');
         }
     });
@@ -212,6 +213,7 @@ window.initApp = async () => {
         await handleUserRouting();
     } else {
         document.getElementById('main-sidebar').style.display = 'none';
+        if (document.getElementById('mobile-header')) document.getElementById('mobile-header').style.display = 'none';
         window.switchView('landing');
     }
 };
@@ -224,6 +226,7 @@ async function handleUserRouting() {
     } else {
         window.userProfile = profile;
         document.getElementById('main-sidebar').style.display = 'flex';
+        if (document.getElementById('mobile-header')) document.getElementById('mobile-header').style.display = 'flex';
         await loadCloudData();
         window.switchView('dashboard');
         if (window.bootUI) window.bootUI();

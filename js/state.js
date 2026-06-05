@@ -168,12 +168,39 @@ window.saveSettingsToCloud = async () => {
     await window.supabase.from('settings').upsert(payload);
 };
 
+window.generateUUID = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+};
+
 window.saveAccountsToCloud = async () => {
-    await window.supabase.from('accounts').delete().eq('user_id', window.currentUser.id);
-    if (window.accountsData.length > 0) {
-        const payload = window.accountsData.map(a => ({ ...a, user_id: window.currentUser.id }));
-        await window.supabase.from('accounts').insert(payload);
+    if (window.accountsData.length === 0) {
+        await window.supabase.from('accounts').delete().eq('user_id', window.currentUser.id);
+        return;
     }
+    
+    const payload = window.accountsData.map(a => ({
+        id: a.id || window.generateUUID(),
+        user_id: window.currentUser.id,
+        name: a.name,
+        type: a.type,
+        balance: a.balance,
+        color: a.color,
+        note: a.note
+    }));
+    
+    const { error } = await window.supabase
+        .from('accounts')
+        .upsert(payload, { onConflict: 'id' });
+    
+    if (error) {
+        console.error('Error saving accounts:', error);
+        throw error;
+    }
+    
+    window.accountsData = window.accountsData.map((a, idx) => ({ ...a, id: a.id || payload[idx].id }));
 };
 
 window.bulkUpsertTransactions = async (parsedData) => {

@@ -387,6 +387,8 @@ window.openReceiptModal = (entry) => {
     const overlay = document.getElementById('receipt-overlay');
     if(!overlay) return;
     
+    window.currentEditingTransaction = entry;
+    
     const isIncome = (entry.amount || 0) >= 0;
     const safeSet = (id, text) => { const el = document.getElementById(id); if(el) el.innerText = text; };
 
@@ -401,13 +403,110 @@ window.openReceiptModal = (entry) => {
     
     if (merchRow && merchText) {
         merchRow.style.display = 'flex';
-        merchText.innerText = entry.notes ? entry.notes : 'N/A'; 
+        merchText.innerText = entry.merchant ? entry.merchant : 'N/A'; 
     }
 
     overlay.classList.add('active');
 };
 
 window.closeReceiptModal = () => { const overlay = document.getElementById('receipt-overlay'); if(overlay) overlay.classList.remove('active'); }
+
+window.currentEditingTransaction = null;
+
+window.editTransaction = () => {
+    if (!window.currentEditingTransaction) return;
+    const entry = window.currentEditingTransaction;
+    
+    document.getElementById('edit-tx-name').value = entry.name || '';
+    document.getElementById('edit-tx-amount').value = Math.abs(entry.amount) || 0;
+    document.getElementById('edit-tx-merchant').value = entry.merchant || '';
+    document.getElementById('edit-tx-notes').value = entry.notes || '';
+    
+    const catSelect = document.getElementById('edit-tx-category');
+    catSelect.innerHTML = '';
+    const allCategories = new Set([...(window.userSettings.categories?.map(c => c.name) || []), entry.category]);
+    Array.from(allCategories).forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat;
+        opt.innerText = cat;
+        catSelect.appendChild(opt);
+    });
+    catSelect.value = entry.category || '';
+    
+    window.closeReceiptModal();
+    const overlay = document.getElementById('edit-transaction-overlay');
+    if(overlay) overlay.classList.add('active');
+};
+
+window.closeEditTransactionModal = () => {
+    const overlay = document.getElementById('edit-transaction-overlay');
+    if(overlay) overlay.classList.remove('active');
+    window.currentEditingTransaction = null;
+};
+
+window.saveTransactionEdit = async () => {
+    if (!window.currentEditingTransaction) return;
+    
+    const entry = window.currentEditingTransaction;
+    const newName = document.getElementById('edit-tx-name').value.trim();
+    const newAmount = parseFloat(document.getElementById('edit-tx-amount').value);
+    const newCategory = document.getElementById('edit-tx-category').value;
+    const newMerchant = document.getElementById('edit-tx-merchant').value.trim();
+    const newNotes = document.getElementById('edit-tx-notes').value.trim();
+    
+    if (!newName || !newAmount || isNaN(newAmount)) {
+        alert('Please fill in Name and Amount');
+        return;
+    }
+    
+    const isIncome = entry.amount >= 0;
+    const finalAmount = isIncome ? Math.abs(newAmount) : -Math.abs(newAmount);
+    
+    const { error } = await window.supabase
+        .from('transactions')
+        .update({
+            name: newName,
+            amount: finalAmount,
+            category: newCategory,
+            merchant: newMerchant,
+            notes: newNotes
+        })
+        .eq('id', entry.id);
+    
+    if (error) {
+        console.error('Error updating transaction:', error);
+        alert('Error saving changes');
+    } else {
+        window.closeEditTransactionModal();
+        await window.loadCloudData();
+        window.updateDashboard();
+        window.renderActivity?.();
+        window.renderBudgetTracking?.();
+    }
+};
+
+window.deleteTransaction = async () => {
+    if (!window.currentEditingTransaction) return;
+    
+    if (!confirm('Are you sure you want to delete this transaction? This cannot be undone.')) return;
+    
+    const entry = window.currentEditingTransaction;
+    const { error } = await window.supabase
+        .from('transactions')
+        .delete()
+        .eq('id', entry.id);
+    
+    if (error) {
+        console.error('Error deleting transaction:', error);
+        alert('Error deleting transaction');
+    } else {
+        window.closeEditTransactionModal();
+        await window.loadCloudData();
+        window.updateDashboard();
+        window.renderActivity?.();
+        window.renderBudgetTracking?.();
+    }
+};
 
 window.renderStatistics = (range = 'all') => {
     window.currentStatRange = range;
@@ -511,48 +610,198 @@ window.renderBudgetTracking = () => {
 };
 
 window.renderAccounts = () => {
-    const bankGrid = document.getElementById('bank-accounts-grid');
-    const investGrid = document.getElementById('investment-accounts-grid');
-    const onhandGrid = document.getElementById('onhand-accounts-grid');
-    if (!bankGrid || !investGrid) return;
-
-    let total = 0; let bankHTML = ''; let investHTML = ''; let onhandHTML = '';
+    const container = document.getElementById('accounts-container');
+    if (!container) return;
     
+    let grandTotal = 0;
+    
+    // Group accounts by type
+    const groupedByType = {};
     window.accountsData.forEach((acc, index) => {
-        total += parseFloat(acc.balance || 0);
-        const initial = (acc.name || '?').charAt(0).toUpperCase();
-        const cardHTML = `
-            <div class="account-card" style="--acc-color: ${acc.color};">
-                <div class="acc-header">
-                    <div class="acc-icon-box" style="color: ${acc.color};">${initial}</div>
-                    <div style="display: flex; gap: 8px;">
-                        <button onclick="window.editAccount(${index})" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size: 16px;">✎</button>
-                        <button onclick="window.deleteAccount(${index})" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size: 16px;">✕</button>
-                    </div>
-                </div>
-                <div style="cursor:pointer;" onclick="window.editAccount(${index})">
-                    <p class="text-muted" style="font-size: 13px;">${acc.name || 'Unnamed'}</p>
-                    <h2 class="acc-balance">${window.formatMoney(acc.balance)}</h2>
-                    <p class="text-muted" style="font-size: 12px; margin-top: 8px;">${acc.note || ''}</p>
-                </div>
-            </div>`;
-        if (acc.type === 'investment') investHTML += cardHTML;
-        else if (acc.type === 'onhand') onhandHTML += cardHTML;
-        else bankHTML += cardHTML;
-    });
-
-    bankGrid.innerHTML = bankHTML;
-    investGrid.innerHTML = investHTML;
-    if (onhandGrid) {
-        onhandGrid.innerHTML = onhandHTML;
-        const onhandSection = Array.from(document.querySelectorAll('h3')).find(h => h.innerText.includes('On-hand'));
-        if (onhandSection) {
-            if (onhandHTML) onhandSection.style.display = 'block';
-            else onhandSection.style.display = 'none';
+        let type = acc.type || 'bank';
+        let groupKey = type;
+        
+        // For custom types, use customType as the group key
+        if (type === 'custom' && acc.customType) {
+            groupKey = `custom:${acc.customType}`;
         }
-    }
+        
+        if (!groupedByType[groupKey]) {
+            groupedByType[groupKey] = [];
+        }
+        groupedByType[groupKey].push({ ...acc, _index: index });
+        grandTotal += parseFloat(acc.balance || 0);
+    });
+    
+    // Get type labels
+    const typeLabels = {
+        'bank': 'Banks & E-Wallets',
+        'onhand': 'On-hand Cash',
+        'investment': 'Investments',
+        'custom': 'Custom'
+    };
+    
+    // Define default type order
+    const defaultOrder = ['bank', 'onhand', 'investment'];
+    const allTypes = Object.keys(groupedByType);
+    const customTypes = allTypes.filter(t => t.startsWith('custom:') || (!defaultOrder.includes(t) && !['bank', 'onhand', 'investment'].includes(t)));
+    const orderedTypes = [...defaultOrder.filter(t => allTypes.includes(t)), ...customTypes.sort()];
+    
+    // Render each type section
+    let html = '';
+    orderedTypes.forEach(type => {
+        const accounts = groupedByType[type];
+        if (!accounts || accounts.length === 0) return;
+        
+        const typeLabel = typeLabels[type] || (type.startsWith('custom:') ? type.substring(7) : type.charAt(0).toUpperCase() + type.slice(1));
+        let typeTotal = 0;
+        accounts.forEach(acc => {
+            typeTotal += parseFloat(acc.balance || 0);
+        });
+        
+        const typeSign = typeTotal < 0 ? '-' : typeTotal > 0 ? '+' : '';
+        const typeTotalColor = typeTotal < 0 ? 'var(--accent-red)' : typeTotal > 0 ? 'var(--primary)' : 'var(--text-secondary)';
+        
+        html += `
+            <div class="account-type-section" draggable="true" data-type="${type}" style="margin-bottom: 32px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; cursor: grab; user-select: none;" class="type-header-drag">
+                    <h3 style="margin: 0; font-size: 16px; color: var(--text-secondary);">
+                        <span style="cursor: grab; display: inline-block; margin-right: 8px;">⋮⋮</span> ${typeLabel}
+                    </h3>
+                    <span style="font-weight: 700; color: ${typeTotalColor};">${typeSign}${window.formatMoney(Math.abs(typeTotal))}</span>
+                </div>
+                <div class="accounts-grid account-type-grid" data-type="${type}">
+                    ${accounts.map((acc, idx) => {
+                        const initial = (acc.name || '?').charAt(0).toUpperCase();
+                        const isFavorite = acc.favorite || false;
+                        const favIcon = isFavorite ? '★' : '☆';
+                        const favColor = isFavorite ? '#FFD700' : 'var(--text-secondary)';
+                        const balanceColor = acc.balance < 0 ? 'var(--accent-red)' : 'var(--text)';
+                        
+                        return `
+                            <div class="account-card" draggable="true" data-account-index="${acc._index}" style="--acc-color: ${acc.color}; cursor: grab;" data-account-type="${type}">
+                                <div class="acc-header">
+                                    <div class="acc-icon-box" style="color: ${acc.color};">${initial}</div>
+                                    <div style="display: flex; gap: 8px;">
+                                        <button onclick="window.toggleAccountFavorite(${acc._index})" style="background:none; border:none; color:${favColor}; cursor:pointer; font-size: 16px; padding: 0;">
+                                            ${favIcon}
+                                        </button>
+                                        <button onclick="window.editAccount(${acc._index})" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size: 16px;">✎</button>
+                                        <button onclick="window.deleteAccount(${acc._index})" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size: 16px;">✕</button>
+                                    </div>
+                                </div>
+                                <div style="cursor:pointer;" onclick="window.editAccount(${acc._index})">
+                                    <p class="text-muted" style="font-size: 13px;">${acc.name || 'Unnamed'}</p>
+                                    <h2 class="acc-balance" style="color: ${balanceColor};">${acc.balance < 0 ? '-' : ''}${window.formatMoney(Math.abs(acc.balance))}</h2>
+                                    <p class="text-muted" style="font-size: 12px; margin-top: 8px;">${acc.note || ''}</p>
+                                    ${acc.balance < 0 ? '<p class="text-muted" style="font-size: 11px; color: var(--accent-red);">Liability</p>' : ''}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+    
+    // Setup drag and drop
+    window.setupAccountDragDrop();
+    
     const totalBalEl = document.getElementById('accounts-total-balance');
-    if(totalBalEl) totalBalEl.innerText = window.formatMoney(total);
+    if(totalBalEl) {
+        const sign = grandTotal < 0 ? '-' : grandTotal > 0 ? '+' : '';
+        const color = grandTotal < 0 ? 'var(--accent-red)' : 'var(--text)';
+        totalBalEl.innerText = window.formatMoney(grandTotal);
+        totalBalEl.style.color = color;
+    }
+};
+
+window.toggleAccountFavorite = async (index) => {
+    if (index >= 0 && index < window.accountsData.length) {
+        window.accountsData[index].favorite = !window.accountsData[index].favorite;
+        await window.saveAccountsToCloud();
+        window.renderAccounts();
+    }
+};
+
+window.setupAccountDragDrop = () => {
+    let draggedElement = null;
+    let draggedType = null;
+    
+    const handleDragStart = (e) => {
+        draggedElement = e.target.closest('[draggable="true"]');
+        if (!draggedElement) return;
+        
+        draggedType = draggedElement.getAttribute('data-type');
+        const accountIndex = draggedElement.getAttribute('data-account-index');
+        
+        if (accountIndex !== null) {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('accountIndex', accountIndex);
+            draggedElement.style.opacity = '0.5';
+        } else {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('typeSection', draggedType);
+            draggedElement.style.opacity = '0.5';
+        }
+    };
+    
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const overElement = e.target.closest('[draggable="true"]');
+        if (overElement) {
+            overElement.style.opacity = '0.8';
+        }
+    };
+    
+    const handleDragLeave = (e) => {
+        const overElement = e.target.closest('[draggable="true"]');
+        if (overElement && overElement !== draggedElement) {
+            overElement.style.opacity = '1';
+        }
+    };
+    
+    const handleDrop = async (e) => {
+        e.preventDefault();
+        const dropTarget = e.target.closest('[draggable="true"]');
+        if (!dropTarget || dropTarget === draggedElement) return;
+        
+        const accountIndex = e.dataTransfer.getData('accountIndex');
+        const typeSection = e.dataTransfer.getData('typeSection');
+        const targetAccountIndex = dropTarget.getAttribute('data-account-index');
+        const targetType = dropTarget.getAttribute('data-account-type');
+        
+        if (accountIndex) {
+            const draggedIdx = parseInt(accountIndex);
+            const targetIdx = targetAccountIndex ? parseInt(targetAccountIndex) : draggedIdx;
+            
+            if (draggedIdx !== targetIdx) {
+                const draggedAcc = window.accountsData[draggedIdx];
+                window.accountsData.splice(draggedIdx, 1);
+                const insertIdx = draggedIdx < targetIdx ? targetIdx - 1 : targetIdx;
+                window.accountsData.splice(insertIdx, 0, draggedAcc);
+                await window.saveAccountsToCloud();
+                window.renderAccounts();
+            }
+        }
+    };
+    
+    const handleDragEnd = (e) => {
+        document.querySelectorAll('[draggable="true"]').forEach(el => {
+            el.style.opacity = '1';
+        });
+    };
+    
+    document.querySelectorAll('[draggable="true"]').forEach(el => {
+        el.addEventListener('dragstart', handleDragStart, false);
+        el.addEventListener('dragover', handleDragOver, false);
+        el.addEventListener('dragleave', handleDragLeave, false);
+        el.addEventListener('drop', handleDrop, false);
+        el.addEventListener('dragend', handleDragEnd, false);
+    });
 };
 
 window.deleteAccount = async (index) => {
@@ -596,6 +845,16 @@ window.editAccount = (index) => {
     document.getElementById('acc-balance').value = acc.balance || 0;
     document.getElementById('acc-color').value = acc.color || '#00D26A';
     document.getElementById('acc-note').value = acc.note || '';
+    document.getElementById('acc-favorite').checked = acc.favorite || false;
+    
+    // Handle custom type
+    const customGroup = document.getElementById('custom-type-group');
+    if (acc.type === 'custom') {
+        document.getElementById('acc-custom-type').value = acc.customType || '';
+        if (customGroup) customGroup.style.display = 'block';
+    } else {
+        if (customGroup) customGroup.style.display = 'none';
+    }
     
     const saveBtn = document.getElementById('save-account-btn');
     if (saveBtn) saveBtn.innerText = 'Update Account';
@@ -860,6 +1119,21 @@ document.addEventListener('DOMContentLoaded', () => {
             }).catch(err => console.error("Could not generate image", err));
         });
     }
+    
+    const editReceiptBtn = document.getElementById('edit-receipt-btn');
+    if (editReceiptBtn) {
+        editReceiptBtn.addEventListener('click', window.editTransaction);
+    }
+    
+    const saveEditBtn = document.getElementById('save-tx-edit-btn');
+    if (saveEditBtn) {
+        saveEditBtn.addEventListener('click', window.saveTransactionEdit);
+    }
+    
+    const deleteBtn = document.getElementById('delete-tx-btn');
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', window.deleteTransaction);
+    }
 
     document.querySelectorAll('#stats-filters .chip').forEach(chip => {
         chip.addEventListener('click', (e) => {
@@ -882,6 +1156,10 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('acc-balance').value = '';
         document.getElementById('acc-color').value = '#00D26A';
         document.getElementById('acc-note').value = '';
+        document.getElementById('acc-favorite').checked = false;
+        document.getElementById('acc-custom-type').value = '';
+        const customGroup = document.getElementById('custom-type-group');
+        if (customGroup) customGroup.style.display = 'none';
         const saveBtn = document.getElementById('save-account-btn');
         if (saveBtn) saveBtn.innerText = 'Save Account';
         const overlay = document.getElementById('account-overlay');
@@ -896,17 +1174,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 type: document.getElementById('acc-type')?.value || 'bank',
                 balance: parseFloat(document.getElementById('acc-balance')?.value) || 0,
                 color: document.getElementById('acc-color')?.value || '#00D26A',
-                note: document.getElementById('acc-note')?.value || ''
+                note: document.getElementById('acc-note')?.value || '',
+                favorite: document.getElementById('acc-favorite')?.checked || false
             };
             
             if (window.editingAccountIndex !== undefined) {
-                window.accountsData[window.editingAccountIndex] = accData;
+                window.accountsData[window.editingAccountIndex] = { ...window.accountsData[window.editingAccountIndex], ...accData };
             } else {
+                accData.id = window.generateUUID();
+                const type = document.getElementById('acc-type')?.value || 'bank';
+                if (type === 'custom') {
+                    accData.customType = document.getElementById('acc-custom-type')?.value || 'Custom';
+                }
                 window.accountsData.push(accData);
             }
             
             await window.saveAccountsToCloud();
-            ['acc-name','acc-balance','acc-note'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+            ['acc-name','acc-balance','acc-note','acc-custom-type'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+            document.getElementById('acc-favorite').checked = false;
             window.closeAccountModal();
             window.renderAccounts();
         });

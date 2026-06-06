@@ -24,6 +24,171 @@ window.switchView = (targetId) => {
     }
 };
 
+window.quickAddTemplate = (name, amount, category, merchant) => {
+    const isIncome = amount >= 0;
+    if (isIncome) {
+        document.getElementById('inc-name').value = name || '';
+        document.getElementById('inc-amount').value = Math.abs(amount) || '';
+        document.getElementById('inc-category').value = category || 'INCOME';
+        document.getElementById('inc-notes').value = '';
+        window.openIncomeModal();
+    } else {
+        document.getElementById('exp-name').value = name || '';
+        document.getElementById('exp-amount').value = Math.abs(amount) || '';
+        
+        // Ensure category exists in dropdown, else fallback
+        const expCat = document.getElementById('exp-category');
+        if (Array.from(expCat.options).some(opt => opt.value === category)) {
+            expCat.value = category;
+        } else {
+            expCat.value = expCat.options[0]?.value || '';
+        }
+        
+        document.getElementById('exp-merchant').value = merchant || '';
+        document.getElementById('exp-notes').value = '';
+        window.openExpenseModal();
+    }
+};
+
+window.toggleTxFavorite = async (dbId, localId) => {
+    const tx = window.appData.find(t => t._id === localId);
+    if (!tx) return;
+    
+    tx.favorite = !tx.favorite; // Toggle locally
+    window.updateDashboard();
+    if(window.renderActivity) window.renderActivity();
+    
+    // Save to Cloud
+    const { error } = await window.supabase.from('transactions').update({ favorite: tx.favorite }).eq('id', dbId);
+    if (error) {
+        console.error("Error updating favorite status", error);
+        tx.favorite = !tx.favorite; // Revert on failure
+        window.updateDashboard();
+    }
+};
+
+window.renderQuickAddWidget = () => {
+    const favContainer = document.getElementById('quick-add-favorites');
+    const recContainer = document.getElementById('quick-add-recent');
+    const freqContainer = document.getElementById('quick-add-frequent');
+    if (!favContainer || !recContainer || !freqContainer) return;
+
+    const createChip = (tx) => {
+        const isIncome = tx.amount >= 0;
+        const color = isIncome ? 'var(--primary)' : 'var(--text)';
+        const safeName = (tx.name || '').replace(/'/g, "\\'");
+        const safeCat = (tx.category || '').replace(/'/g, "\\'");
+        const safeMerchant = (tx.merchant || '').replace(/'/g, "\\'");
+        return `<button class="chip" style="border-color: ${color}; color: ${color}; padding: 6px 12px;" 
+            onclick="window.quickAddTemplate('${safeName}', ${tx.amount}, '${safeCat}', '${safeMerchant}')">
+            ${tx.name} (${window.formatMoney(Math.abs(tx.amount))})
+        </button>`;
+    };
+
+    // 1. Favorites (Starred)
+    const favorites = window.appData.filter(t => t.favorite);
+    const uniqueFavs = []; const favSet = new Set();
+    favorites.forEach(f => {
+        const key = `${f.name}_${f.amount}`;
+        if (!favSet.has(key)) { favSet.add(key); uniqueFavs.push(f); }
+    });
+    favContainer.innerHTML = uniqueFavs.length ? uniqueFavs.slice(0, 8).map(createChip).join('') : '<span class="text-muted" style="font-size: 12px;">No favorites yet. Click the star icon on any transaction in your Activity list.</span>';
+
+    // 2. Recent (Max 5, deduplicated, excluding favorites)
+    const uniqueRecent = []; const recSet = new Set();
+    for (let t of window.appData) {
+        const key = `${t.name}_${t.amount}`;
+        if (!recSet.has(key) && !t.favorite) {
+            recSet.add(key); uniqueRecent.push(t);
+            if (uniqueRecent.length >= 6) break;
+        }
+    }
+    recContainer.innerHTML = uniqueRecent.length ? uniqueRecent.map(createChip).join('') : '<span class="text-muted" style="font-size: 12px;">No recent transactions.</span>';
+
+    // 3. Most Frequent (Occurs > 2 times, excluding favs/recent)
+    const freqMap = {};
+    window.appData.forEach(t => {
+        const key = `${t.name}|${t.amount}|${t.category}`;
+        if (!freqMap[key]) freqMap[key] = { count: 0, tx: t };
+        freqMap[key].count++;
+    });
+    const frequent = Object.values(freqMap)
+        .filter(item => item.count > 2)
+        .sort((a, b) => b.count - a.count)
+        .map(item => item.tx)
+        .filter(t => !favSet.has(`${t.name}_${t.amount}`) && !recSet.has(`${t.name}_${t.amount}`))
+        .slice(0, 6);
+    
+    freqContainer.innerHTML = frequent.length ? frequent.map(createChip).join('') : '<span class="text-muted" style="font-size: 12px;">Keep logging! Your most repeated transactions will appear here.</span>';
+};
+
+window.setupAutocomplete = (inputId, fieldType) => {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+
+    // Ensure the parent form-group can anchor the absolute dropdown
+    const parent = input.parentElement;
+    parent.style.position = 'relative';
+
+    // Create the dropdown container
+    const dropdown = document.createElement('div');
+    dropdown.className = 'autocomplete-dropdown';
+    parent.appendChild(dropdown);
+
+    input.addEventListener('input', (e) => {
+        const val = e.target.value.toLowerCase().trim();
+        dropdown.innerHTML = '';
+        
+        if (!val) {
+            dropdown.style.display = 'none';
+            return;
+        }
+
+        // Grab the 200 most recent transactions from local memory (Super fast, 0 API calls)
+        const recentTxs = (window.appData || []).slice(0, 200);
+        
+        // Extract unique matching values
+        const uniqueValues = new Set();
+        recentTxs.forEach(tx => {
+            const text = tx[fieldType]; // 'name' or 'merchant'
+            if (text && text.toLowerCase().includes(val)) {
+                uniqueValues.add(text);
+            }
+        });
+
+        // Limit to top 5 suggestions
+        const suggestions = Array.from(uniqueValues).slice(0, 5);
+
+        if (suggestions.length > 0) {
+            suggestions.forEach(suggestion => {
+                const div = document.createElement('div');
+                div.className = 'autocomplete-item';
+                
+                // Highlight the part of the word the user typed
+                const regex = new RegExp(`(${val})`, "gi");
+                div.innerHTML = suggestion.replace(regex, "<strong style='color: var(--primary)'>$1</strong>");
+                
+                // On click, fill the input and hide
+                div.addEventListener('click', () => {
+                    input.value = suggestion;
+                    dropdown.style.display = 'none';
+                });
+                dropdown.appendChild(div);
+            });
+            dropdown.style.display = 'block';
+        } else {
+            dropdown.style.display = 'none';
+        }
+    });
+
+    // Hide dropdown if user clicks outside of it
+    document.addEventListener('click', (e) => {
+        if (e.target !== input && e.target !== dropdown) {
+            dropdown.style.display = 'none';
+        }
+    });
+};
+
 window.applySettingsToUI = () => {
     if (window.userSettings.theme === 'dark') {
         document.body.classList.add('dark-theme');
@@ -123,20 +288,44 @@ window.removeCategory = (i) => {
     if(window.renderBudgetTracking) window.renderBudgetTracking(); 
 };
 
+// window.generateTxHTML = (entry) => {
+//     const isPositiveEffect = (entry.amount || 0) >= 0;
+//     const amountColor = (isPositiveEffect && entry.amount !== 0) ? 'var(--primary)' : 'var(--text)';
+//     const sign = isPositiveEffect ? '+' : '-';
+//     return `
+//         <li class="tx-item" data-id="${entry._id}">
+//             <div class="tx-left">
+//                 <span class="tx-cat">${entry.category || 'Uncategorized'}</span>
+//                 <span class="tx-name">${entry.name || 'Unnamed Transaction'}</span>
+//             </div>
+//             <div class="tx-right">
+//                 <span class="tx-date">${window.formatListDate(entry.timestamp)}</span>
+//                 <span class="tx-amount" style="color: ${amountColor}">${sign}${window.formatMoney(entry.amount)}</span>
+//             </div>
+//         </li>`;
+// };
 window.generateTxHTML = (entry) => {
     const isPositiveEffect = (entry.amount || 0) >= 0;
     const amountColor = (isPositiveEffect && entry.amount !== 0) ? 'var(--primary)' : 'var(--text)';
     const sign = isPositiveEffect ? '+' : '-';
+    const starColor = entry.favorite ? '#FFD700' : 'var(--border)';
+    
     return `
-        <li class="tx-item" data-id="${entry._id}">
+        <li class="tx-item" data-id="${entry._id}" style="padding-right: 8px;">
             <div class="tx-left">
                 <span class="tx-cat">${entry.category || 'Uncategorized'}</span>
                 <span class="tx-name">${entry.name || 'Unnamed Transaction'}</span>
             </div>
-            <div class="tx-right">
+            <div class="tx-right" style="margin-left: auto; padding-right: 12px;">
                 <span class="tx-date">${window.formatListDate(entry.timestamp)}</span>
                 <span class="tx-amount" style="color: ${amountColor}">${sign}${window.formatMoney(entry.amount)}</span>
             </div>
+            <button class="star-btn" style="position: static; padding: 4px; color: ${starColor}; fill: ${starColor};" 
+                onclick="event.stopPropagation(); window.toggleTxFavorite('${entry.id}', ${entry._id})">
+                <svg class="tx-star" viewBox="0 0 24 24" style="width: 20px; height: 20px; color: inherit; fill: inherit;">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+                </svg>
+            </button>
         </li>`;
 };
 
@@ -434,6 +623,9 @@ window.updateDashboard = () => {
     
     // NEW: Trigger Dashboard Widgets
     if (window.renderDashboardInsights) window.renderDashboardInsights();
+
+    // Render Quick Add Widget
+    if (window.renderQuickAddWidget) window.renderQuickAddWidget();
 };
 
 window.activeCategoryFilters = new Set();
@@ -1453,6 +1645,14 @@ window.bootUI = () => {
 // ==========================================
 
 document.addEventListener('DOMContentLoaded', () => {
+
+    // --- INITIALIZE AUTOCOMPLETE ---
+    window.setupAutocomplete('exp-name', 'name');
+    window.setupAutocomplete('exp-merchant', 'merchant');
+    window.setupAutocomplete('inc-name', 'name');
+    window.setupAutocomplete('edit-tx-name', 'name');
+    window.setupAutocomplete('edit-tx-merchant', 'merchant');
+
     window.openGoalModal = (goalId = null) => {
         const modal = document.getElementById('goal-overlay');
         const title = document.getElementById('goal-modal-title');
@@ -1897,6 +2097,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('exp-merchant').value = '';
             document.getElementById('exp-notes').value = '';
             await window.loadCloudData();
+            window.updateDashboard();
             window.renderBudgetTracking();
             window.renderActivity?.();
         }
@@ -1934,6 +2135,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('inc-amount').value = '';
             document.getElementById('inc-notes').value = '';
             await window.loadCloudData();
+            window.updateDashboard();
             window.renderBudgetTracking();
             window.renderActivity?.();
         }

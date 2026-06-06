@@ -399,3 +399,36 @@ input:checked + .slider:before { transform: translateX(22px); }
     .landing-container .card { margin-bottom: 12px; }
     .landing-container > div[style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
 }
+
+
+/* --- AUTOCOMPLETE DROPDOWN --- */
+.autocomplete-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--shadow-modal);
+    z-index: 1100;
+    max-height: 180px;
+    overflow-y: auto;
+    margin-top: 4px;
+    display: none;
+}
+.autocomplete-item {
+    padding: 12px 16px;
+    cursor: pointer;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+    transition: background 0.2s, padding-left 0.2s;
+}
+.autocomplete-item:last-child {
+    border-bottom: none;
+}
+.autocomplete-item:hover {
+    background-color: var(--surface-hover);
+    padding-left: 20px;
+}

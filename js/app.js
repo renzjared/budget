@@ -574,6 +574,45 @@ window.renderDashboardInsights = () => {
         });
     }
 
+    // --- 1.5 Income Distribution (Doughnut Chart) ---
+    const recentIncome = window.appData.filter(e => new Date(e.timestamp) >= thirtyDaysAgo && (e.type || '').toUpperCase().includes('INCOM'));
+    const incCategoryTotals = {};
+    recentIncome.forEach(e => {
+        const cat = e.category || 'Uncategorized';
+        incCategoryTotals[cat] = (incCategoryTotals[cat] || 0) + e.amount;
+    });
+
+    const ctxInc = document.getElementById('dashboardIncomeChart');
+    if (ctxInc) {
+        if (window.dashboardIncChartInst) window.dashboardIncChartInst.destroy();
+
+        const sortedIncCats = Object.keys(incCategoryTotals).sort((a,b) => incCategoryTotals[b] - incCategoryTotals[a]);
+        const sortedIncData = sortedIncCats.map(c => incCategoryTotals[c]);
+        const isDark = document.body.classList.contains('dark-theme');
+        const textColor = isDark ? '#FFFFFF' : '#111111';
+        const incPalette = ['#00D26A', '#26D9B0', '#00B85C', '#3A5DFF', '#81ecec', '#00cec9', '#74b9ff'];
+
+        window.dashboardIncChartInst = new Chart(ctxInc, {
+            type: 'doughnut',
+            data: {
+                labels: sortedIncCats.length ? sortedIncCats : ['No Data'],
+                datasets: [{
+                    data: sortedIncData.length ? sortedIncData : [1],
+                    backgroundColor: sortedIncData.length ? incPalette : [isDark ? '#2C2C2C' : '#ECECEC'],
+                    borderWidth: 0,
+                    cutout: '70%'
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right', labels: { color: textColor, font: { family: "'DM Sans', sans-serif", size: 11 }, boxWidth: 12 } },
+                    tooltip: { callbacks: { label: function(c) { return sortedIncData.length ? ` ${window.formatMoney(c.raw)}` : ' No Data'; } } }
+                }
+            }
+        });
+    }
+
     // --- 2. Weekly Budget Briefer ---
     const budgetContainer = document.getElementById('dashboard-weekly-budget-container');
     if (!budgetContainer) return;
@@ -816,7 +855,7 @@ window.editTransaction = () => {
         : (window.userSettings.categories?.map(c => c.name) || []);
         
     const allCategories = new Set([...baseCategories, entry.category]);
-    
+
     Array.from(allCategories).forEach(cat => {
         if (!cat) return; // Prevent empty options
         const opt = document.createElement('option');
@@ -1096,6 +1135,90 @@ window.renderStatistics = (range = 'all') => {
     }
 
     if(window.ChartsEngine) window.ChartsEngine.render(filteredData, dataBeforeStart, cutoffStart);
+
+    // --- NEW: Google Charts Sankey Diagram ---
+    const renderSankeyFlow = () => {
+        const container = document.getElementById('sankey_diagram');
+        if (!container) return;
+
+        // Ensure Google Charts is loaded
+        if (typeof google === 'undefined' || !google.visualization) {
+            google.charts.load('current', { packages: ['sankey'] });
+            google.charts.setOnLoadCallback(renderSankeyFlow);
+            return;
+        }
+
+        const data = new google.visualization.DataTable();
+        data.addColumn('string', 'From');
+        data.addColumn('string', 'To');
+        data.addColumn('number', 'Amount');
+
+        const rows = [];
+        const incByCat = {};
+        const expByCat = {};
+
+        // Calculate totals from filtered data
+        filteredData.forEach(entry => {
+            const isIncome = (entry.type || '').toUpperCase().includes('INCOM');
+            if (isIncome) {
+                incByCat[entry.category || 'Other'] = (incByCat[entry.category || 'Other'] || 0) + entry.amount;
+            } else {
+                // Keep expenses positive for the flow weights
+                expByCat[entry.category || 'Other'] = (expByCat[entry.category || 'Other'] || 0) + Math.abs(entry.amount);
+            }
+        });
+
+        if (totalIncome === 0 && totalExpense === 0) {
+            container.innerHTML = '<p class="text-muted" style="text-align:center; margin-top: 140px;">No flow data available for this range.</p>';
+            return;
+        }
+
+        container.innerHTML = ''; // Clear previous content
+
+        // 1. Income -> Cash Flow
+        for (const [cat, amt] of Object.entries(incByCat)) {
+            if (amt > 0) rows.push([`${cat}`, 'Budget', amt]);
+        }
+
+        // 2. Cash Flow -> Expenses
+        for (const [cat, amt] of Object.entries(expByCat)) {
+            if (amt > 0) rows.push(['Budget', cat, amt]);
+        }
+
+        // 3. Handle leftover (Savings or Deficit)
+        if (totalIncome > totalExpense) {
+            rows.push(['Budget', 'Savings', totalIncome - totalExpense]);
+        } else if (totalExpense > totalIncome) {
+            rows.push(['Deficit', 'Budget', totalExpense - totalIncome]);
+        }
+
+        data.addRows(rows);
+
+        const isDark = document.body.classList.contains('dark-theme');
+        const textColor = isDark ? '#A0A0A0' : '#757575';
+
+        const options = {
+            sankey: {
+                node: {
+                    width: 36,          // Wider nodes
+                    nodePadding: 18,    // Slightly smaller padding
+                    label: { color: textColor, fontSize: 14, fontName: 'DM Sans' },
+                    colors: ['#26D9B0'] // Default node color
+                },
+                link: {
+                    colorMode: 'gradient',
+                    colors: ['#FFA800', '#FF4A4A', '#3A5DFF', '#00D26A', '#26D9B0']
+                }
+            },
+            backgroundColor: 'transparent'
+        };
+
+        const chart = new google.visualization.Sankey(container);
+        chart.draw(data, options);
+    };
+
+    // Trigger the Sankey rendering
+    renderSankeyFlow();
 };
 
 window.renderBudgetTracking = () => {

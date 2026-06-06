@@ -810,8 +810,15 @@ window.editTransaction = () => {
     
     const catSelect = document.getElementById('edit-tx-category');
     catSelect.innerHTML = '';
-    const allCategories = new Set([...(window.userSettings.categories?.map(c => c.name) || []), entry.category]);
+    
+    const baseCategories = isIncome 
+        ? (window.userSettings.incomeCategories || [])
+        : (window.userSettings.categories?.map(c => c.name) || []);
+        
+    const allCategories = new Set([...baseCategories, entry.category]);
+    
     Array.from(allCategories).forEach(cat => {
+        if (!cat) return; // Prevent empty options
         const opt = document.createElement('option');
         opt.value = cat;
         opt.innerText = cat;
@@ -823,7 +830,6 @@ window.editTransaction = () => {
     const overlay = document.getElementById('edit-transaction-overlay');
     if(overlay) overlay.classList.add('active');
 };
-
 window.closeEditTransactionModal = () => {
     const overlay = document.getElementById('edit-transaction-overlay');
     if(overlay) overlay.classList.remove('active');

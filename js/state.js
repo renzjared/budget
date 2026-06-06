@@ -271,10 +271,11 @@ async function loadCloudData() {
             budgetCycle: set.budget_cycle || 'monthly', 
             categories: set.categories || [],
             incomeCategories: set.income_categories || ['SALARY', 'ALLOWANCE', 'BONUS'],
-            
-            // THIS UNPACKS IT ON REFRESH:
+
             typeOrder: set.type_order || [], 
-            goalAllocations: set.goal_allocations || {}
+            goalAllocations: set.goal_allocations || {},
+            defaultAccountBehavior: set.default_acc_behavior || 'blank',
+            defaultAccountId: set.default_acc_id || null
         };
     }
     if (!window.userSettings.categories.find(c => c.name.toUpperCase() === 'SAVINGS')) {
@@ -349,7 +350,9 @@ window.saveSettingsToCloud = async () => {
         categories: window.userSettings.categories,
         income_categories: window.userSettings.incomeCategories,
         type_order: window.userSettings.typeOrder, 
-        goal_allocations: window.userSettings.goalAllocations
+        goal_allocations: window.userSettings.goalAllocations,
+        default_acc_behavior: window.userSettings.defaultAccountBehavior,
+        default_acc_id: window.userSettings.defaultAccountId
     };
     
     const { error } = await window.supabase.from('settings').upsert(payload, { onConflict: 'user_id' });

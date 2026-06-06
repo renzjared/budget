@@ -57,7 +57,7 @@
                         <div style="display:flex; justify-content:center; margin-bottom: 24px;">
                             <img src="logo.png" alt="Renz-bot Finance Logo" class="landing-logo" style="max-width: 200px; height: auto;">
                         </div>
-                        <h1 style="font-size: 56px; font-weight: 700; letter-spacing: -2px; margin-bottom: 16px;">sum random renzbot shi.</h1>
+                        <h1 style="font-size: 56px; font-weight: 700; letter-spacing: -2px; margin-bottom: 16px;">manage money or something</h1>
                         <p class="text-muted" style="font-size: 18px; margin-bottom: 48px; line-height: 1.6;">A financial management tool. Track budgets, analyze cash flow, and manage multiple accounts with seamless cloud sync.</p>
                         
                         <button id="discord-login-btn" class="primary-btn" style="font-size: 18px; padding: 16px 40px; background-color: #5865F2; color: white;">
@@ -422,6 +422,17 @@
                     
                     <div class="form-group" style="margin-top: 24px;"><label class="text-muted" style="display: block; margin-bottom: 8px;">Dashboard Metric</label><select id="setting-metric" class="form-input"><option value="running">Running Balance</option><option value="net_worth">Net Worth (Accounts)</option><option value="remaining_daily">Remaining Budget (Daily)</option><option value="remaining_weekly">Remaining Budget (Weekly)</option><option value="remaining_monthly">Remaining Budget (Monthly)</option></select></div>
                     
+                    <div class="form-group" style="margin-top: 24px;">
+                        <label class="text-muted" style="display: block; margin-bottom: 8px;">Default Transaction Account</label>
+                        <select id="setting-default-acc-behavior" class="form-input">
+                            <option value="blank">Blank (None)</option>
+                            <option value="recent">Most Recently Used</option>
+                            <option value="custom">Custom Account...</option>
+                        </select>
+                        <select id="setting-default-acc-custom" class="form-input" style="display: none; margin-top: 8px;">
+                            </select>
+                    </div>
+
                     <div class="form-group" style="margin-top: 32px; padding: 24px; border: 1px solid var(--border); border-radius: 16px; background-color: var(--bg);">
                         <h3 style="margin-bottom: 8px;">Category Budgets</h3>
                         <p class="text-muted" style="font-size: 13px; margin-bottom: 16px;">Set a cycle limit. Percentages automatically compute total budgets based on your cycle's income.</p>
@@ -552,6 +563,7 @@
             <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Description</label><input type="text" id="exp-name" class="form-input" placeholder="e.g., Grocery"></div>
             <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Amount</label><input type="number" id="exp-amount" class="form-input" placeholder="0.00" step="0.01"></div>
             <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Category</label><select id="exp-category" class="form-input"></select></div>
+            <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Account (Optional)</label><select id="exp-account" class="form-input"><option value="">-- None --</option></select></div>
             <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Merchant</label><input type="text" id="exp-merchant" class="form-input" placeholder="e.g., SM Mall"></div>
             <div class="form-group" style="margin-bottom: 24px;"><label class="text-muted">Notes</label><input type="text" id="exp-notes" class="form-input" placeholder="Additional notes..."></div>
             <button id="save-expense-btn" class="primary-btn" style="width: 100%;">Save Expense</button>
@@ -564,6 +576,7 @@
             <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Description</label><input type="text" id="inc-name" class="form-input" placeholder="e.g., Salary"></div>
             <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Amount</label><input type="number" id="inc-amount" class="form-input" placeholder="0.00" step="0.01"></div>
             <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Category</label><select id="inc-category" class="form-input"><option value="INCOME">General Income</option><option value="SALARY">Salary</option><option value="BONUS">Bonus</option><option value="FREELANCE">Freelance</option><option value="INVESTMENT">Investment Returns</option></select></div>
+            <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Account (Optional)</label><select id="inc-account" class="form-input"><option value="">-- None --</option></select></div>
             <div class="form-group" style="margin-bottom: 24px;"><label class="text-muted">Notes</label><input type="text" id="inc-notes" class="form-input" placeholder="Additional notes..."></div>
             <button id="save-income-btn" class="primary-btn" style="width: 100%;">Save Income</button>
         </div>

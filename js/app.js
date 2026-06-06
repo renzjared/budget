@@ -24,19 +24,20 @@ window.switchView = (targetId) => {
     }
 };
 
-window.quickAddTemplate = (name, amount, category, merchant) => {
-    const isIncome = amount >= 0;
+window.quickAddTemplate = (name, amount, category, merchant, typeStr) => {
+    const isIncome = (typeStr || '').toUpperCase().includes('INCOM');
+    const displayAmount = isIncome ? amount : -amount;
+    
     if (isIncome) {
         document.getElementById('inc-name').value = name || '';
-        document.getElementById('inc-amount').value = Math.abs(amount) || '';
+        document.getElementById('inc-amount').value = displayAmount || '';
         document.getElementById('inc-category').value = category || 'INCOME';
         document.getElementById('inc-notes').value = '';
         window.openIncomeModal();
     } else {
         document.getElementById('exp-name').value = name || '';
-        document.getElementById('exp-amount').value = Math.abs(amount) || '';
+        document.getElementById('exp-amount').value = displayAmount || '';
         
-        // Ensure category exists in dropdown, else fallback
         const expCat = document.getElementById('exp-category');
         if (Array.from(expCat.options).some(opt => opt.value === category)) {
             expCat.value = category;
@@ -74,13 +75,13 @@ window.renderQuickAddWidget = () => {
     if (!favContainer || !recContainer || !freqContainer) return;
 
     const createChip = (tx) => {
-        const isIncome = tx.amount >= 0;
+        const isIncome = (tx.type || '').toUpperCase().includes('INCOM');
         const color = isIncome ? 'var(--primary)' : 'var(--text)';
         const safeName = (tx.name || '').replace(/'/g, "\\'");
         const safeCat = (tx.category || '').replace(/'/g, "\\'");
         const safeMerchant = (tx.merchant || '').replace(/'/g, "\\'");
         return `<button class="chip" style="border-color: ${color}; color: ${color}; padding: 6px 12px;" 
-            onclick="window.quickAddTemplate('${safeName}', ${tx.amount}, '${safeCat}', '${safeMerchant}')">
+            onclick="window.quickAddTemplate('${safeName}', ${tx.amount}, '${safeCat}', '${safeMerchant}', '${tx.type || ''}')">
             ${tx.name} (${window.formatMoney(Math.abs(tx.amount))})
         </button>`;
     };
@@ -105,13 +106,17 @@ window.renderQuickAddWidget = () => {
     }
     recContainer.innerHTML = uniqueRecent.length ? uniqueRecent.map(createChip).join('') : '<span class="text-muted" style="font-size: 12px;">No recent transactions.</span>';
 
-    // 3. Most Frequent (Occurs > 2 times, excluding favs/recent)
+    // 3. Most Frequent (Occurs > 2 times in the last 200 txs, excluding favs/recent)
     const freqMap = {};
-    window.appData.forEach(t => {
+    
+    // Slice the array to only analyze the 200 most recent items
+    const recent200 = window.appData.slice(0, 200); 
+    recent200.forEach(t => {
         const key = `${t.name}|${t.amount}|${t.category}`;
         if (!freqMap[key]) freqMap[key] = { count: 0, tx: t };
         freqMap[key].count++;
     });
+    
     const frequent = Object.values(freqMap)
         .filter(item => item.count > 2)
         .sort((a, b) => b.count - a.count)
@@ -119,7 +124,9 @@ window.renderQuickAddWidget = () => {
         .filter(t => !favSet.has(`${t.name}_${t.amount}`) && !recSet.has(`${t.name}_${t.amount}`))
         .slice(0, 6);
     
-    freqContainer.innerHTML = frequent.length ? frequent.map(createChip).join('') : '<span class="text-muted" style="font-size: 12px;">Keep logging! Your most repeated transactions will appear here.</span>';
+    freqContainer.innerHTML = frequent.length 
+        ? frequent.map(createChip).join('') 
+        : '<span class="text-muted" style="font-size: 12px;">Keep logging! Your most repeated recent transactions will appear here.</span>';
 };
 
 window.setupAutocomplete = (inputId, fieldType) => {
@@ -220,6 +227,24 @@ window.applySettingsToUI = () => {
     window.recalculateSavings(); 
     window.renderSettingsCategories();
     window.renderSettingsIncomeCategories();
+
+    // Default Account Settings UI
+    const behaviorSelect = document.getElementById('setting-default-acc-behavior');
+    const customSelect = document.getElementById('setting-default-acc-custom');
+    
+    if (behaviorSelect && customSelect) {
+        behaviorSelect.value = window.userSettings.defaultAccountBehavior || 'blank';
+        
+        // Populate custom dropdown
+        customSelect.innerHTML = window.accountsData.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+        if (window.userSettings.defaultAccountId) customSelect.value = window.userSettings.defaultAccountId;
+        
+        customSelect.style.display = behaviorSelect.value === 'custom' ? 'block' : 'none';
+        
+        behaviorSelect.addEventListener('change', (e) => {
+            customSelect.style.display = e.target.value === 'custom' ? 'block' : 'none';
+        });
+    }
 };
 
 window.recalculateSavings = () => {
@@ -327,6 +352,48 @@ window.generateTxHTML = (entry) => {
                 </svg>
             </button>
         </li>`;
+};
+
+window.populateAccountDropdowns = (targetSelectId) => {
+    const selectEl = document.getElementById(targetSelectId);
+    if (!selectEl) return;
+
+    // 1. Calculate "Last Used" timestamp for every account based on transactions
+    const getAccountLastUsed = (accId) => {
+        const txs = window.appData.filter(t => t.account_id === accId);
+        if (!txs.length) return 0;
+        return Math.max(...txs.map(t => new Date(t.timestamp).getTime()));
+    };
+
+    // 2. Sort: Favorites first, then by most recently used
+    const sortedAccounts = [...window.accountsData].sort((a, b) => {
+        if (a.favorite !== b.favorite) return a.favorite ? -1 : 1;
+        return getAccountLastUsed(b.id) - getAccountLastUsed(a.id);
+    });
+
+    // 3. Build HTML
+    let html = '<option value="">-- None --</option>';
+    sortedAccounts.forEach(acc => {
+        const favIndicator = acc.favorite ? '★ ' : '';
+        html += `<option value="${acc.id}">${favIndicator}${acc.name} (${window.formatMoney(acc.balance)})</option>`;
+    });
+    selectEl.innerHTML = html;
+
+    // 4. Determine Default Selection based on User Settings
+    let defaultVal = '';
+    const behavior = window.userSettings.defaultAccountBehavior || 'blank';
+    
+    if (behavior === 'custom') {
+        const customId = window.userSettings.defaultAccountId;
+        if (window.accountsData.find(a => a.id === customId)) defaultVal = customId;
+    } else if (behavior === 'recent') {
+        const recentTx = window.appData.find(t => t.account_id);
+        if (recentTx && window.accountsData.find(a => a.id === recentTx.account_id)) {
+            defaultVal = recentTx.account_id;
+        }
+    }
+    
+    selectEl.value = defaultVal;
 };
 
 window.setupReceiptListeners = () => {
@@ -518,12 +585,13 @@ window.renderDashboardInsights = () => {
 
     let weeklyIncome = 0;
     const weeklySpent = {};
-    
     window.appData.filter(e => new Date(e.timestamp) >= weekStart).forEach(e => {
-        if (e.amount > 0) weeklyIncome += e.amount;
-        else if (e.amount < 0) {
+        const isIncome = (e.type || '').toUpperCase().includes('INCOM');
+        if (isIncome) {
+            weeklyIncome += e.amount;
+        } else {
             const cat = (e.category || 'Uncategorized').toUpperCase();
-            weeklySpent[cat] = (weeklySpent[cat] || 0) + Math.abs(e.amount);
+            weeklySpent[cat] = (weeklySpent[cat] || 0) - e.amount;
         }
     });
 
@@ -732,8 +800,11 @@ window.editTransaction = () => {
     if (!window.currentEditingTransaction) return;
     const entry = window.currentEditingTransaction;
     
+    const isIncome = (entry.type || '').toUpperCase().includes('INCOM');
+    const displayAmount = isIncome ? entry.amount : -entry.amount;
+    
     document.getElementById('edit-tx-name').value = entry.name || '';
-    document.getElementById('edit-tx-amount').value = Math.abs(entry.amount) || 0;
+    document.getElementById('edit-tx-amount').value = displayAmount || 0;
     document.getElementById('edit-tx-merchant').value = entry.merchant || '';
     document.getElementById('edit-tx-notes').value = entry.notes || '';
     
@@ -908,8 +979,8 @@ window.saveTransactionEdit = async () => {
         return;
     }
     
-    const isIncome = entry.amount >= 0;
-    const finalAmount = isIncome ? Math.abs(newAmount) : -Math.abs(newAmount);
+    const isIncome = (entry.type || '').toUpperCase().includes('INCOM');
+    const finalAmount = isIncome ? newAmount : -newAmount;
     
     const { error } = await window.supabase
         .from('transactions')
@@ -991,8 +1062,13 @@ window.renderStatistics = (range = 'all') => {
             if (eDate < cutoffStart) dataBeforeStart.push(entry);
             if (eDate >= cutoffStart && eDate <= cutoffEnd) {
                 filteredData.push(entry);
-                if (entry.amount > 0) totalIncome += entry.amount;
-                if (entry.amount < 0) { totalExpense += Math.abs(entry.amount); expensesList.push(entry); }
+                const isIncome = (entry.type || '').toUpperCase().includes('INCOM');
+                if (isIncome) { 
+                    totalIncome += entry.amount; 
+                } else { 
+                    totalExpense -= entry.amount; 
+                    expensesList.push(entry); 
+                }
             }
         }
     });
@@ -1031,8 +1107,13 @@ window.renderBudgetTracking = () => {
 
     let cycleIncome = 0; const grouped = {};
     window.appData.filter(e => new Date(e.timestamp) >= cutoff).forEach(e => {
-        if (e.amount > 0) cycleIncome += e.amount;
-        else if (e.amount < 0) { const cat = (e.category || 'Uncategorized').toUpperCase(); grouped[cat] = (grouped[cat] || 0) + Math.abs(e.amount); }
+        const isIncome = (e.type || '').toUpperCase().includes('INCOM');
+        if (isIncome) {
+            cycleIncome += e.amount;
+        } else { 
+            const cat = (e.category || 'Uncategorized').toUpperCase(); 
+            grouped[cat] = (grouped[cat] || 0) - e.amount; 
+        }
     });
 
     if (cycleIncome === 0) { container.innerHTML = '<p class="text-muted" style="text-align:center; padding: 24px 0;">No income detected for this cycle. Budgets require an incoming cash flow to allocate.</p>'; return; }
@@ -1610,6 +1691,7 @@ window.openExpenseModal = () => {
             catSelect.appendChild(opt);
         });
     }
+    window.populateAccountDropdowns('exp-account');
     if (overlay) overlay.classList.add('active');
 };
 
@@ -1620,6 +1702,7 @@ window.closeExpenseModal = () => {
 
 window.openIncomeModal = () => {
     const overlay = document.getElementById('income-overlay');
+    window.populateAccountDropdowns('inc-account');
     if (overlay) overlay.classList.add('active');
 };
 
@@ -1795,7 +1878,9 @@ document.addEventListener('DOMContentLoaded', () => {
             window.userSettings.metric = document.getElementById('setting-metric')?.value || 'running';
             window.userSettings.theme = document.getElementById('setting-theme')?.checked ? 'dark' : 'light';
             window.userSettings.budgetCycle = document.getElementById('setting-budget-cycle')?.value || 'monthly';
-            
+            window.userSettings.defaultAccountBehavior = document.getElementById('setting-default-acc-behavior')?.value || 'blank';
+            window.userSettings.defaultAccountId = document.getElementById('setting-default-acc-custom')?.value || null;
+
             window.recalculateSavings(); 
             const status = document.getElementById('settings-status');
             
@@ -2068,6 +2153,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const category = document.getElementById('exp-category').value || 'UNCATEGORIZED';
         const merchant = document.getElementById('exp-merchant').value.trim() || '';
         const notes = document.getElementById('exp-notes').value.trim() || '';
+        const accountId = document.getElementById('exp-account').value || null;
 
         if (!name || !amount || isNaN(amount)) {
             alert('Please fill in Name and Amount');
@@ -2080,9 +2166,10 @@ document.addEventListener('DOMContentLoaded', () => {
             type: 'EXPENDITURE',
             category: category,
             name: name,
-            amount: -Math.abs(amount),
+            amount: -amount,
             notes: notes,
             merchant: merchant,
+            account_id: accountId,
             timestamp: new Date().toISOString()
         };
 
@@ -2091,6 +2178,15 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error saving expense:', error);
             alert('Error saving expense');
         } else {
+            // Deduct from Account Balance ---
+            if (accountId) {
+                const accIndex = window.accountsData.findIndex(a => a.id === accountId);
+                if (accIndex !== -1) {
+                    window.accountsData[accIndex].balance -= amount;
+                    await window.saveAccountsToCloud();
+                }
+            }
+
             window.closeExpenseModal();
             document.getElementById('exp-name').value = '';
             document.getElementById('exp-amount').value = '';
@@ -2108,6 +2204,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const amount = parseFloat(document.getElementById('inc-amount').value);
         const category = document.getElementById('inc-category').value || 'INCOME';
         const notes = document.getElementById('inc-notes').value.trim() || '';
+        const accountId = document.getElementById('inc-account').value || null;
 
         if (!name || !amount || isNaN(amount)) {
             alert('Please fill in Name and Amount');
@@ -2120,8 +2217,9 @@ document.addEventListener('DOMContentLoaded', () => {
             type: 'INCOMING',
             category: category,
             name: name,
-            amount: Math.abs(amount),
+            amount: amount,
             notes: notes,
+            account_id: accountId,
             timestamp: new Date().toISOString()
         };
 
@@ -2130,6 +2228,14 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error saving income:', error);
             alert('Error saving income');
         } else {
+            if (accountId) {
+                const accIndex = window.accountsData.findIndex(a => a.id === accountId);
+                if (accIndex !== -1) {
+                    window.accountsData[accIndex].balance += Math.abs(amount);
+                    await window.saveAccountsToCloud();
+                }
+            }
+
             window.closeIncomeModal();
             document.getElementById('inc-name').value = '';
             document.getElementById('inc-amount').value = '';

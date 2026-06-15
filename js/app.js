@@ -1,3 +1,49 @@
+// js/app.js
+
+// ==========================================
+// 1. GLOBAL CORE FUNCTIONS
+// ==========================================
+
+// --- PRIVACY MODE ENGINE ---
+if (!window.originalFormatMoney) {
+    window.originalFormatMoney = window.formatMoney;
+    window.originalFormatMoneyWithSymbol = window.formatMoneyWithSymbol;
+
+    // Redefine formatters to respect privacy states
+    window.formatMoney = (amount, isTotal = false) => {
+        const mode = window.userSettings?.privacyMode || 0;
+        if (mode === 1) return '••••••'; // Hide Everything
+        if (mode === 2 && isTotal) return '••••••'; // Hide Totals Only
+        return window.originalFormatMoney(amount);
+    };
+
+    window.formatMoneyWithSymbol = (amount, symbol, isTotal = false) => {
+        const mode = window.userSettings?.privacyMode || 0;
+        if (mode === 1) return '••••••';
+        if (mode === 2 && isTotal) return '••••••';
+        return window.originalFormatMoneyWithSymbol(amount, symbol);
+    };
+}
+
+window.getPrivacyIcon = () => {
+    const mode = window.userSettings?.privacyMode || 0;
+    if (mode === 0) return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`; // Open Eye
+    if (mode === 1) return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`; // Slashed Eye
+    return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg>`; // Eye with minus (Hide Totals)
+};
+
+window.togglePrivacyMode = async () => {
+    let mode = window.userSettings.privacyMode || 0;
+    mode = (mode + 1) % 3; // Cycle: 0 -> 1 -> 2 -> 0
+    window.userSettings.privacyMode = mode;
+    
+    // Save to Cloud instantly
+    await window.supabase.from('settings').update({ privacy_mode: mode }).eq('user_id', window.currentUser.id);
+    
+    // Refresh UI
+    window.bootUI();
+};
+
 window.switchView = (targetId) => {
     if (!targetId) return;
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -133,11 +179,9 @@ window.setupAutocomplete = (inputId, fieldType) => {
     const input = document.getElementById(inputId);
     if (!input) return;
 
-    // Ensure the parent form-group can anchor the absolute dropdown
     const parent = input.parentElement;
     parent.style.position = 'relative';
 
-    // Create the dropdown container
     const dropdown = document.createElement('div');
     dropdown.className = 'autocomplete-dropdown';
     parent.appendChild(dropdown);
@@ -151,19 +195,16 @@ window.setupAutocomplete = (inputId, fieldType) => {
             return;
         }
 
-        // Grab the 200 most recent transactions from local memory (Super fast, 0 API calls)
         const recentTxs = (window.appData || []).slice(0, 200);
         
-        // Extract unique matching values
         const uniqueValues = new Set();
         recentTxs.forEach(tx => {
-            const text = tx[fieldType]; // 'name' or 'merchant'
+            const text = tx[fieldType]; 
             if (text && text.toLowerCase().includes(val)) {
                 uniqueValues.add(text);
             }
         });
 
-        // Limit to top 5 suggestions
         const suggestions = Array.from(uniqueValues).slice(0, 5);
 
         if (suggestions.length > 0) {
@@ -171,11 +212,9 @@ window.setupAutocomplete = (inputId, fieldType) => {
                 const div = document.createElement('div');
                 div.className = 'autocomplete-item';
                 
-                // Highlight the part of the word the user typed
                 const regex = new RegExp(`(${val})`, "gi");
                 div.innerHTML = suggestion.replace(regex, "<strong style='color: var(--primary)'>$1</strong>");
                 
-                // On click, fill the input and hide
                 div.addEventListener('click', () => {
                     input.value = suggestion;
                     dropdown.style.display = 'none';
@@ -188,7 +227,6 @@ window.setupAutocomplete = (inputId, fieldType) => {
         }
     });
 
-    // Hide dropdown if user clicks outside of it
     document.addEventListener('click', (e) => {
         if (e.target !== input && e.target !== dropdown) {
             dropdown.style.display = 'none';
@@ -197,6 +235,8 @@ window.setupAutocomplete = (inputId, fieldType) => {
 };
 
 window.applySettingsToUI = () => {
+    document.querySelectorAll('.privacy-toggle-btn').forEach(btn => btn.innerHTML = window.getPrivacyIcon());
+
     if (window.userSettings.theme === 'dark') {
         document.body.classList.add('dark-theme');
         const st = document.getElementById('setting-theme'); if(st) st.checked = true;
@@ -204,8 +244,19 @@ window.applySettingsToUI = () => {
         document.body.classList.remove('dark-theme');
         const st = document.getElementById('setting-theme'); if(st) st.checked = false;
     }
+
+    // --- TRAVEL MODE THEME ENFORCEMENT ---
+    if (window.userSettings.activeTripId) {
+        document.body.classList.add('travel-theme');
+        const tmLabel = document.getElementById('travel-mode-label');
+        if(tmLabel) tmLabel.innerText = "Manage Trip";
+    } else {
+        document.body.classList.remove('travel-theme');
+        const tmLabel = document.getElementById('travel-mode-label');
+        if(tmLabel) tmLabel.innerText = "Travel Mode";
+    }
     
-    // Greeting Update (Uses Username & Avatar)
+    // Greeting Update
     const greetEl = document.getElementById('dashboard-greeting');
     const avatarEl = document.getElementById('dashboard-avatar');
 
@@ -235,7 +286,6 @@ window.applySettingsToUI = () => {
     if (behaviorSelect && customSelect) {
         behaviorSelect.value = window.userSettings.defaultAccountBehavior || 'blank';
         
-        // Populate custom dropdown
         customSelect.innerHTML = window.accountsData.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
         if (window.userSettings.defaultAccountId) customSelect.value = window.userSettings.defaultAccountId;
         
@@ -313,22 +363,6 @@ window.removeCategory = (i) => {
     if(window.renderBudgetTracking) window.renderBudgetTracking(); 
 };
 
-// window.generateTxHTML = (entry) => {
-//     const isPositiveEffect = (entry.amount || 0) >= 0;
-//     const amountColor = (isPositiveEffect && entry.amount !== 0) ? 'var(--primary)' : 'var(--text)';
-//     const sign = isPositiveEffect ? '+' : '-';
-//     return `
-//         <li class="tx-item" data-id="${entry._id}">
-//             <div class="tx-left">
-//                 <span class="tx-cat">${entry.category || 'Uncategorized'}</span>
-//                 <span class="tx-name">${entry.name || 'Unnamed Transaction'}</span>
-//             </div>
-//             <div class="tx-right">
-//                 <span class="tx-date">${window.formatListDate(entry.timestamp)}</span>
-//                 <span class="tx-amount" style="color: ${amountColor}">${sign}${window.formatMoney(entry.amount)}</span>
-//             </div>
-//         </li>`;
-// };
 window.generateTxHTML = (entry) => {
     const isPositiveEffect = (entry.amount || 0) >= 0;
     const amountColor = (isPositiveEffect && entry.amount !== 0) ? 'var(--primary)' : 'var(--text)';
@@ -358,20 +392,17 @@ window.populateAccountDropdowns = (targetSelectId) => {
     const selectEl = document.getElementById(targetSelectId);
     if (!selectEl) return;
 
-    // 1. Calculate "Last Used" timestamp for every account based on transactions
     const getAccountLastUsed = (accId) => {
         const txs = window.appData.filter(t => t.account_id === accId);
         if (!txs.length) return 0;
         return Math.max(...txs.map(t => new Date(t.timestamp).getTime()));
     };
 
-    // 2. Sort: Favorites first, then by most recently used
     const sortedAccounts = [...window.accountsData].sort((a, b) => {
         if (a.favorite !== b.favorite) return a.favorite ? -1 : 1;
         return getAccountLastUsed(b.id) - getAccountLastUsed(a.id);
     });
 
-    // 3. Build HTML
     let html = '<option value="">-- None --</option>';
     sortedAccounts.forEach(acc => {
         const favIndicator = acc.favorite ? '★ ' : '';
@@ -379,7 +410,6 @@ window.populateAccountDropdowns = (targetSelectId) => {
     });
     selectEl.innerHTML = html;
 
-    // 4. Determine Default Selection based on User Settings
     let defaultVal = '';
     const behavior = window.userSettings.defaultAccountBehavior || 'blank';
     
@@ -413,11 +443,11 @@ window.setupReceiptListeners = () => {
 };
 
 window.dashboardChartInst = null;
+window.dashboardIncChartInst = null;
 
 window.renderGoalsWidget = () => {
     const container = document.getElementById('dashboard-goals-list');
     const widget = document.getElementById('dashboard-goals-widget');
-    
     if (!container) return;
     
     if (!window.userGoals || window.userGoals.length === 0) {
@@ -426,7 +456,6 @@ window.renderGoalsWidget = () => {
     }
     
     const activeGoals = window.userGoals.filter(g => g.status === 'Active').slice(0, 3);
-    
     if (activeGoals.length === 0) {
         if (widget) widget.style.display = 'none';
         return;
@@ -452,11 +481,9 @@ window.renderGoalsWidget = () => {
     }).join('');
 };
 
-// Phase 4: Upcoming Subscriptions Timeline Widget
 window.renderUpcomingSubscriptions = () => {
     const container = document.getElementById('dashboard-upcoming-subs-timeline');
     const widget = document.getElementById('dashboard-upcoming-subs-widget');
-    
     if (!container) return;
     
     if (!window.userSubscriptions || window.userSubscriptions.length === 0) {
@@ -481,7 +508,6 @@ window.renderUpcomingSubscriptions = () => {
     
     if (widget) widget.style.display = 'block';
     
-    // Group by date
     const grouped = {};
     upcoming.forEach(sub => {
         const date = sub.next_billing_date;
@@ -518,7 +544,6 @@ window.renderUpcomingSubscriptions = () => {
         })
         .join('');
     
-    // Add total upcoming spend footer
     const footer = document.createElement('div');
     footer.style.cssText = 'padding: 12px; background: rgba(248, 113, 93, 0.05); border-radius: 6px; margin-top: 8px; text-align: center;';
     footer.innerHTML = `<div style="font-size: 11px; color: var(--text-secondary);">Total upcoming (14 days): ${window.formatMoney(totalUpcoming)}</div>`;
@@ -535,7 +560,8 @@ window.renderDashboardInsights = () => {
     const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
     
     // --- 1. Expense Distribution (Doughnut Chart) ---
-    const recentExpenses = window.appData.filter(e => new Date(e.timestamp) >= thirtyDaysAgo && e.amount < 0);
+    // Note: Exclude Trip transactions to keep dashboard clean
+    const recentExpenses = window.appData.filter(e => new Date(e.timestamp) >= thirtyDaysAgo && e.amount < 0 && !e.trip_id);
     const categoryTotals = {};
     
     recentExpenses.forEach(e => {
@@ -568,14 +594,14 @@ window.renderDashboardInsights = () => {
                 responsive: true, maintainAspectRatio: false,
                 plugins: {
                     legend: { position: 'right', labels: { color: textColor, font: { family: "'DM Sans', sans-serif", size: 11 }, boxWidth: 12 } },
-                    tooltip: { callbacks: { label: function(c) { return sortedData.length ? ` ${window.formatMoney(c.raw)}` : ' No Data'; } } }
+                    tooltip: { callbacks: { label: function(c) { return sortedData.length ? ` ${window.formatMoney(c.raw, true)}` : ' No Data'; } } }
                 }
             }
         });
     }
 
     // --- 1.5 Income Distribution (Doughnut Chart) ---
-    const recentIncome = window.appData.filter(e => new Date(e.timestamp) >= thirtyDaysAgo && (e.type || '').toUpperCase().includes('INCOM'));
+    const recentIncome = window.appData.filter(e => new Date(e.timestamp) >= thirtyDaysAgo && (e.type || '').toUpperCase().includes('INCOM') && !e.trip_id);
     const incCategoryTotals = {};
     recentIncome.forEach(e => {
         const cat = e.category || 'Uncategorized';
@@ -617,20 +643,19 @@ window.renderDashboardInsights = () => {
     const budgetContainer = document.getElementById('dashboard-weekly-budget-container');
     if (!budgetContainer) return;
 
-    // Calculate start of current week (Monday)
     const day = now.getDay() || 7; 
     const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day + 1);
     weekStart.setHours(0,0,0,0);
 
     let weeklyIncome = 0;
     const weeklySpent = {};
-    window.appData.filter(e => new Date(e.timestamp) >= weekStart).forEach(e => {
+    window.appData.filter(e => new Date(e.timestamp) >= weekStart && !e.trip_id).forEach(e => {
         const isIncome = (e.type || '').toUpperCase().includes('INCOM');
         if (isIncome) {
             weeklyIncome += e.amount;
         } else {
             const cat = (e.category || 'Uncategorized').toUpperCase();
-            weeklySpent[cat] = (weeklySpent[cat] || 0) - e.amount;
+            weeklySpent[cat] = (weeklySpent[cat] || 0) - e.amount; // Remember e.amount is negative
         }
     });
 
@@ -689,49 +714,42 @@ window.updateDashboard = () => {
         subtitle = "Remaining Budget (Today)";
         const now = new Date(); const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         let cycleIncome = 0;
-        sortedData.filter(e => new Date(e.timestamp) >= cutoff).forEach(e => {
+        sortedData.filter(e => new Date(e.timestamp) >= cutoff && !e.trip_id).forEach(e => {
             if (e.amount > 0) cycleIncome += e.amount;
         });
-        const totalSpent = sortedData.filter(e => new Date(e.timestamp) >= cutoff && e.amount < 0).reduce((sum, e) => sum + Math.abs(e.amount), 0);
+        const totalSpent = sortedData.filter(e => new Date(e.timestamp) >= cutoff && e.amount < 0 && !e.trip_id).reduce((sum, e) => sum + Math.abs(e.amount), 0);
         displayTotal = cycleIncome - totalSpent;
     } else if (metric === 'remaining_weekly') {
         subtitle = "Remaining Budget (This Week)";
         const now = new Date(); const day = now.getDay() || 7;
         const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day + 1);
         let cycleIncome = 0;
-        sortedData.filter(e => new Date(e.timestamp) >= cutoff).forEach(e => {
+        sortedData.filter(e => new Date(e.timestamp) >= cutoff && !e.trip_id).forEach(e => {
             if (e.amount > 0) cycleIncome += e.amount;
         });
-        const totalSpent = sortedData.filter(e => new Date(e.timestamp) >= cutoff && e.amount < 0).reduce((sum, e) => sum + Math.abs(e.amount), 0);
+        const totalSpent = sortedData.filter(e => new Date(e.timestamp) >= cutoff && e.amount < 0 && !e.trip_id).reduce((sum, e) => sum + Math.abs(e.amount), 0);
         displayTotal = cycleIncome - totalSpent;
     } else if (metric === 'remaining_monthly') {
         subtitle = "Remaining Budget (This Month)";
         const now = new Date(); const cutoff = new Date(now.getFullYear(), now.getMonth(), 1);
         let cycleIncome = 0;
-        sortedData.filter(e => new Date(e.timestamp) >= cutoff).forEach(e => {
+        sortedData.filter(e => new Date(e.timestamp) >= cutoff && !e.trip_id).forEach(e => {
             if (e.amount > 0) cycleIncome += e.amount;
         });
-        const totalSpent = sortedData.filter(e => new Date(e.timestamp) >= cutoff && e.amount < 0).reduce((sum, e) => sum + Math.abs(e.amount), 0);
+        const totalSpent = sortedData.filter(e => new Date(e.timestamp) >= cutoff && e.amount < 0 && !e.trip_id).reduce((sum, e) => sum + Math.abs(e.amount), 0);
         displayTotal = cycleIncome - totalSpent;
     }
 
     const dashSub = document.getElementById('dashboard-subtitle');
     if(dashSub) dashSub.innerText = subtitle;
     const balEl = document.getElementById('display-balance');
-    if(balEl) balEl.innerText = `${displayTotal < 0 ? '-' : ''}${window.formatMoney(displayTotal)}`;
+    if(balEl) balEl.innerText = `${displayTotal < 0 ? '-' : ''}${window.formatMoney(displayTotal, true)}`;
     
     recentLogs.innerHTML = sortedData.slice(0, 5).map(window.generateTxHTML).join('');
     
-    // Render Goals Widget
     if (window.renderGoalsWidget) window.renderGoalsWidget();
-    
-    // Render Upcoming Subscriptions Widget
     if (window.renderUpcomingSubscriptions) window.renderUpcomingSubscriptions();
-    
-    // NEW: Trigger Dashboard Widgets
     if (window.renderDashboardInsights) window.renderDashboardInsights();
-
-    // Render Quick Add Widget
     if (window.renderQuickAddWidget) window.renderQuickAddWidget();
 };
 
@@ -811,7 +829,7 @@ window.openReceiptModal = (entry) => {
     
     window.currentEditingTransaction = entry;
     
-    const isIncome = (entry.amount || 0) >= 0;
+    const isIncome = (entry.type || '').toUpperCase().includes('INCOM');
     const safeSet = (id, text) => { const el = document.getElementById(id); if(el) el.innerText = text; };
 
     safeSet('receipt-title', isIncome ? 'Received' : 'Paid');
@@ -857,7 +875,7 @@ window.editTransaction = () => {
     const allCategories = new Set([...baseCategories, entry.category]);
 
     Array.from(allCategories).forEach(cat => {
-        if (!cat) return; // Prevent empty options
+        if (!cat) return; 
         const opt = document.createElement('option');
         opt.value = cat;
         opt.innerText = cat;
@@ -883,7 +901,7 @@ window.setupAccountDragDrop = () => {
         draggedElement = e.target.closest('[draggable="true"]');
         if (!draggedElement) return;
         
-        e.stopPropagation(); // Prevent card drags from dragging the section
+        e.stopPropagation(); 
         
         draggedType = draggedElement.getAttribute('data-type');
         const accountIndex = draggedElement.getAttribute('data-account-index');
@@ -952,7 +970,6 @@ window.setupAccountDragDrop = () => {
                 window.accountsData.splice(draggedIdx, 1);
                 
                 if (!isNaN(targetIdx)) {
-                    // Fixes the off-by-one bug when dragging downwards
                     const insertIdx = draggedIdx < targetIdx ? targetIdx - 1 : targetIdx;
                     window.accountsData.splice(insertIdx, 0, draggedAcc);
                 } else {
@@ -965,13 +982,11 @@ window.setupAccountDragDrop = () => {
         }
         // --- 2. Handle Type Section Drag ---
         else if (typeSection && targetType) {
-            // Read the absolute DOM order to avoid array-splicing mistakes
             const currentDOMOrder = Array.from(document.querySelectorAll('.account-type-section')).map(el => el.getAttribute('data-type'));
             const draggedTypeIdx = currentDOMOrder.indexOf(typeSection);
             const targetTypeIdx = currentDOMOrder.indexOf(targetType);
             
             if (draggedTypeIdx !== -1 && targetTypeIdx !== -1 && draggedTypeIdx !== targetTypeIdx) {
-                // Move visually in the DOM first
                 const draggedNode = document.querySelector(`.account-type-section[data-type="${typeSection}"]`);
                 const targetNode = document.querySelector(`.account-type-section[data-type="${targetType}"]`);
                 
@@ -984,7 +999,6 @@ window.setupAccountDragDrop = () => {
                     }
                 }
                 
-                // Record the final exact visual order and save to cloud
                 window.userSettings.typeOrder = Array.from(document.querySelectorAll('.account-type-section')).map(el => el.getAttribute('data-type'));
                 
                 await window.saveSettingsToCloud();
@@ -1101,17 +1115,22 @@ window.renderStatistics = (range = 'all') => {
     let totalIncome = 0; let totalExpense = 0; let expensesList = [];
     let filteredData = []; let dataBeforeStart = [];
 
+    const includeTravel = document.getElementById('stats-include-travel')?.checked || false;
+
     window.appData.forEach(entry => {
         if (entry.timestamp) {
             const eDate = new Date(entry.timestamp);
             if (eDate < cutoffStart) dataBeforeStart.push(entry);
             if (eDate >= cutoffStart && eDate <= cutoffEnd) {
+                // EXCLUDE TRIPS UNLESS TOGGLED
+                if (!includeTravel && entry.trip_id) return; 
+
                 filteredData.push(entry);
                 const isIncome = (entry.type || '').toUpperCase().includes('INCOM');
                 if (isIncome) { 
                     totalIncome += entry.amount; 
                 } else { 
-                    totalExpense -= entry.amount; 
+                    totalExpense -= entry.amount; // entry.amount is negative, so subtracting makes it positive for display
                     expensesList.push(entry); 
                 }
             }
@@ -1119,13 +1138,13 @@ window.renderStatistics = (range = 'all') => {
     });
 
     const safeSet = (id, text) => { const el = document.getElementById(id); if(el) el.innerText = text; };
-    safeSet('stat-income', window.formatMoney(totalIncome));
-    safeSet('stat-expense', window.formatMoney(totalExpense));
+    safeSet('stat-income', window.formatMoney(totalIncome, true));
+    safeSet('stat-expense', window.formatMoney(totalExpense, true));
     
     const net = totalIncome - totalExpense;
     const netEl = document.getElementById('stat-net');
     if (netEl) {
-        netEl.innerText = `${net < 0 ? '-' : '+'}${window.formatMoney(net)}`;
+        netEl.innerText = `${net < 0 ? '-' : '+'}${window.formatMoney(net, true)}`;
         netEl.style.color = net < 0 ? 'var(--text)' : 'var(--primary)';
     }
 
@@ -1136,12 +1155,11 @@ window.renderStatistics = (range = 'all') => {
 
     if(window.ChartsEngine) window.ChartsEngine.render(filteredData, dataBeforeStart, cutoffStart);
 
-    // --- NEW: Google Charts Sankey Diagram ---
+    // Google Charts Sankey Diagram
     const renderSankeyFlow = () => {
         const container = document.getElementById('sankey_diagram');
         if (!container) return;
 
-        // Ensure Google Charts is loaded
         if (typeof google === 'undefined' || !google.visualization) {
             google.charts.load('current', { packages: ['sankey'] });
             google.charts.setOnLoadCallback(renderSankeyFlow);
@@ -1157,13 +1175,11 @@ window.renderStatistics = (range = 'all') => {
         const incByCat = {};
         const expByCat = {};
 
-        // Calculate totals from filtered data
         filteredData.forEach(entry => {
             const isIncome = (entry.type || '').toUpperCase().includes('INCOM');
             if (isIncome) {
                 incByCat[entry.category || 'Other'] = (incByCat[entry.category || 'Other'] || 0) + entry.amount;
             } else {
-                // Keep expenses positive for the flow weights
                 expByCat[entry.category || 'Other'] = (expByCat[entry.category || 'Other'] || 0) + Math.abs(entry.amount);
             }
         });
@@ -1173,19 +1189,14 @@ window.renderStatistics = (range = 'all') => {
             return;
         }
 
-        container.innerHTML = ''; // Clear previous content
+        container.innerHTML = ''; 
 
-        // 1. Income -> Cash Flow
         for (const [cat, amt] of Object.entries(incByCat)) {
             if (amt > 0) rows.push([`${cat}`, 'Budget', amt]);
         }
-
-        // 2. Cash Flow -> Expenses
         for (const [cat, amt] of Object.entries(expByCat)) {
             if (amt > 0) rows.push(['Budget', cat, amt]);
         }
-
-        // 3. Handle leftover (Savings or Deficit)
         if (totalIncome > totalExpense) {
             rows.push(['Budget', 'Savings', totalIncome - totalExpense]);
         } else if (totalExpense > totalIncome) {
@@ -1200,10 +1211,10 @@ window.renderStatistics = (range = 'all') => {
         const options = {
             sankey: {
                 node: {
-                    width: 36,          // Wider nodes
-                    nodePadding: 18,    // Slightly smaller padding
+                    width: 36,
+                    nodePadding: 18,
                     label: { color: textColor, fontSize: 14, fontName: 'DM Sans' },
-                    colors: ['#26D9B0'] // Default node color
+                    colors: ['#26D9B0']
                 },
                 link: {
                     colorMode: 'gradient',
@@ -1216,8 +1227,6 @@ window.renderStatistics = (range = 'all') => {
         const chart = new google.visualization.Sankey(container);
         chart.draw(data, options);
     };
-
-    // Trigger the Sankey rendering
     renderSankeyFlow();
 };
 
@@ -1235,7 +1244,7 @@ window.renderBudgetTracking = () => {
     else if (cycle === 'weekly') { const day = now.getDay() || 7; cutoff = new Date(now.setHours(0,0,0,0)); cutoff.setDate(cutoff.getDate() - day + 1); }
 
     let cycleIncome = 0; const grouped = {};
-    window.appData.filter(e => new Date(e.timestamp) >= cutoff).forEach(e => {
+    window.appData.filter(e => new Date(e.timestamp) >= cutoff && !e.trip_id).forEach(e => {
         const isIncome = (e.type || '').toUpperCase().includes('INCOM');
         if (isIncome) {
             cycleIncome += e.amount;
@@ -1275,61 +1284,47 @@ window.renderAccounts = async () => {
     let grandTotal = 0;
     const userCurrency = (window.userSettings?.currency || '₱').replace('₱', 'PHP');
     
-    // Pre-fetch all unique currencies to cache prices
     const uniqueCurrencies = [...new Set(window.accountsData.map(acc => acc.currency || userCurrency).filter(c => c !== userCurrency))];
     for (const curr of uniqueCurrencies) {
         await window.getPrice(curr);
     }
     
-    // Group accounts by type
     const groupedByType = {};
     window.accountsData.forEach((acc, index) => {
         let type = acc.type || 'bank';
         let groupKey = type;
-        
-        // For custom types, use customType as the group key
         if (type === 'custom' && acc.customType) {
             groupKey = `custom:${acc.customType}`;
         }
-        
         if (!groupedByType[groupKey]) {
             groupedByType[groupKey] = [];
         }
         groupedByType[groupKey].push({ ...acc, _index: index });
     });
     
-    // Get type labels
-    const typeLabels = {
-        'bank': 'Banks & E-Wallets',
-        'onhand': 'On-hand Cash',
-        'investment': 'Investments',
-        'custom': 'Custom'
-    };
+    const typeLabels = { 'bank': 'Banks & E-Wallets', 'onhand': 'On-hand Cash', 'investment': 'Investments', 'custom': 'Custom' };
     
-    // Use saved typeOrder or generate default order
     const defaultOrder = ['bank', 'onhand', 'investment'];
     const allTypes = Object.keys(groupedByType);
     const customTypes = allTypes.filter(t => t.startsWith('custom:') || (!defaultOrder.includes(t) && !['bank', 'onhand', 'investment'].includes(t)));
+    
     if (typeof window.userSettings.typeOrder === 'string') {
         try {
             window.userSettings.typeOrder = JSON.parse(window.userSettings.typeOrder);
         } catch (e) {
-            window.userSettings.typeOrder = []; // fallback if parsing fails
+            window.userSettings.typeOrder = []; 
         }
     }
 
-    // 2. Fallback: if it is still not a valid array, or is empty, generate the default order
     if (!Array.isArray(window.userSettings.typeOrder) || window.userSettings.typeOrder.length === 0) {
         window.userSettings.typeOrder = [...defaultOrder.filter(t => allTypes.includes(t)), ...customTypes.sort()];
     }
     
-    // Use saved order, but include any new types that weren't in the saved order
     const orderedTypes = [
         ...window.userSettings.typeOrder.filter(t => allTypes.includes(t)),
         ...allTypes.filter(t => !window.userSettings.typeOrder.includes(t))
     ];
     
-    // Render each type section
     let html = '';
     for (const type of orderedTypes) {
         const accounts = groupedByType[type];
@@ -1338,16 +1333,13 @@ window.renderAccounts = async () => {
         const typeLabel = typeLabels[type] || (type.startsWith('custom:') ? type.substring(7) : type.charAt(0).toUpperCase() + type.slice(1));
         let typeTotal = 0;
         
-        // Calculate type total (converting all to user's currency using cached prices)
         const cache = window.getPriceCache();
         for (const acc of accounts) {
             const balance = parseFloat(acc.balance || 0);
             const accCurrency = acc.currency || userCurrency;
-            
             if (accCurrency === userCurrency) {
                 typeTotal += balance;
             } else {
-                // Use cached price
                 const rate = cache[accCurrency]?.rate || 1;
                 typeTotal += balance * rate;
             }
@@ -1362,7 +1354,7 @@ window.renderAccounts = async () => {
                     <h3 style="margin: 0; font-size: 16px; color: var(--text-secondary);">
                         <span style="cursor: grab; display: inline-block; margin-right: 8px;">⋮⋮</span> ${typeLabel}
                     </h3>
-                    <span style="font-weight: 700; color: ${typeTotalColor};">${typeSign}${window.formatMoney(Math.abs(typeTotal))}</span>
+                    <span style="font-weight: 700; color: ${typeTotalColor};">${typeSign}${window.formatMoney(Math.abs(typeTotal, true))}</span>
                 </div>
                 <div class="accounts-grid account-type-grid" data-type="${type}">
                     ${accounts.map((acc, idx) => {
@@ -1373,7 +1365,6 @@ window.renderAccounts = async () => {
                         const balanceColor = acc.balance < 0 ? 'var(--accent-red)' : 'var(--text)';
                         const accCurrency = acc.currency || userCurrency;
                         
-                        // Get cached price to calculate converted amount
                         const cache = window.getPriceCache();
                         let convertedAmount = acc.balance;
                         let originalDisplay = '';
@@ -1430,7 +1421,7 @@ window.renderAccounts = async () => {
     if(totalBalEl) {
         const sign = grandTotal < 0 ? '-' : grandTotal > 0 ? '+' : '';
         const color = grandTotal < 0 ? 'var(--accent-red)' : 'var(--text)';
-        totalBalEl.innerText = window.formatMoney(grandTotal);
+        totalBalEl.innerText = window.formatMoney(grandTotal, true);
         totalBalEl.style.color = color;
     }
 };
@@ -1559,6 +1550,214 @@ window.renderSubscriptions = async () => {
     }).join('');
 };
 
+// ==========================================
+// TRIPS & EVENTS HUB
+// ==========================================
+
+window.getTripDates = (tripId) => {
+    const txs = window.appData.filter(t => t.trip_id === tripId);
+    if (!txs.length) return 'No logged activity';
+    const dates = txs.map(t => new Date(t.timestamp).getTime());
+    const min = new Date(Math.min(...dates));
+    const max = new Date(Math.max(...dates));
+    if (min.toDateString() === max.toDateString()) return window.formatListDate(min);
+    return `${window.formatListDate(min)} — ${window.formatListDate(max)}`;
+};
+
+window.renderTripsView = (forceShowPast = false) => {
+    const container = document.getElementById('trips-content-container');
+    if (!container) return;
+
+    if (!window.tripsData || window.tripsData.length === 0) {
+        container.innerHTML = `
+            <div class="card" style="text-align: center; padding: 60px 20px;">
+                <h3 style="margin-bottom: 12px; font-size: 24px;">Welcome to Travel Mode ✈️</h3>
+                <p class="text-muted" style="margin-bottom: 24px; max-width: 500px; margin-left: auto; margin-right: auto; line-height: 1.6;">
+                    Travels and events often break your standard budget. By starting a Trip, you can completely isolate vacation expenses from your daily averages and fund them via specific savings goals.
+                </p>
+                <button class="primary-btn" onclick="document.getElementById('travel-mode-btn').click()">Start your first Trip</button>
+            </div>
+        `;
+        return;
+    }
+
+    const activeTrip = window.tripsData.find(t => t.id === window.userSettings.activeTripId);
+
+    // STATE: Active Trip (Unless toggled to view history)
+    if (activeTrip && !forceShowPast) {
+        const txs = window.appData.filter(t => t.trip_id === activeTrip.id);
+        const spent = txs.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
+        
+        let budgetContext = '<span class="text-muted">Tracking via Standard Income</span>';
+        let limit = 0;
+        let progressHtml = '';
+
+        if (activeTrip.budget_source_type === 'fixed') {
+            limit = activeTrip.fixed_budget_amount || 0;
+        } else if (activeTrip.budget_source_type === 'goal') {
+            const goal = window.userGoals.find(g => g.id === activeTrip.budget_source_id);
+            limit = goal ? goal.target_amount : 0;
+        }
+
+        if (limit > 0) {
+            const pct = Math.min((spent / limit) * 100, 100);
+            const color = spent > limit ? 'var(--accent-red)' : 'var(--primary)';
+            budgetContext = `<span style="font-weight:700; color:${color};">${window.formatMoney(spent)} <span class="text-muted" style="font-weight:400;">/ ${window.formatMoney(limit, true)}</span></span>`;
+            
+            progressHtml = `
+                <div style="width: 100%; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-top: 12px;">
+                    <div style="height: 100%; width: ${pct}%; background: ${color}; transition: width 0.3s;"></div>
+                </div>
+            `;
+        } else {
+            budgetContext = `<span style="font-weight:700;">${window.formatMoney(spent)} <span class="text-muted" style="font-weight:400;">Total Spent</span></span>`;
+        }
+
+        // Category Breakdown
+        const cats = {};
+        txs.filter(t => t.amount < 0).forEach(t => {
+            const c = t.category || 'Other';
+            cats[c] = (cats[c] || 0) + Math.abs(t.amount);
+        });
+        const breakdownHtml = Object.entries(cats)
+            .sort((a,b) => b[1] - a[1])
+            .map(([c, amt]) => `<div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:8px;"><span class="text-muted">${c}</span> <span style="font-weight:600;">${window.formatMoney(amt)}</span></div>`)
+            .join('') || '<span class="text-muted" style="font-size: 13px;">No expenses logged yet.</span>';
+
+        container.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h3 style="color: var(--primary);">Currently Traveling</h3>
+                <button class="secondary-btn" onclick="window.renderTripsView(true)" style="padding: 6px 12px; font-size: 12px;">View Past Trips</button>
+            </div>
+            
+            <div class="card" style="margin-bottom: 24px; border: 2px solid var(--primary);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div>
+                        <h2 style="margin-bottom: 4px; font-size: 24px;">${activeTrip.name}</h2>
+                        <p class="text-muted" style="font-size: 13px;">${window.getTripDates(activeTrip.id)}</p>
+                    </div>
+                    <div style="text-align: right;">${budgetContext}</div>
+                </div>
+                ${progressHtml}
+                
+                <hr style="border: none; border-top: 1px solid var(--border); margin: 24px 0;">
+                
+                <h4 style="margin-bottom: 16px; font-size: 14px;">Expense Breakdown</h4>
+                ${breakdownHtml}
+            </div>
+            
+            <h3 style="margin-bottom: 16px;">Trip Activity</h3>
+            <div class="card">
+                <ul class="minimal-list interactive-list">
+                    ${txs.length ? txs.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 10).map(window.generateTxHTML).join('') : '<li class="text-muted">No activity logged.</li>'}
+                </ul>
+            </div>
+        `;
+        return;
+    }
+
+    // STATE: Past / All Trips List
+    const pastTrips = window.tripsData.filter(t => t.status !== 'active' || forceShowPast).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+    
+    let html = '';
+    if (forceShowPast && activeTrip) {
+        html += `<button class="text-btn" onclick="window.renderTripsView(false)" style="margin-bottom: 24px;">← Back to Active Trip</button>`;
+    }
+
+    if (pastTrips.length === 0) {
+        html += `<p class="text-muted" style="text-align: center; padding: 40px;">No trip history found.</p>`;
+    } else {
+        html += `<div style="display: flex; flex-direction: column; gap: 16px;">` + pastTrips.map(trip => {
+            const txs = window.appData.filter(t => t.trip_id === trip.id);
+            const spent = txs.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
+            const isActiveLabel = trip.status === 'active' ? `<span style="color:var(--primary); font-size:12px; font-weight:700; margin-left:8px;">(Active)</span>` : '';
+            
+            return `
+                <div class="card" style="display: flex; justify-content: space-between; align-items: center; padding: 20px;">
+                    <div>
+                        <h3 style="margin-bottom: 4px;">${trip.name} ${isActiveLabel}</h3>
+                        <p class="text-muted" style="font-size: 13px;">${window.getTripDates(trip.id)}</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 24px;">
+                        <div style="text-align: right;">
+                            <p class="text-muted" style="font-size: 12px; margin-bottom: 2px;">Total Spent</p>
+                            <h4 style="font-size: 16px;">${window.formatMoney(spent)}</h4>
+                        </div>
+                        <button class="text-btn" style="color: var(--accent-red);" onclick="window.openDeleteTripModal('${trip.id}', '${trip.name.replace(/'/g, "\\'")}')">Delete</button>
+                    </div>
+                </div>
+            `;
+        }).join('') + `</div>`;
+    }
+
+    container.innerHTML = html;
+};
+
+window.openDeleteTripModal = (tripId, tripName) => {
+    window.tripToDeleteId = tripId;
+    document.getElementById('delete-trip-name-display').innerText = tripName;
+    document.getElementById('delete-trip-overlay').classList.add('active');
+};
+
+window.closeDeleteTripModal = () => {
+    document.getElementById('delete-trip-overlay').classList.remove('active');
+    window.tripToDeleteId = null;
+};
+
+// --- DANGEROUS: TRIP DELETION ENGINE ---
+document.getElementById('confirm-delete-trip-btn')?.addEventListener('click', async () => {
+    const tripId = window.tripToDeleteId;
+    const revertBalances = document.getElementById('delete-trip-revert-balances').checked;
+    if (!tripId) return;
+
+    try {
+        const txsToRevert = window.appData.filter(t => t.trip_id === tripId);
+        
+        // 1. Revert Balances Safely
+        if (revertBalances) {
+            let accountsChanged = false;
+            txsToRevert.forEach(tx => {
+                if (tx.account_id) {
+                    const acc = window.accountsData.find(a => a.id === tx.account_id);
+                    if (acc) {
+                        // Math logic:
+                        // If income, tx.amount is positive (+50). balance -= 50 correctly removes the income.
+                        // If expense, tx.amount is negative (-50). balance -= (-50) mathematically acts as balance += 50, correctly refunding it!
+                        acc.balance -= tx.amount; 
+                        accountsChanged = true;
+                    }
+                }
+            });
+            if (accountsChanged) await window.saveAccountsToCloud();
+        }
+
+        // 2. Delete Transactions from Database
+        await window.supabase.from('transactions').delete().eq('trip_id', tripId);
+
+        // 3. Delete Trip from Database
+        await window.supabase.from('trips').delete().eq('id', tripId);
+
+        // 4. Purge from local memory
+        window.appData = window.appData.filter(t => t.trip_id !== tripId);
+        window.tripsData = window.tripsData.filter(t => t.id !== tripId);
+
+        // 5. Reset UI if the deleted trip was currently active
+        if (window.userSettings.activeTripId === tripId) {
+            window.userSettings.activeTripId = null;
+            await window.supabase.from('settings').update({ active_trip_id: null }).eq('user_id', window.currentUser.id);
+            document.body.classList.remove('travel-theme');
+        }
+
+        window.closeDeleteTripModal();
+        window.bootUI();
+        window.renderTripsView();
+
+    } catch (e) {
+        console.error("Failed to delete trip:", e);
+        alert("An error occurred while deleting the trip.");
+    }
+});
+
 window.deleteGoal = async (goalId) => {
     if (!confirm('Delete this goal?')) return;
     window.userGoals = window.userGoals.filter(g => g.id !== goalId);
@@ -1573,138 +1772,6 @@ window.deleteSubscription = async (subId) => {
     await window.saveSubscriptionsToCloud();
     await window.renderSubscriptions();
     window.closeSubscriptionModal();
-};
-
-window.toggleAccountFavorite = async (index) => {
-    if (index >= 0 && index < window.accountsData.length) {
-        window.accountsData[index].favorite = !window.accountsData[index].favorite;
-        await window.saveAccountsToCloud();
-        window.renderAccounts();
-    }
-};
-
-window.setupAccountDragDrop = () => {
-    let draggedElement = null;
-    let draggedType = null;
-    
-    const handleDragStart = (e) => {
-        draggedElement = e.target.closest('[draggable="true"]');
-        if (!draggedElement) return;
-        
-        // Prevent the drag event from bubbling up to the parent section
-        e.stopPropagation(); 
-        
-        draggedType = draggedElement.getAttribute('data-type');
-        const accountIndex = draggedElement.getAttribute('data-account-index');
-        
-        if (accountIndex !== null) {
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('accountIndex', accountIndex);
-            draggedElement.style.opacity = '0.5';
-        } else {
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('typeSection', draggedType);
-            draggedElement.style.opacity = '0.5';
-        }
-    };
-    
-    const handleDragOver = (e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        const overElement = e.target.closest('[draggable="true"]');
-        if (overElement && overElement !== draggedElement) {
-            overElement.style.opacity = '0.6';
-        }
-    };
-    
-    const handleDragLeave = (e) => {
-        const overElement = e.target.closest('[draggable="true"]');
-        if (overElement && overElement !== draggedElement) {
-            overElement.style.opacity = '1';
-        }
-    };
-    
-    const handleDrop = async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        const dropTarget = e.target.closest('[draggable="true"]');
-        if (!dropTarget || dropTarget === draggedElement) return;
-        
-        dropTarget.style.opacity = '1';
-        
-        const accountIndex = e.dataTransfer.getData('accountIndex');
-        const typeSection = e.dataTransfer.getData('typeSection');
-        
-        const targetAccountIndex = dropTarget.getAttribute('data-account-index');
-        
-        // Safely get the type of the section, whether we dropped on a card or the section header
-        const targetType = dropTarget.getAttribute('data-type') || dropTarget.closest('.account-type-section')?.getAttribute('data-type');
-        
-        // --- 1. Handle Account Card Drag ---
-        if (accountIndex) {
-            const draggedIdx = parseInt(accountIndex);
-            const targetIdx = parseInt(targetAccountIndex);
-            
-            if (!isNaN(draggedIdx)) {
-                const draggedAcc = window.accountsData[draggedIdx];
-                
-                // If dragged to a different type section, update the account's type
-                if (targetType) {
-                    let parsedType = targetType;
-                    let parsedCustom = '';
-                    if (targetType.startsWith('custom:')) {
-                        parsedType = 'custom';
-                        parsedCustom = targetType.substring(7);
-                    }
-                    draggedAcc.type = parsedType;
-                    draggedAcc.customType = parsedCustom || null;
-                }
-
-                // Remove from original position
-                window.accountsData.splice(draggedIdx, 1);
-                
-                // Insert at new position
-                if (!isNaN(targetIdx)) {
-                    window.accountsData.splice(targetIdx, 0, draggedAcc);
-                } else {
-                    window.accountsData.push(draggedAcc); // Appended if dropped directly on a section header
-                }
-                
-                await window.saveAccountsToCloud();
-                await window.renderAccounts();
-            }
-        }
-        // --- 2. Handle Type Section Drag ---
-        else if (typeSection && targetType) {
-            const draggedTypeIdx = window.userSettings.typeOrder.indexOf(typeSection);
-            const targetTypeIdx = window.userSettings.typeOrder.indexOf(targetType);
-            
-            if (draggedTypeIdx !== -1 && targetTypeIdx !== -1 && draggedTypeIdx !== targetTypeIdx) {
-                // Remove the section and insert it exactly at the target index
-                const draggedTypeValue = window.userSettings.typeOrder.splice(draggedTypeIdx, 1)[0];
-                window.userSettings.typeOrder.splice(targetTypeIdx, 0, draggedTypeValue);
-                
-                await window.saveSettingsToCloud();
-                await window.renderAccounts();
-            }
-        }
-    };
-    
-    const handleDragEnd = (e) => {
-        document.querySelectorAll('[draggable="true"]').forEach(el => {
-            el.style.opacity = '1';
-        });
-        draggedElement = null;
-    };
-    
-    document.querySelectorAll('[draggable="true"]').forEach(el => {
-        el.addEventListener('dragstart', handleDragStart, false);
-        el.addEventListener('dragover', handleDragOver, false);
-        el.addEventListener('dragleave', handleDragLeave, false);
-        el.addEventListener('drop', handleDrop, false);
-        el.addEventListener('dragend', handleDragEnd, false);
-    });
 };
 
 window.deleteAccount = async (index) => {
@@ -1751,7 +1818,6 @@ window.editAccount = (index) => {
         document.getElementById('acc-favorite').checked = acc.favorite || false;
         document.getElementById('acc-currency').value = acc.currency || '';
         
-        // Handle custom type visibility and population
         const customGroup = document.getElementById('custom-type-group');
         if (acc.type === 'custom') {
             document.getElementById('acc-custom-type').value = acc.customType || '';
@@ -1760,7 +1826,6 @@ window.editAccount = (index) => {
             if (customGroup) customGroup.style.display = 'none';
         }
 
-        // Expand the "More Options" section if favorite or currency has data
         const expandSection = document.getElementById('acc-expand-section');
         const expandBtn = document.getElementById('acc-expand-btn');
         if (acc.favorite || acc.currency) {
@@ -1821,6 +1886,10 @@ window.openExpenseModal = () => {
         });
     }
     window.populateAccountDropdowns('exp-account');
+    
+    // Auto-setup Travel Mode checks
+    if(window.setupTxTripToggle) window.setupTxTripToggle('exp');
+    
     if (overlay) overlay.classList.add('active');
 };
 
@@ -1832,6 +1901,10 @@ window.closeExpenseModal = () => {
 window.openIncomeModal = () => {
     const overlay = document.getElementById('income-overlay');
     window.populateAccountDropdowns('inc-account');
+    
+    // Auto-setup Travel Mode checks
+    if(window.setupTxTripToggle) window.setupTxTripToggle('inc');
+    
     if (overlay) overlay.classList.add('active');
 };
 
@@ -1858,7 +1931,6 @@ window.bootUI = () => {
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- INITIALIZE AUTOCOMPLETE ---
     window.setupAutocomplete('exp-name', 'name');
     window.setupAutocomplete('exp-merchant', 'merchant');
     window.setupAutocomplete('inc-name', 'name');
@@ -2097,11 +2169,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const target = btn.getAttribute('data-target');
             window.switchView(target);
             
-            // Render specific views when opened
             if (target === 'goals') {
                 await window.renderGoals();
             } else if (target === 'subscriptions') {
                 await window.renderSubscriptions();
+            } else if (target === 'trips') {
+                window.renderTripsView();
             }
         });
     });
@@ -2151,7 +2224,6 @@ document.addEventListener('DOMContentLoaded', () => {
         deleteBtn.addEventListener('click', window.deleteTransaction);
     }
 
-    // Toggle More Options in account modal
     const expandBtn = document.getElementById('acc-expand-btn');
     if (expandBtn) {
         expandBtn.addEventListener('click', (e) => {
@@ -2219,7 +2291,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 currency: document.getElementById('acc-currency')?.value?.toUpperCase() || ''
             };
             
-            // Assign customType if applicable, otherwise clear it
             if (typeValue === 'custom') {
                 accData.customType = document.getElementById('acc-custom-type')?.value || 'Custom';
             } else {
@@ -2227,11 +2298,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             if (window.editingAccountIndex !== undefined) {
-                // Preserve the existing ID when updating
                 accData.id = window.accountsData[window.editingAccountIndex].id;
                 window.accountsData[window.editingAccountIndex] = accData;
             } else {
-                // Generate a new ID for new accounts
                 accData.id = window.generateUUID();
                 window.accountsData.push(accData);
             }
@@ -2283,6 +2352,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const merchant = document.getElementById('exp-merchant').value.trim() || '';
         const notes = document.getElementById('exp-notes').value.trim() || '';
         const accountId = document.getElementById('exp-account').value || null;
+        
+        const isTrip = document.getElementById('exp-is-trip')?.checked;
+        const tripId = isTrip ? document.getElementById('exp-trip-id')?.value : null;
 
         if (!name || !amount || isNaN(amount)) {
             alert('Please fill in Name and Amount');
@@ -2299,6 +2371,7 @@ document.addEventListener('DOMContentLoaded', () => {
             notes: notes,
             merchant: merchant,
             account_id: accountId,
+            trip_id: tripId,
             timestamp: new Date().toISOString()
         };
 
@@ -2307,12 +2380,23 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error saving expense:', error);
             alert('Error saving expense');
         } else {
-            // Deduct from Account Balance ---
             if (accountId) {
                 const accIndex = window.accountsData.findIndex(a => a.id === accountId);
                 if (accIndex !== -1) {
                     window.accountsData[accIndex].balance -= amount;
                     await window.saveAccountsToCloud();
+                }
+            }
+            
+            if (tripId) {
+                const trip = window.tripsData?.find(t => t.id === tripId);
+                if (trip && trip.budget_source_type === 'goal') {
+                    const goal = window.userGoals.find(g => g.id === trip.budget_source_id);
+                    if (goal) {
+                        goal.current_amount -= amount;
+                        await window.saveGoalsToCloud();
+                        if(window.renderGoalsWidget) window.renderGoalsWidget();
+                    }
                 }
             }
 
@@ -2334,6 +2418,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const category = document.getElementById('inc-category').value || 'INCOME';
         const notes = document.getElementById('inc-notes').value.trim() || '';
         const accountId = document.getElementById('inc-account').value || null;
+        
+        const isTrip = document.getElementById('inc-is-trip')?.checked;
+        const tripId = isTrip ? document.getElementById('inc-trip-id')?.value : null;
 
         if (!name || !amount || isNaN(amount)) {
             alert('Please fill in Name and Amount');
@@ -2349,6 +2436,7 @@ document.addEventListener('DOMContentLoaded', () => {
             amount: amount,
             notes: notes,
             account_id: accountId,
+            trip_id: tripId,
             timestamp: new Date().toISOString()
         };
 
@@ -2360,8 +2448,20 @@ document.addEventListener('DOMContentLoaded', () => {
             if (accountId) {
                 const accIndex = window.accountsData.findIndex(a => a.id === accountId);
                 if (accIndex !== -1) {
-                    window.accountsData[accIndex].balance += Math.abs(amount);
+                    window.accountsData[accIndex].balance += amount;
                     await window.saveAccountsToCloud();
+                }
+            }
+
+            if (tripId) {
+                const trip = window.tripsData?.find(t => t.id === tripId);
+                if (trip && trip.budget_source_type === 'goal') {
+                    const goal = window.userGoals.find(g => g.id === trip.budget_source_id);
+                    if (goal) {
+                        goal.current_amount += amount;
+                        await window.saveGoalsToCloud();
+                        if(window.renderGoalsWidget) window.renderGoalsWidget();
+                    }
                 }
             }
 
@@ -2390,10 +2490,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const file = fileInput.files[0];
             
-            // If file selected, import CSV; otherwise sync to cloud
             if (file) {
-                // CSV IMPORT FLOW
-                // Show styled confirmation
                 let confirmed;
                 if (typeof window.showConfirmation === 'function') {
                     confirmed = await window.showConfirmation(
@@ -2512,10 +2609,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             } else {
                                 const occurrenceNum = fingerprintMap.get(baseFingerprint);
                                 fingerprintMap.set(baseFingerprint, occurrenceNum + 1);
-                                // Parse timestamp while preserving timezone (don't use toISOString)
                                 let ts = new Date(item.timestamp);
                                 ts.setSeconds(ts.getSeconds() + occurrenceNum);
-                                // Keep original timestamp format to avoid timezone shifts
                                 const year = ts.getFullYear();
                                 const month = String(ts.getMonth() + 1).padStart(2, '0');
                                 const day = String(ts.getDate()).padStart(2, '0');
@@ -2543,8 +2638,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
                 reader.readAsText(file);
             } else {
-                // SYNC TO CLOUD FLOW
-                // Show confirmation
                 let confirmed;
                 if (typeof window.showConfirmation === 'function') {
                     confirmed = await window.showConfirmation(
@@ -2565,7 +2658,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 statusMsg.style.color = "var(--text)";
                 
                 try {
-                    // Save all data to cloud
                     await window.saveAccountsToCloud();
                     await window.saveGoalsToCloud();
                     await window.saveSubscriptionsToCloud();
@@ -2586,8 +2678,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-
-    // Save Goal Handler
     document.getElementById('save-goal-btn')?.addEventListener('click', async () => {
         const goalId = document.getElementById('goal-modal-title').innerText.includes('Edit') 
             ? window.userGoals.find(g => g.name === document.getElementById('goal-name').value)?.id
@@ -2622,7 +2712,6 @@ document.addEventListener('DOMContentLoaded', () => {
         window.closeGoalModal();
     });
     
-    // Save Subscription Handler
     document.getElementById('save-sub-btn')?.addEventListener('click', async () => {
         const subId = document.getElementById('subscription-modal-title').innerText.includes('Edit')
             ? window.userSubscriptions.find(s => s.name === document.getElementById('sub-name').value)?.id
@@ -2659,7 +2748,6 @@ document.addEventListener('DOMContentLoaded', () => {
         window.closeSubscriptionModal();
     });
     
-    // Add Goal/Subscription Button Handlers
     const addGoalBtn = document.getElementById('add-goal-btn');
     const addSubBtn = document.getElementById('add-subscription-btn');
     
@@ -2670,7 +2758,6 @@ document.addEventListener('DOMContentLoaded', () => {
         addSubBtn.addEventListener('click', () => window.openSubscriptionModal());
     }
     
-    // Close modals when clicking outside
     document.getElementById('goal-overlay')?.addEventListener('click', (e) => {
         if (e.target.id === 'goal-overlay') window.closeGoalModal();
     });
@@ -2681,7 +2768,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.target.id === 'goal-allocation-overlay') window.closeGoalAllocationModal();
     });
     
-    // --- MOBILE MENU HANDLERS ---
     const mobileMenuBtn = document.getElementById('mobile-menu-btn');
     const sidebar = document.getElementById('main-sidebar');
     const backdrop = document.getElementById('sidebar-backdrop');
@@ -2697,6 +2783,105 @@ document.addEventListener('DOMContentLoaded', () => {
             backdrop.classList.remove('active');
         });
     }
+
+    // --- TRAVEL MODE LISTENERS ---
+    
+    document.getElementById('travel-mode-btn')?.addEventListener('click', () => {
+        const overlay = document.getElementById('travel-overlay');
+        const setupView = document.getElementById('travel-setup-view');
+        const activeView = document.getElementById('travel-active-view');
+        
+        if (window.userSettings.activeTripId) {
+            setupView.style.display = 'none';
+            activeView.style.display = 'block';
+        } else {
+            setupView.style.display = 'block';
+            activeView.style.display = 'none';
+            const goalSel = document.getElementById('trip-goal-id');
+            goalSel.innerHTML = window.userGoals.map(g => `<option value="${g.id}">${g.name} (${window.formatMoney(g.current_amount)})</option>`).join('');
+        }
+        overlay.classList.add('active');
+    });
+
+    document.getElementById('trip-budget-type')?.addEventListener('change', (e) => {
+        const type = e.target.value;
+        document.getElementById('trip-fixed-amount-group').style.display = type === 'fixed' ? 'block' : 'none';
+        document.getElementById('trip-goal-group').style.display = type === 'goal' ? 'block' : 'none';
+    });
+
+    document.getElementById('start-trip-btn')?.addEventListener('click', async () => {
+        const name = document.getElementById('trip-name').value.trim();
+        const bType = document.getElementById('trip-budget-type').value;
+        const fixedAmt = document.getElementById('trip-amount').value;
+        const goalId = document.getElementById('trip-goal-id').value;
+
+        if(!name) return alert("Trip name required");
+
+        const payload = {
+            user_id: window.currentUser.id,
+            name: name,
+            budget_source_type: bType,
+            // FIX 1: Ensure blank goals are sent as null, not ""
+            budget_source_id: (bType === 'goal' && goalId) ? goalId : null, 
+            // FIX 2: Ensure blank amounts are sent as 0, not NaN
+            fixed_budget_amount: bType === 'fixed' ? (parseFloat(fixedAmt) || 0) : 0, 
+            status: 'active'
+        };
+
+        const { data, error } = await window.supabase.from('trips').insert(payload).select().single();
+        
+        if (error) {
+            console.error("Supabase Error:", error);
+            // FIX 3: Actually show you the error message so we aren't guessing!
+            return alert("Failed to start trip: " + error.message); 
+        }
+
+        if(!window.tripsData) window.tripsData = [];
+        window.tripsData.push(data);
+        window.userSettings.activeTripId = data.id;
+        await window.supabase.from('settings').update({ active_trip_id: data.id }).eq('user_id', window.currentUser.id);
+        
+        document.getElementById('travel-overlay').classList.remove('active');
+        window.bootUI();
+    });
+
+    document.getElementById('end-trip-btn')?.addEventListener('click', async () => {
+        await window.supabase.from('settings').update({ active_trip_id: null }).eq('user_id', window.currentUser.id);
+        await window.supabase.from('trips').update({ status: 'completed' }).eq('id', window.userSettings.activeTripId);
+        
+        window.userSettings.activeTripId = null;
+        document.getElementById('travel-overlay').classList.remove('active');
+        window.bootUI();
+    });
+
+    document.getElementById('stats-include-travel')?.addEventListener('change', () => {
+        window.renderStatistics(window.currentStatRange);
+    });
+
+    window.setupTxTripToggle = (prefix) => {
+        const isTripCb = document.getElementById(`${prefix}-is-trip`);
+        const tripSel = document.getElementById(`${prefix}-trip-id`);
+        if (!isTripCb || !tripSel) return;
+
+        tripSel.innerHTML = (window.tripsData || []).map(t => `<option value="${t.id}">${t.name} (${t.status})</option>`).join('');
+        
+        if (window.userSettings.activeTripId) {
+            isTripCb.checked = true;
+            tripSel.style.display = 'block';
+            tripSel.value = window.userSettings.activeTripId;
+        } else {
+            isTripCb.checked = false;
+            tripSel.style.display = 'none';
+        }
+        
+        isTripCb.onchange = (e) => tripSel.style.display = e.target.checked ? 'block' : 'none';
+    };
+
+    // Override original modal open functions to run the prep safely
+    const origExp = window.openExpenseModal;
+    window.openExpenseModal = () => { if(window.setupTxTripToggle) window.setupTxTripToggle('exp'); origExp(); };
+    const origInc = window.openIncomeModal;
+    window.openIncomeModal = () => { if(window.setupTxTripToggle) window.setupTxTripToggle('inc'); origInc(); };
     
     // ==========================================
     // GOAL ALLOCATION FUNCTIONS

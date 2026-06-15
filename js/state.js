@@ -275,7 +275,10 @@ async function loadCloudData() {
             typeOrder: set.type_order || [], 
             goalAllocations: set.goal_allocations || {},
             defaultAccountBehavior: set.default_acc_behavior || 'blank',
-            defaultAccountId: set.default_acc_id || null
+            defaultAccountId: set.default_acc_id || null,
+
+            activeTripId: set.active_trip_id || null,
+            privacyMode: set.privacy_mode || 0
         };
     }
     if (!window.userSettings.categories.find(c => c.name.toUpperCase() === 'SAVINGS')) {
@@ -298,6 +301,9 @@ async function loadCloudData() {
         ...acc,
         customType: acc.custom_type || undefined
     }));
+
+    const { data: trips } = await window.supabase.from('trips').select('*').eq('user_id', uid);
+    window.tripsData = trips || [];
 
     // Load Transactions (with batching for >1000 records)
     let allTxs = [];
@@ -352,7 +358,10 @@ window.saveSettingsToCloud = async () => {
         type_order: window.userSettings.typeOrder, 
         goal_allocations: window.userSettings.goalAllocations,
         default_acc_behavior: window.userSettings.defaultAccountBehavior,
-        default_acc_id: window.userSettings.defaultAccountId
+        default_acc_id: window.userSettings.defaultAccountId,
+
+        active_trip_id: window.userSettings.activeTripId,
+        privacy_mode: window.userSettings.privacyMode
     };
     
     const { error } = await window.supabase.from('settings').upsert(payload, { onConflict: 'user_id' });

@@ -173,7 +173,7 @@
                                     <path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.2-1.1.6L2.5 9l8.1 3.5-3.5 3.5-3-1-1.5 1.5 2.5 3.5 3.5 2.5 1.5-1.5-1-3 3.5-3.5 3.5 8.1c.4-.2.7-.6.6-1.1z"/>
                                 </svg>
                             </div>
-                            <span id="travel-mode-label">Travel Mode</span>
+                            <span id="travel-mode-label">Manage Trip</span>
                         </button>
                         <button class="action-card nav-proxy" data-target="settings">
                             <div class="action-icon">
@@ -225,7 +225,7 @@
                             <button onclick="window.switchView('goals')" class="text-btn" style="font-size: 12px; padding: 4px 8px;">View All →</button>
                         </div>
                         <div id="dashboard-goals-list" style="max-height: 240px; overflow-y: auto; padding-right: 8px;">
-                            </div>
+                        </div>
                     </div>
 
                     <div class="card" id="dashboard-upcoming-subs-widget" style="display: none;">
@@ -237,7 +237,7 @@
                             <button onclick="window.switchView('subscriptions')" class="text-btn" style="font-size: 12px; padding: 4px 8px;">View All →</button>
                         </div>
                         <div id="dashboard-upcoming-subs-timeline" style="max-height: 240px; overflow-y: auto; padding-right: 8px;">
-                            </div>
+                        </div>
                     </div>
 
                 </div>
@@ -439,8 +439,8 @@
 
             <section id="trips" class="view">
                 <header class="top-header" style="display: flex; justify-content: space-between; align-items: center;">
-                    <h2>Trips</h2>
-                    <button class="primary-btn" onclick="document.getElementById('travel-mode-btn').click()" style="padding: 8px 16px; font-size: 14px;">+ Start a Trip</button>
+                    <h2>Trips Dashboard</h2>
+                    <button class="primary-btn" onclick="window.openTravelSetupModal()" style="padding: 8px 16px; font-size: 14px;">+ Start a Trip</button>
                 </header>
                 <div id="trips-content-container">
                     </div>
@@ -629,18 +629,14 @@
     </div>
 
     <div id="travel-overlay" class="modal-overlay">
-        <div class="account-modal-content card">
+        <div class="account-modal-content card" style="max-height: 90vh; overflow-y: auto;">
             <header style="display: flex; justify-content: space-between; margin-bottom: 24px;">
-                <h3 id="travel-modal-title">Start Travel Mode</h3>
+                <h3 id="travel-modal-title">Setup Trip Budget</h3>
                 <button class="close-modal-btn" onclick="document.getElementById('travel-overlay').classList.remove('active')">✕</button>
             </header>
             
-            <div id="travel-active-view" style="display: none;">
-                <p class="text-muted" style="margin-bottom: 24px; line-height: 1.6;">You are currently traveling! The app accent is purple, and transactions will default to this trip budget.</p>
-                <button id="end-trip-btn" class="secondary-btn" style="width: 100%; border-color: var(--accent-red); color: var(--accent-red);">End Trip & Resume Normal Budget</button>
-            </div>
-
             <div id="travel-setup-view">
+                <input type="hidden" id="editing-trip-id" value="">
                 <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Trip Name</label><input type="text" id="trip-name" class="form-input" placeholder="e.g., Japan 2026"></div>
                 
                 <div class="form-group" style="margin-bottom: 16px;">
@@ -662,7 +658,22 @@
                     <input type="number" id="trip-amount" class="form-input" placeholder="0.00" step="0.01">
                 </div>
 
-                <button id="start-trip-btn" class="primary-btn" style="width: 100%; margin-top: 12px;">Begin Travel Mode</button>
+                <hr style="border:none; border-top:1px solid var(--border); margin: 24px 0;">
+
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="text-muted" style="display:block; margin-bottom:8px;">Trip Categories & Allowances (%)</label>
+                    <p class="text-muted" style="font-size:12px; margin-bottom:12px;">Customize categories specific to this trip. Total must equal 100%.</p>
+                    <p id="trip-budget-warning" style="color: var(--accent-red); font-size: 13px; font-weight: 500; display: none; margin-bottom: 12px;">⚠️ Total allocated exceeds 100%.</p>
+                    
+                    <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                        <input type="text" id="new-trip-cat-name" class="form-input" placeholder="e.g. FOOD">
+                        <input type="number" id="new-trip-cat-pct" class="form-input" placeholder="%" style="width: 80px;">
+                        <button id="add-trip-cat-btn" class="primary-btn">Add</button>
+                    </div>
+                    <ul id="trip-categories-list" class="minimal-list" style="margin-bottom: 16px;"></ul>
+                </div>
+
+                <button id="start-trip-btn" class="primary-btn" style="width: 100%; margin-top: 12px;">Save & Start Travel Mode</button>
             </div>
         </div>
     </div>

@@ -1,19 +1,12 @@
-// js/app.js
-
-// ==========================================
-// 1. GLOBAL CORE FUNCTIONS
-// ==========================================
-
 // --- PRIVACY MODE ENGINE ---
 if (!window.originalFormatMoney) {
     window.originalFormatMoney = window.formatMoney;
     window.originalFormatMoneyWithSymbol = window.formatMoneyWithSymbol;
 
-    // Redefine formatters to respect privacy states
     window.formatMoney = (amount, isTotal = false) => {
         const mode = window.userSettings?.privacyMode || 0;
-        if (mode === 1) return '••••••'; // Hide Everything
-        if (mode === 2 && isTotal) return '••••••'; // Hide Totals Only
+        if (mode === 1) return '••••••'; 
+        if (mode === 2 && isTotal) return '••••••'; 
         return window.originalFormatMoney(amount);
     };
 
@@ -27,20 +20,16 @@ if (!window.originalFormatMoney) {
 
 window.getPrivacyIcon = () => {
     const mode = window.userSettings?.privacyMode || 0;
-    if (mode === 0) return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`; // Open Eye
-    if (mode === 1) return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`; // Slashed Eye
-    return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg>`; // Eye with minus (Hide Totals)
+    if (mode === 0) return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`; 
+    if (mode === 1) return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`; 
+    return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg>`; 
 };
 
 window.togglePrivacyMode = async () => {
     let mode = window.userSettings.privacyMode || 0;
-    mode = (mode + 1) % 3; // Cycle: 0 -> 1 -> 2 -> 0
+    mode = (mode + 1) % 3; 
     window.userSettings.privacyMode = mode;
-    
-    // Save to Cloud instantly
     await window.supabase.from('settings').update({ privacy_mode: mode }).eq('user_id', window.currentUser.id);
-    
-    // Refresh UI
     window.bootUI();
 };
 
@@ -61,7 +50,6 @@ window.switchView = (targetId) => {
         viewEl.style.display = 'block'; 
     }
 
-    // close sidebar on mobile after clicking a link
     const sidebar = document.getElementById('main-sidebar');
     const backdrop = document.getElementById('sidebar-backdrop');
     if (sidebar && sidebar.classList.contains('mobile-open')) {
@@ -101,15 +89,14 @@ window.toggleTxFavorite = async (dbId, localId) => {
     const tx = window.appData.find(t => t._id === localId);
     if (!tx) return;
     
-    tx.favorite = !tx.favorite; // Toggle locally
+    tx.favorite = !tx.favorite; 
     window.updateDashboard();
     if(window.renderActivity) window.renderActivity();
     
-    // Save to Cloud
     const { error } = await window.supabase.from('transactions').update({ favorite: tx.favorite }).eq('id', dbId);
     if (error) {
         console.error("Error updating favorite status", error);
-        tx.favorite = !tx.favorite; // Revert on failure
+        tx.favorite = !tx.favorite; 
         window.updateDashboard();
     }
 };
@@ -132,7 +119,6 @@ window.renderQuickAddWidget = () => {
         </button>`;
     };
 
-    // 1. Favorites (Starred)
     const favorites = window.appData.filter(t => t.favorite);
     const uniqueFavs = []; const favSet = new Set();
     favorites.forEach(f => {
@@ -141,7 +127,6 @@ window.renderQuickAddWidget = () => {
     });
     favContainer.innerHTML = uniqueFavs.length ? uniqueFavs.slice(0, 8).map(createChip).join('') : '<span class="text-muted" style="font-size: 12px;">No favorites yet. Click the star icon on any transaction in your Activity list.</span>';
 
-    // 2. Recent (Max 5, deduplicated, excluding favorites)
     const uniqueRecent = []; const recSet = new Set();
     for (let t of window.appData) {
         const key = `${t.name}_${t.amount}`;
@@ -152,10 +137,7 @@ window.renderQuickAddWidget = () => {
     }
     recContainer.innerHTML = uniqueRecent.length ? uniqueRecent.map(createChip).join('') : '<span class="text-muted" style="font-size: 12px;">No recent transactions.</span>';
 
-    // 3. Most Frequent (Occurs > 2 times in the last 200 txs, excluding favs/recent)
     const freqMap = {};
-    
-    // Slice the array to only analyze the 200 most recent items
     const recent200 = window.appData.slice(0, 200); 
     recent200.forEach(t => {
         const key = `${t.name}|${t.amount}|${t.category}`;
@@ -245,7 +227,6 @@ window.applySettingsToUI = () => {
         const st = document.getElementById('setting-theme'); if(st) st.checked = false;
     }
 
-    // --- TRAVEL MODE THEME ENFORCEMENT ---
     if (window.userSettings.activeTripId) {
         document.body.classList.add('travel-theme');
         const tmLabel = document.getElementById('travel-mode-label');
@@ -256,7 +237,6 @@ window.applySettingsToUI = () => {
         if(tmLabel) tmLabel.innerText = "Travel Mode";
     }
     
-    // Greeting Update
     const greetEl = document.getElementById('dashboard-greeting');
     const avatarEl = document.getElementById('dashboard-avatar');
 
@@ -279,16 +259,13 @@ window.applySettingsToUI = () => {
     window.renderSettingsCategories();
     window.renderSettingsIncomeCategories();
 
-    // Default Account Settings UI
     const behaviorSelect = document.getElementById('setting-default-acc-behavior');
     const customSelect = document.getElementById('setting-default-acc-custom');
     
     if (behaviorSelect && customSelect) {
         behaviorSelect.value = window.userSettings.defaultAccountBehavior || 'blank';
-        
         customSelect.innerHTML = window.accountsData.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
         if (window.userSettings.defaultAccountId) customSelect.value = window.userSettings.defaultAccountId;
-        
         customSelect.style.display = behaviorSelect.value === 'custom' ? 'block' : 'none';
         
         behaviorSelect.addEventListener('change', (e) => {
@@ -332,7 +309,6 @@ window.renderSettingsCategories = () => {
 window.renderSettingsIncomeCategories = () => {
     const list = document.getElementById('settings-inc-categories-list');
     if(!list) return;
-    
     if(!window.userSettings.incomeCategories) window.userSettings.incomeCategories = ['SALARY', 'ALLOWANCE', 'BONUS'];
 
     list.innerHTML = window.userSettings.incomeCategories.map((c, i) => `
@@ -559,8 +535,6 @@ window.renderDashboardInsights = () => {
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
     
-    // --- 1. Expense Distribution (Doughnut Chart) ---
-    // Note: Exclude Trip transactions to keep dashboard clean
     const recentExpenses = window.appData.filter(e => new Date(e.timestamp) >= thirtyDaysAgo && e.amount < 0 && !e.trip_id);
     const categoryTotals = {};
     
@@ -600,7 +574,6 @@ window.renderDashboardInsights = () => {
         });
     }
 
-    // --- 1.5 Income Distribution (Doughnut Chart) ---
     const recentIncome = window.appData.filter(e => new Date(e.timestamp) >= thirtyDaysAgo && (e.type || '').toUpperCase().includes('INCOM') && !e.trip_id);
     const incCategoryTotals = {};
     recentIncome.forEach(e => {
@@ -633,13 +606,12 @@ window.renderDashboardInsights = () => {
                 responsive: true, maintainAspectRatio: false,
                 plugins: {
                     legend: { position: 'right', labels: { color: textColor, font: { family: "'DM Sans', sans-serif", size: 11 }, boxWidth: 12 } },
-                    tooltip: { callbacks: { label: function(c) { return sortedIncData.length ? ` ${window.formatMoney(c.raw)}` : ' No Data'; } } }
+                    tooltip: { callbacks: { label: function(c) { return sortedIncData.length ? ` ${window.formatMoney(c.raw, true)}` : ' No Data'; } } }
                 }
             }
         });
     }
 
-    // --- 2. Weekly Budget Briefer ---
     const budgetContainer = document.getElementById('dashboard-weekly-budget-container');
     if (!budgetContainer) return;
 
@@ -655,7 +627,7 @@ window.renderDashboardInsights = () => {
             weeklyIncome += e.amount;
         } else {
             const cat = (e.category || 'Uncategorized').toUpperCase();
-            weeklySpent[cat] = (weeklySpent[cat] || 0) - e.amount; // Remember e.amount is negative
+            weeklySpent[cat] = (weeklySpent[cat] || 0) - e.amount;
         }
     });
 
@@ -743,7 +715,7 @@ window.updateDashboard = () => {
     const dashSub = document.getElementById('dashboard-subtitle');
     if(dashSub) dashSub.innerText = subtitle;
     const balEl = document.getElementById('display-balance');
-    if(balEl) balEl.innerText = `${displayTotal < 0 ? '-' : ''}${window.formatMoney(displayTotal, true)}`;
+    if(balEl) balEl.innerText = `${displayTotal < 0 ? '-' : ''}${window.formatMoney(Math.abs(displayTotal), true)}`;
     
     recentLogs.innerHTML = sortedData.slice(0, 5).map(window.generateTxHTML).join('');
     
@@ -887,6 +859,7 @@ window.editTransaction = () => {
     const overlay = document.getElementById('edit-transaction-overlay');
     if(overlay) overlay.classList.add('active');
 };
+
 window.closeEditTransactionModal = () => {
     const overlay = document.getElementById('edit-transaction-overlay');
     if(overlay) overlay.classList.remove('active');
@@ -948,7 +921,6 @@ window.setupAccountDragDrop = () => {
         const targetAccountIndex = dropTarget.getAttribute('data-account-index');
         const targetType = dropTarget.getAttribute('data-type') || dropTarget.closest('.account-type-section')?.getAttribute('data-type');
         
-        // --- 1. Handle Account Card Drag ---
         if (accountIndex) {
             const draggedIdx = parseInt(accountIndex);
             const targetIdx = parseInt(targetAccountIndex);
@@ -979,9 +951,7 @@ window.setupAccountDragDrop = () => {
                 await window.saveAccountsToCloud();
                 await window.renderAccounts();
             }
-        }
-        // --- 2. Handle Type Section Drag ---
-        else if (typeSection && targetType) {
+        } else if (typeSection && targetType) {
             const currentDOMOrder = Array.from(document.querySelectorAll('.account-type-section')).map(el => el.getAttribute('data-type'));
             const draggedTypeIdx = currentDOMOrder.indexOf(typeSection);
             const targetTypeIdx = currentDOMOrder.indexOf(targetType);
@@ -1122,7 +1092,6 @@ window.renderStatistics = (range = 'all') => {
             const eDate = new Date(entry.timestamp);
             if (eDate < cutoffStart) dataBeforeStart.push(entry);
             if (eDate >= cutoffStart && eDate <= cutoffEnd) {
-                // EXCLUDE TRIPS UNLESS TOGGLED
                 if (!includeTravel && entry.trip_id) return; 
 
                 filteredData.push(entry);
@@ -1130,7 +1099,7 @@ window.renderStatistics = (range = 'all') => {
                 if (isIncome) { 
                     totalIncome += entry.amount; 
                 } else { 
-                    totalExpense -= entry.amount; // entry.amount is negative, so subtracting makes it positive for display
+                    totalExpense -= entry.amount; 
                     expensesList.push(entry); 
                 }
             }
@@ -1144,7 +1113,7 @@ window.renderStatistics = (range = 'all') => {
     const net = totalIncome - totalExpense;
     const netEl = document.getElementById('stat-net');
     if (netEl) {
-        netEl.innerText = `${net < 0 ? '-' : '+'}${window.formatMoney(net, true)}`;
+        netEl.innerText = `${net < 0 ? '-' : '+'}${window.formatMoney(Math.abs(net), true)}`;
         netEl.style.color = net < 0 ? 'var(--text)' : 'var(--primary)';
     }
 
@@ -1155,7 +1124,6 @@ window.renderStatistics = (range = 'all') => {
 
     if(window.ChartsEngine) window.ChartsEngine.render(filteredData, dataBeforeStart, cutoffStart);
 
-    // Google Charts Sankey Diagram
     const renderSankeyFlow = () => {
         const container = document.getElementById('sankey_diagram');
         if (!container) return;
@@ -1354,7 +1322,7 @@ window.renderAccounts = async () => {
                     <h3 style="margin: 0; font-size: 16px; color: var(--text-secondary);">
                         <span style="cursor: grab; display: inline-block; margin-right: 8px;">⋮⋮</span> ${typeLabel}
                     </h3>
-                    <span style="font-weight: 700; color: ${typeTotalColor};">${typeSign}${window.formatMoney(Math.abs(typeTotal, true))}</span>
+                    <span style="font-weight: 700; color: ${typeTotalColor};">${typeSign}${window.formatMoney(Math.abs(typeTotal), true)}</span>
                 </div>
                 <div class="accounts-grid account-type-grid" data-type="${type}">
                     ${accounts.map((acc, idx) => {
@@ -1421,7 +1389,7 @@ window.renderAccounts = async () => {
     if(totalBalEl) {
         const sign = grandTotal < 0 ? '-' : grandTotal > 0 ? '+' : '';
         const color = grandTotal < 0 ? 'var(--accent-red)' : 'var(--text)';
-        totalBalEl.innerText = window.formatMoney(grandTotal, true);
+        totalBalEl.innerText = window.formatMoney(Math.abs(grandTotal), true);
         totalBalEl.style.color = color;
     }
 };
@@ -1550,214 +1518,6 @@ window.renderSubscriptions = async () => {
     }).join('');
 };
 
-// ==========================================
-// TRIPS & EVENTS HUB
-// ==========================================
-
-window.getTripDates = (tripId) => {
-    const txs = window.appData.filter(t => t.trip_id === tripId);
-    if (!txs.length) return 'No logged activity';
-    const dates = txs.map(t => new Date(t.timestamp).getTime());
-    const min = new Date(Math.min(...dates));
-    const max = new Date(Math.max(...dates));
-    if (min.toDateString() === max.toDateString()) return window.formatListDate(min);
-    return `${window.formatListDate(min)} — ${window.formatListDate(max)}`;
-};
-
-window.renderTripsView = (forceShowPast = false) => {
-    const container = document.getElementById('trips-content-container');
-    if (!container) return;
-
-    if (!window.tripsData || window.tripsData.length === 0) {
-        container.innerHTML = `
-            <div class="card" style="text-align: center; padding: 60px 20px;">
-                <h3 style="margin-bottom: 12px; font-size: 24px;">Welcome to Travel Mode ✈️</h3>
-                <p class="text-muted" style="margin-bottom: 24px; max-width: 500px; margin-left: auto; margin-right: auto; line-height: 1.6;">
-                    Travels and events often break your standard budget. By starting a Trip, you can completely isolate vacation expenses from your daily averages and fund them via specific savings goals.
-                </p>
-                <button class="primary-btn" onclick="document.getElementById('travel-mode-btn').click()">Start your first Trip</button>
-            </div>
-        `;
-        return;
-    }
-
-    const activeTrip = window.tripsData.find(t => t.id === window.userSettings.activeTripId);
-
-    // STATE: Active Trip (Unless toggled to view history)
-    if (activeTrip && !forceShowPast) {
-        const txs = window.appData.filter(t => t.trip_id === activeTrip.id);
-        const spent = txs.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
-        
-        let budgetContext = '<span class="text-muted">Tracking via Standard Income</span>';
-        let limit = 0;
-        let progressHtml = '';
-
-        if (activeTrip.budget_source_type === 'fixed') {
-            limit = activeTrip.fixed_budget_amount || 0;
-        } else if (activeTrip.budget_source_type === 'goal') {
-            const goal = window.userGoals.find(g => g.id === activeTrip.budget_source_id);
-            limit = goal ? goal.target_amount : 0;
-        }
-
-        if (limit > 0) {
-            const pct = Math.min((spent / limit) * 100, 100);
-            const color = spent > limit ? 'var(--accent-red)' : 'var(--primary)';
-            budgetContext = `<span style="font-weight:700; color:${color};">${window.formatMoney(spent)} <span class="text-muted" style="font-weight:400;">/ ${window.formatMoney(limit, true)}</span></span>`;
-            
-            progressHtml = `
-                <div style="width: 100%; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-top: 12px;">
-                    <div style="height: 100%; width: ${pct}%; background: ${color}; transition: width 0.3s;"></div>
-                </div>
-            `;
-        } else {
-            budgetContext = `<span style="font-weight:700;">${window.formatMoney(spent)} <span class="text-muted" style="font-weight:400;">Total Spent</span></span>`;
-        }
-
-        // Category Breakdown
-        const cats = {};
-        txs.filter(t => t.amount < 0).forEach(t => {
-            const c = t.category || 'Other';
-            cats[c] = (cats[c] || 0) + Math.abs(t.amount);
-        });
-        const breakdownHtml = Object.entries(cats)
-            .sort((a,b) => b[1] - a[1])
-            .map(([c, amt]) => `<div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:8px;"><span class="text-muted">${c}</span> <span style="font-weight:600;">${window.formatMoney(amt)}</span></div>`)
-            .join('') || '<span class="text-muted" style="font-size: 13px;">No expenses logged yet.</span>';
-
-        container.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-                <h3 style="color: var(--primary);">Currently Traveling</h3>
-                <button class="secondary-btn" onclick="window.renderTripsView(true)" style="padding: 6px 12px; font-size: 12px;">View Past Trips</button>
-            </div>
-            
-            <div class="card" style="margin-bottom: 24px; border: 2px solid var(--primary);">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <div>
-                        <h2 style="margin-bottom: 4px; font-size: 24px;">${activeTrip.name}</h2>
-                        <p class="text-muted" style="font-size: 13px;">${window.getTripDates(activeTrip.id)}</p>
-                    </div>
-                    <div style="text-align: right;">${budgetContext}</div>
-                </div>
-                ${progressHtml}
-                
-                <hr style="border: none; border-top: 1px solid var(--border); margin: 24px 0;">
-                
-                <h4 style="margin-bottom: 16px; font-size: 14px;">Expense Breakdown</h4>
-                ${breakdownHtml}
-            </div>
-            
-            <h3 style="margin-bottom: 16px;">Trip Activity</h3>
-            <div class="card">
-                <ul class="minimal-list interactive-list">
-                    ${txs.length ? txs.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 10).map(window.generateTxHTML).join('') : '<li class="text-muted">No activity logged.</li>'}
-                </ul>
-            </div>
-        `;
-        return;
-    }
-
-    // STATE: Past / All Trips List
-    const pastTrips = window.tripsData.filter(t => t.status !== 'active' || forceShowPast).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
-    
-    let html = '';
-    if (forceShowPast && activeTrip) {
-        html += `<button class="text-btn" onclick="window.renderTripsView(false)" style="margin-bottom: 24px;">← Back to Active Trip</button>`;
-    }
-
-    if (pastTrips.length === 0) {
-        html += `<p class="text-muted" style="text-align: center; padding: 40px;">No trip history found.</p>`;
-    } else {
-        html += `<div style="display: flex; flex-direction: column; gap: 16px;">` + pastTrips.map(trip => {
-            const txs = window.appData.filter(t => t.trip_id === trip.id);
-            const spent = txs.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
-            const isActiveLabel = trip.status === 'active' ? `<span style="color:var(--primary); font-size:12px; font-weight:700; margin-left:8px;">(Active)</span>` : '';
-            
-            return `
-                <div class="card" style="display: flex; justify-content: space-between; align-items: center; padding: 20px;">
-                    <div>
-                        <h3 style="margin-bottom: 4px;">${trip.name} ${isActiveLabel}</h3>
-                        <p class="text-muted" style="font-size: 13px;">${window.getTripDates(trip.id)}</p>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 24px;">
-                        <div style="text-align: right;">
-                            <p class="text-muted" style="font-size: 12px; margin-bottom: 2px;">Total Spent</p>
-                            <h4 style="font-size: 16px;">${window.formatMoney(spent)}</h4>
-                        </div>
-                        <button class="text-btn" style="color: var(--accent-red);" onclick="window.openDeleteTripModal('${trip.id}', '${trip.name.replace(/'/g, "\\'")}')">Delete</button>
-                    </div>
-                </div>
-            `;
-        }).join('') + `</div>`;
-    }
-
-    container.innerHTML = html;
-};
-
-window.openDeleteTripModal = (tripId, tripName) => {
-    window.tripToDeleteId = tripId;
-    document.getElementById('delete-trip-name-display').innerText = tripName;
-    document.getElementById('delete-trip-overlay').classList.add('active');
-};
-
-window.closeDeleteTripModal = () => {
-    document.getElementById('delete-trip-overlay').classList.remove('active');
-    window.tripToDeleteId = null;
-};
-
-// --- DANGEROUS: TRIP DELETION ENGINE ---
-document.getElementById('confirm-delete-trip-btn')?.addEventListener('click', async () => {
-    const tripId = window.tripToDeleteId;
-    const revertBalances = document.getElementById('delete-trip-revert-balances').checked;
-    if (!tripId) return;
-
-    try {
-        const txsToRevert = window.appData.filter(t => t.trip_id === tripId);
-        
-        // 1. Revert Balances Safely
-        if (revertBalances) {
-            let accountsChanged = false;
-            txsToRevert.forEach(tx => {
-                if (tx.account_id) {
-                    const acc = window.accountsData.find(a => a.id === tx.account_id);
-                    if (acc) {
-                        // Math logic:
-                        // If income, tx.amount is positive (+50). balance -= 50 correctly removes the income.
-                        // If expense, tx.amount is negative (-50). balance -= (-50) mathematically acts as balance += 50, correctly refunding it!
-                        acc.balance -= tx.amount; 
-                        accountsChanged = true;
-                    }
-                }
-            });
-            if (accountsChanged) await window.saveAccountsToCloud();
-        }
-
-        // 2. Delete Transactions from Database
-        await window.supabase.from('transactions').delete().eq('trip_id', tripId);
-
-        // 3. Delete Trip from Database
-        await window.supabase.from('trips').delete().eq('id', tripId);
-
-        // 4. Purge from local memory
-        window.appData = window.appData.filter(t => t.trip_id !== tripId);
-        window.tripsData = window.tripsData.filter(t => t.id !== tripId);
-
-        // 5. Reset UI if the deleted trip was currently active
-        if (window.userSettings.activeTripId === tripId) {
-            window.userSettings.activeTripId = null;
-            await window.supabase.from('settings').update({ active_trip_id: null }).eq('user_id', window.currentUser.id);
-            document.body.classList.remove('travel-theme');
-        }
-
-        window.closeDeleteTripModal();
-        window.bootUI();
-        window.renderTripsView();
-
-    } catch (e) {
-        console.error("Failed to delete trip:", e);
-        alert("An error occurred while deleting the trip.");
-    }
-});
-
 window.deleteGoal = async (goalId) => {
     if (!confirm('Delete this goal?')) return;
     window.userGoals = window.userGoals.filter(g => g.id !== goalId);
@@ -1784,7 +1544,6 @@ window.deleteAccount = async (index) => {
         }
         return;
     }
-    
     window.accountToDeleteIndex = index;
     overlay.classList.add('active');
 };
@@ -1875,21 +1634,8 @@ window.loadLegal = async (filename, title) => {
 
 window.openExpenseModal = () => {
     const overlay = document.getElementById('expense-overlay');
-    const catSelect = document.getElementById('exp-category');
-    if (catSelect) {
-        catSelect.innerHTML = '';
-        (window.userSettings.categories || []).forEach(cat => {
-            const opt = document.createElement('option');
-            opt.value = cat.name;
-            opt.innerText = cat.name;
-            catSelect.appendChild(opt);
-        });
-    }
     window.populateAccountDropdowns('exp-account');
-    
-    // Auto-setup Travel Mode checks
     if(window.setupTxTripToggle) window.setupTxTripToggle('exp');
-    
     if (overlay) overlay.classList.add('active');
 };
 
@@ -1901,10 +1647,7 @@ window.closeExpenseModal = () => {
 window.openIncomeModal = () => {
     const overlay = document.getElementById('income-overlay');
     window.populateAccountDropdowns('inc-account');
-    
-    // Auto-setup Travel Mode checks
     if(window.setupTxTripToggle) window.setupTxTripToggle('inc');
-    
     if (overlay) overlay.classList.add('active');
 };
 
@@ -1923,7 +1666,263 @@ window.bootUI = () => {
     window.renderBudgetTracking();
     window.renderAccounts();
     window.setupReceiptListeners();
+    if(window.renderTripsView) window.renderTripsView();
 };
+
+// ==========================================
+// TRIPS & EVENTS HUB (WITH CUSTOM BUDGETS)
+// ==========================================
+
+window.getTripDates = (tripId) => {
+    const txs = window.appData.filter(t => t.trip_id === tripId);
+    if (!txs.length) return 'No logged activity';
+    const dates = txs.map(t => new Date(t.timestamp).getTime());
+    const min = new Date(Math.min(...dates));
+    const max = new Date(Math.max(...dates));
+    if (min.toDateString() === max.toDateString()) return window.formatListDate(min);
+    return `${window.formatListDate(min)} — ${window.formatListDate(max)}`;
+};
+
+window.tempTripCategories = [];
+
+window.renderTripCategoriesList = () => {
+    const list = document.getElementById('trip-categories-list');
+    if (!list) return;
+
+    let sum = 0;
+    window.tempTripCategories.forEach(c => sum += parseFloat(c.percent) || 0);
+    const warning = document.getElementById('trip-budget-warning');
+    if(warning) warning.style.display = sum !== 100 ? 'block' : 'none';
+
+    list.innerHTML = window.tempTripCategories.map((c, i) => `
+        <li style="display:flex; justify-content:space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
+            <span style="font-weight: 500;">${c.name}</span>
+            <div>
+                <span style="margin-right: 16px; color: var(--text-secondary);">${c.percent}%</span>
+                <button onclick="window.tempTripCategories.splice(${i}, 1); window.renderTripCategoriesList();" class="text-btn" style="color:var(--accent-red)">Remove</button>
+            </div>
+        </li>
+    `).join('');
+};
+
+window.openTravelSetupModal = (tripId = null) => {
+    const overlay = document.getElementById('travel-overlay');
+    const title = document.getElementById('travel-modal-title');
+    const saveBtn = document.getElementById('start-trip-btn');
+
+    // We populate the goal dropdown
+    const goalSel = document.getElementById('trip-goal-id');
+    goalSel.innerHTML = window.userGoals.map(g => `<option value="${g.id}">${g.name} (${window.formatMoney(g.current_amount)})</option>`).join('');
+
+    if (tripId) {
+        title.innerText = "Manage Trip";
+        saveBtn.innerText = "Save Changes";
+        const trip = window.tripsData.find(t => t.id === tripId);
+        if (trip) {
+            document.getElementById('editing-trip-id').value = tripId;
+            document.getElementById('trip-name').value = trip.name || '';
+            document.getElementById('trip-budget-type').value = trip.budget_source_type || 'fixed';
+            
+            document.getElementById('trip-goal-group').style.display = trip.budget_source_type === 'goal' ? 'block' : 'none';
+            document.getElementById('trip-fixed-amount-group').style.display = trip.budget_source_type === 'fixed' ? 'block' : 'none';
+
+            if (trip.budget_source_type === 'goal') goalSel.value = trip.budget_source_id;
+            if (trip.budget_source_type === 'fixed') document.getElementById('trip-amount').value = trip.fixed_budget_amount;
+
+            window.tempTripCategories = [...(trip.categories || [])];
+        }
+    } else {
+        title.innerText = "Setup Trip Budget";
+        saveBtn.innerText = "Save & Start Travel Mode";
+        document.getElementById('editing-trip-id').value = '';
+        document.getElementById('trip-name').value = '';
+        document.getElementById('trip-budget-type').value = 'fixed';
+        document.getElementById('trip-fixed-amount-group').style.display = 'block';
+        document.getElementById('trip-goal-group').style.display = 'none';
+        document.getElementById('trip-amount').value = '';
+
+        window.tempTripCategories = [
+            { name: 'ACCOMMODATION', percent: 30 },
+            { name: 'FOOD', percent: 30 },
+            { name: 'TRANSPORT', percent: 20 },
+            { name: 'ACTIVITIES', percent: 20 }
+        ];
+    }
+    
+    window.renderTripCategoriesList();
+    overlay.classList.add('active');
+};
+
+window.renderTripsView = (forceShowPast = false) => {
+    const container = document.getElementById('trips-content-container');
+    if (!container) return;
+
+    if (!window.tripsData || window.tripsData.length === 0) {
+        container.innerHTML = `
+            <div class="card" style="text-align: center; padding: 60px 20px;">
+                <h3 style="margin-bottom: 12px; font-size: 24px;">Welcome to Travel Mode ✈️</h3>
+                <p class="text-muted" style="margin-bottom: 24px; max-width: 500px; margin-left: auto; margin-right: auto; line-height: 1.6;">
+                    Travels and events often break your standard budget. By starting a Trip, you can completely isolate vacation expenses from your daily averages and fund them via specific savings goals.
+                </p>
+                <button class="primary-btn" onclick="window.openTravelSetupModal()">Start your first Trip</button>
+            </div>
+        `;
+        return;
+    }
+
+    const activeTrip = window.tripsData.find(t => t.id === window.userSettings.activeTripId);
+
+    if (activeTrip && !forceShowPast) {
+        const txs = window.appData.filter(t => t.trip_id === activeTrip.id);
+        const spent = txs.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
+        
+        let limit = 0;
+        let limitSourceText = '';
+
+        if (activeTrip.budget_source_type === 'fixed') {
+            limit = activeTrip.fixed_budget_amount || 0;
+            limitSourceText = 'Fixed Allowance';
+        } else if (activeTrip.budget_source_type === 'goal') {
+            const goal = window.userGoals.find(g => g.id === activeTrip.budget_source_id);
+            limit = goal ? goal.target_amount : 0;
+            limitSourceText = goal ? `Goal: ${goal.name}` : 'Goal Wallet';
+        } else {
+            limit = txs.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
+            limitSourceText = 'Income Logged to Trip';
+        }
+
+        const pct = limit > 0 ? Math.min((spent / limit) * 100, 100) : (spent > 0 ? 100 : 0);
+        const overTotal = limit > 0 && spent > limit;
+        const color = overTotal ? 'var(--accent-red)' : 'var(--primary)';
+        
+        const remaining = limit - spent;
+        const remText = remaining >= 0 ? `${window.formatMoney(remaining, true)} Left` : `${window.formatMoney(Math.abs(remaining), true)} Over`;
+
+        const catProgressHtml = (activeTrip.categories || []).map(cat => {
+            const allocated = limit * (cat.percent / 100);
+            const catSpent = txs.filter(t => t.amount < 0 && (t.category || '').toUpperCase() === cat.name.toUpperCase()).reduce((sum, t) => sum + Math.abs(t.amount), 0);
+            const catPct = allocated > 0 ? (catSpent / allocated) * 100 : (catSpent > 0 ? 100 : 0);
+            const over = catPct > 100;
+            const cColor = over ? 'var(--accent-red)' : 'var(--primary)';
+
+            return `
+                <div style="margin-bottom: 16px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px;">
+                        <span style="font-weight: 600;">${cat.name} <span style="font-weight:400; color:var(--text-secondary)">(${cat.percent}%)</span></span>
+                        <span style="font-weight: 700; color: ${cColor};">${window.formatMoney(catSpent, true)} <span style="font-weight:400; color:var(--text-secondary)">/ ${window.formatMoney(allocated, true)}</span></span>
+                    </div>
+                    <div style="width: 100%; height: 6px; background-color: var(--border); border-radius: 4px; overflow: hidden;">
+                        <div style="height: 100%; width: ${Math.min(catPct, 100)}%; background-color: ${cColor}; transition: width 0.3s ease;"></div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        container.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h3 style="color: var(--primary);">Currently Traveling</h3>
+                <button class="secondary-btn" onclick="window.renderTripsView(true)" style="padding: 6px 12px; font-size: 12px;">View Past Trips</button>
+            </div>
+            
+            <div class="card" style="margin-bottom: 24px; border: 2px solid var(--primary);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+                    <div>
+                        <h2 style="margin-bottom: 4px; font-size: 24px;">${activeTrip.name}</h2>
+                        <p class="text-muted" style="font-size: 13px;">${window.getTripDates(activeTrip.id)}</p>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="secondary-btn" onclick="window.openTravelSetupModal('${activeTrip.id}')" style="padding: 6px 12px; font-size: 12px;">Edit Setup</button>
+                        <button id="end-trip-btn-dashboard" class="secondary-btn" style="padding: 6px 12px; font-size: 12px; border-color: var(--accent-red); color: var(--accent-red);">End Trip</button>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;">
+                    <div style="background: var(--bg); padding: 16px; border-radius: 12px;">
+                        <p class="text-muted" style="font-size: 12px; margin-bottom: 4px;">Total Budget</p>
+                        <h3 style="margin-bottom: 4px;">${window.formatMoney(limit, true)}</h3>
+                        <p class="text-muted" style="font-size: 11px;">${limitSourceText}</p>
+                    </div>
+                    <div style="background: var(--bg); padding: 16px; border-radius: 12px;">
+                        <p class="text-muted" style="font-size: 12px; margin-bottom: 4px;">Total Spent</p>
+                        <h3 style="color: ${color};">${window.formatMoney(spent, true)}</h3>
+                    </div>
+                    <div style="background: var(--bg); padding: 16px; border-radius: 12px;">
+                        <p class="text-muted" style="font-size: 12px; margin-bottom: 4px;">Remaining</p>
+                        <h3 style="color: ${color};">${remText}</h3>
+                    </div>
+                </div>
+                
+                <h4 style="margin-bottom: 16px; font-size: 14px;">Category Progress</h4>
+                ${catProgressHtml || '<span class="text-muted" style="font-size: 13px;">No categories configured.</span>'}
+            </div>
+            
+            <h3 style="margin-bottom: 16px;">Trip Activity</h3>
+            <div class="card">
+                <ul class="minimal-list interactive-list">
+                    ${txs.length ? txs.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 10).map(window.generateTxHTML).join('') : '<li class="text-muted">No activity logged.</li>'}
+                </ul>
+            </div>
+        `;
+
+        document.getElementById('end-trip-btn-dashboard')?.addEventListener('click', async () => {
+            if(!confirm("End this trip? You will return to your standard budget constraints.")) return;
+            await window.supabase.from('settings').update({ active_trip_id: null }).eq('user_id', window.currentUser.id);
+            await window.supabase.from('trips').update({ status: 'completed' }).eq('id', window.userSettings.activeTripId);
+            window.userSettings.activeTripId = null;
+            window.bootUI();
+        });
+
+        return;
+    }
+
+    const pastTrips = window.tripsData.filter(t => t.status !== 'active' || forceShowPast).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+    
+    let html = '';
+    if (forceShowPast && activeTrip) {
+        html += `<button class="text-btn" onclick="window.renderTripsView(false)" style="margin-bottom: 24px;">← Back to Active Trip</button>`;
+    }
+
+    if (pastTrips.length === 0) {
+        html += `<p class="text-muted" style="text-align: center; padding: 40px;">No trip history found.</p>`;
+    } else {
+        html += `<div style="display: flex; flex-direction: column; gap: 16px;">` + pastTrips.map(trip => {
+            const txs = window.appData.filter(t => t.trip_id === trip.id);
+            const spent = txs.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
+            const isActiveLabel = trip.status === 'active' ? `<span style="color:var(--primary); font-size:12px; font-weight:700; margin-left:8px;">(Active)</span>` : '';
+            
+            return `
+                <div class="card" style="display: flex; justify-content: space-between; align-items: center; padding: 20px;">
+                    <div>
+                        <h3 style="margin-bottom: 4px;">${trip.name} ${isActiveLabel}</h3>
+                        <p class="text-muted" style="font-size: 13px;">${window.getTripDates(trip.id)}</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 24px;">
+                        <div style="text-align: right;">
+                            <p class="text-muted" style="font-size: 12px; margin-bottom: 2px;">Total Spent</p>
+                            <h4 style="font-size: 16px;">${window.formatMoney(spent, true)}</h4>
+                        </div>
+                        <button class="text-btn" style="color: var(--primary);" onclick="window.openTravelSetupModal('${trip.id}')">Edit</button>
+                        <button class="text-btn" style="color: var(--accent-red);" onclick="window.openDeleteTripModal('${trip.id}', '${trip.name.replace(/'/g, "\\'")}')">Delete</button>
+                    </div>
+                </div>
+            `;
+        }).join('') + `</div>`;
+    }
+
+    container.innerHTML = html;
+};
+
+window.openDeleteTripModal = (tripId, tripName) => {
+    window.tripToDeleteId = tripId;
+    document.getElementById('delete-trip-name-display').innerText = tripName;
+    document.getElementById('delete-trip-overlay').classList.add('active');
+};
+
+window.closeDeleteTripModal = () => {
+    document.getElementById('delete-trip-overlay').classList.remove('active');
+    window.tripToDeleteId = null;
+};
+
 
 // ==========================================
 // 2. DOM EVENT LISTENERS
@@ -2409,6 +2408,7 @@ document.addEventListener('DOMContentLoaded', () => {
             window.updateDashboard();
             window.renderBudgetTracking();
             window.renderActivity?.();
+            if(window.renderTripsView && window.userSettings.activeTripId) window.renderTripsView();
         }
     });
 
@@ -2473,6 +2473,7 @@ document.addEventListener('DOMContentLoaded', () => {
             window.updateDashboard();
             window.renderBudgetTracking();
             window.renderActivity?.();
+            if(window.renderTripsView && window.userSettings.activeTripId) window.renderTripsView();
         }
     });
 
@@ -2785,22 +2786,31 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- TRAVEL MODE LISTENERS ---
+
+    document.getElementById('add-trip-cat-btn')?.addEventListener('click', () => {
+        const nameEl = document.getElementById('new-trip-cat-name'); 
+        const pctEl = document.getElementById('new-trip-cat-pct');
+        if(!nameEl || !pctEl) return;
+
+        const name = nameEl.value.trim().toUpperCase();
+        const pct = parseFloat(pctEl.value);
+        
+        if(name && pct > 0) {
+            const existing = window.tempTripCategories.find(c => c.name.toUpperCase() === name);
+            if (existing) existing.percent = pct;
+            else window.tempTripCategories.push({ name, percent: pct });
+            
+            nameEl.value = ''; pctEl.value = '';
+            window.renderTripCategoriesList();
+        }
+    });
     
     document.getElementById('travel-mode-btn')?.addEventListener('click', () => {
-        const overlay = document.getElementById('travel-overlay');
-        const setupView = document.getElementById('travel-setup-view');
-        const activeView = document.getElementById('travel-active-view');
-        
         if (window.userSettings.activeTripId) {
-            setupView.style.display = 'none';
-            activeView.style.display = 'block';
+            window.switchView('trips');
         } else {
-            setupView.style.display = 'block';
-            activeView.style.display = 'none';
-            const goalSel = document.getElementById('trip-goal-id');
-            goalSel.innerHTML = window.userGoals.map(g => `<option value="${g.id}">${g.name} (${window.formatMoney(g.current_amount)})</option>`).join('');
+            window.openTravelSetupModal();
         }
-        overlay.classList.add('active');
     });
 
     document.getElementById('trip-budget-type')?.addEventListener('change', (e) => {
@@ -2810,46 +2820,42 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('start-trip-btn')?.addEventListener('click', async () => {
+        const editingId = document.getElementById('editing-trip-id').value;
         const name = document.getElementById('trip-name').value.trim();
         const bType = document.getElementById('trip-budget-type').value;
         const fixedAmt = document.getElementById('trip-amount').value;
         const goalId = document.getElementById('trip-goal-id').value;
 
         if(!name) return alert("Trip name required");
+        let sum = 0; window.tempTripCategories.forEach(c => sum += parseFloat(c.percent) || 0);
+        if (window.tempTripCategories.length > 0 && Math.round(sum) !== 100) {
+            return alert("Category percentages must add up to exactly 100%.");
+        }
 
         const payload = {
             user_id: window.currentUser.id,
             name: name,
             budget_source_type: bType,
-            // FIX 1: Ensure blank goals are sent as null, not ""
-            budget_source_id: (bType === 'goal' && goalId) ? goalId : null, 
-            // FIX 2: Ensure blank amounts are sent as 0, not NaN
-            fixed_budget_amount: bType === 'fixed' ? (parseFloat(fixedAmt) || 0) : 0, 
-            status: 'active'
+            budget_source_id: (bType === 'goal' && goalId) ? goalId : null,
+            fixed_budget_amount: bType === 'fixed' ? (parseFloat(fixedAmt) || 0) : 0,
+            status: 'active',
+            categories: window.tempTripCategories
         };
 
-        const { data, error } = await window.supabase.from('trips').insert(payload).select().single();
-        
-        if (error) {
-            console.error("Supabase Error:", error);
-            // FIX 3: Actually show you the error message so we aren't guessing!
-            return alert("Failed to start trip: " + error.message); 
+        if (editingId) {
+            const { error } = await window.supabase.from('trips').update(payload).eq('id', editingId);
+            if(error) return alert("Failed to update trip: " + error.message);
+            const tIdx = window.tripsData.findIndex(t => t.id === editingId);
+            if(tIdx > -1) window.tripsData[tIdx] = { ...window.tripsData[tIdx], ...payload };
+        } else {
+            const { data, error } = await window.supabase.from('trips').insert(payload).select().single();
+            if(error) return alert("Failed to start trip: " + error.message);
+            if(!window.tripsData) window.tripsData = [];
+            window.tripsData.push(data);
+            window.userSettings.activeTripId = data.id;
+            await window.supabase.from('settings').update({ active_trip_id: data.id }).eq('user_id', window.currentUser.id);
         }
-
-        if(!window.tripsData) window.tripsData = [];
-        window.tripsData.push(data);
-        window.userSettings.activeTripId = data.id;
-        await window.supabase.from('settings').update({ active_trip_id: data.id }).eq('user_id', window.currentUser.id);
         
-        document.getElementById('travel-overlay').classList.remove('active');
-        window.bootUI();
-    });
-
-    document.getElementById('end-trip-btn')?.addEventListener('click', async () => {
-        await window.supabase.from('settings').update({ active_trip_id: null }).eq('user_id', window.currentUser.id);
-        await window.supabase.from('trips').update({ status: 'completed' }).eq('id', window.userSettings.activeTripId);
-        
-        window.userSettings.activeTripId = null;
         document.getElementById('travel-overlay').classList.remove('active');
         window.bootUI();
     });
@@ -2861,7 +2867,8 @@ document.addEventListener('DOMContentLoaded', () => {
     window.setupTxTripToggle = (prefix) => {
         const isTripCb = document.getElementById(`${prefix}-is-trip`);
         const tripSel = document.getElementById(`${prefix}-trip-id`);
-        if (!isTripCb || !tripSel) return;
+        const catSelect = document.getElementById(`${prefix}-category`);
+        if (!isTripCb || !tripSel || !catSelect) return;
 
         tripSel.innerHTML = (window.tripsData || []).map(t => `<option value="${t.id}">${t.name} (${t.status})</option>`).join('');
         
@@ -2873,15 +2880,33 @@ document.addEventListener('DOMContentLoaded', () => {
             isTripCb.checked = false;
             tripSel.style.display = 'none';
         }
+
+        const updateCategories = () => {
+            if (prefix !== 'exp') return; // Incomes keep Income Categories
+            catSelect.innerHTML = '';
+            if (isTripCb.checked && tripSel.value) {
+                const trip = window.tripsData.find(t => t.id === tripSel.value);
+                if (trip && trip.categories && trip.categories.length) {
+                    trip.categories.forEach(c => {
+                        const opt = document.createElement('option'); opt.value = c.name; opt.innerText = c.name; catSelect.appendChild(opt);
+                    });
+                    return;
+                }
+            }
+            (window.userSettings.categories || []).forEach(c => {
+                const opt = document.createElement('option'); opt.value = c.name; opt.innerText = c.name; catSelect.appendChild(opt);
+            });
+        };
         
-        isTripCb.onchange = (e) => tripSel.style.display = e.target.checked ? 'block' : 'none';
+        isTripCb.onchange = (e) => { tripSel.style.display = e.target.checked ? 'block' : 'none'; updateCategories(); };
+        tripSel.onchange = updateCategories;
+        updateCategories();
     };
 
-    // Override original modal open functions to run the prep safely
     const origExp = window.openExpenseModal;
-    window.openExpenseModal = () => { if(window.setupTxTripToggle) window.setupTxTripToggle('exp'); origExp(); };
+    window.openExpenseModal = () => { origExp(); if(window.setupTxTripToggle) window.setupTxTripToggle('exp'); };
     const origInc = window.openIncomeModal;
-    window.openIncomeModal = () => { if(window.setupTxTripToggle) window.setupTxTripToggle('inc'); origInc(); };
+    window.openIncomeModal = () => { origInc(); if(window.setupTxTripToggle) window.setupTxTripToggle('inc'); };
     
     // ==========================================
     // GOAL ALLOCATION FUNCTIONS
@@ -2963,5 +2988,47 @@ document.addEventListener('DOMContentLoaded', () => {
         alert('Allocations saved! Your savings will now be distributed across these goals.');
         window.closeGoalAllocationModal();
     };
+
+    document.getElementById('confirm-delete-trip-btn')?.addEventListener('click', async () => {
+        const tripId = window.tripToDeleteId;
+        const revertBalances = document.getElementById('delete-trip-revert-balances').checked;
+        if (!tripId) return;
+
+        try {
+            const txsToRevert = window.appData.filter(t => t.trip_id === tripId);
+            
+            if (revertBalances) {
+                let accountsChanged = false;
+                txsToRevert.forEach(tx => {
+                    if (tx.account_id) {
+                        const acc = window.accountsData.find(a => a.id === tx.account_id);
+                        if (acc) {
+                            acc.balance -= tx.amount; 
+                            accountsChanged = true;
+                        }
+                    }
+                });
+                if (accountsChanged) await window.saveAccountsToCloud();
+            }
+
+            await window.supabase.from('transactions').delete().eq('trip_id', tripId);
+            await window.supabase.from('trips').delete().eq('id', tripId);
+
+            window.appData = window.appData.filter(t => t.trip_id !== tripId);
+            window.tripsData = window.tripsData.filter(t => t.id !== tripId);
+
+            if (window.userSettings.activeTripId === tripId) {
+                window.userSettings.activeTripId = null;
+                await window.supabase.from('settings').update({ active_trip_id: null }).eq('user_id', window.currentUser.id);
+                document.body.classList.remove('travel-theme');
+            }
+
+            window.closeDeleteTripModal();
+            window.bootUI();
+        } catch (e) {
+            console.error("Failed to delete trip:", e);
+            alert("An error occurred while deleting the trip.");
+        }
+    });
 
 });

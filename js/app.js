@@ -340,6 +340,29 @@ window.removeCategory = (i) => {
 };
 
 window.generateTxHTML = (entry) => {
+    // NEW: Handle Transfer UI
+    if (entry.type === 'TRANSFER') {
+        const fromName = window.accountsData.find(a => a.id === entry.account_id)?.name || 'External';
+        const toName = window.accountsData.find(a => a.id === entry.to_account_id)?.name || 'External';
+        const starColor = entry.favorite ? '#FFD700' : 'var(--border)';
+
+        return `
+            <li class="tx-item" data-id="${entry._id}" style="padding-right: 8px;">
+                <div class="tx-left">
+                    <span class="tx-cat" style="background: var(--surface-hover); border-color: var(--border);">⇄ Transfer</span>
+                    <span class="tx-name">${entry.name || `${fromName} → ${toName}`}</span>
+                </div>
+                <div class="tx-right" style="margin-left: auto; padding-right: 12px;">
+                    <span class="tx-date">${window.formatListDate(entry.timestamp)}</span>
+                    <span class="tx-amount" style="color: var(--text-secondary);">${window.formatMoney(entry.amount)}</span>
+                </div>
+                <button class="star-btn" style="position: static; padding: 4px; color: ${starColor}; fill: ${starColor};" onclick="event.stopPropagation(); window.toggleTxFavorite('${entry.id}', ${entry._id})">
+                    <svg class="tx-star" viewBox="0 0 24 24" style="width: 20px; height: 20px; color: inherit; fill: inherit;"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+                </button>
+            </li>`;
+    }
+
+    // Existing Income/Expense UI
     const isPositiveEffect = (entry.amount || 0) >= 0;
     const amountColor = (isPositiveEffect && entry.amount !== 0) ? 'var(--primary)' : 'var(--text)';
     const sign = isPositiveEffect ? '+' : '-';
@@ -355,11 +378,8 @@ window.generateTxHTML = (entry) => {
                 <span class="tx-date">${window.formatListDate(entry.timestamp)}</span>
                 <span class="tx-amount" style="color: ${amountColor}">${sign}${window.formatMoney(entry.amount)}</span>
             </div>
-            <button class="star-btn" style="position: static; padding: 4px; color: ${starColor}; fill: ${starColor};" 
-                onclick="event.stopPropagation(); window.toggleTxFavorite('${entry.id}', ${entry._id})">
-                <svg class="tx-star" viewBox="0 0 24 24" style="width: 20px; height: 20px; color: inherit; fill: inherit;">
-                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
-                </svg>
+            <button class="star-btn" style="position: static; padding: 4px; color: ${starColor}; fill: ${starColor};" onclick="event.stopPropagation(); window.toggleTxFavorite('${entry.id}', ${entry._id})">
+                <svg class="tx-star" viewBox="0 0 24 24" style="width: 20px; height: 20px; color: inherit; fill: inherit;"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
             </button>
         </li>`;
 };
@@ -535,7 +555,7 @@ window.renderDashboardInsights = () => {
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
     
-    const recentExpenses = window.appData.filter(e => new Date(e.timestamp) >= thirtyDaysAgo && e.amount < 0 && !e.trip_id);
+    const recentExpenses = window.appData.filter(e => new Date(e.timestamp) >= thirtyDaysAgo && e.amount < 0 && !e.trip_id && e.type !== 'TRANSFER');
     const categoryTotals = {};
     
     recentExpenses.forEach(e => {
@@ -625,7 +645,7 @@ window.renderDashboardInsights = () => {
         const isIncome = (e.type || '').toUpperCase().includes('INCOM');
         if (isIncome) {
             weeklyIncome += e.amount;
-        } else {
+        } else if (e.type !== 'TRANSFER') {
             const cat = (e.category || 'Uncategorized').toUpperCase();
             weeklySpent[cat] = (weeklySpent[cat] || 0) - e.amount;
         }
@@ -1098,7 +1118,7 @@ window.renderStatistics = (range = 'all') => {
                 const isIncome = (entry.type || '').toUpperCase().includes('INCOM');
                 if (isIncome) { 
                     totalIncome += entry.amount; 
-                } else { 
+                } else if (entry.type !== 'TRANSFER') { 
                     totalExpense -= entry.amount; 
                     expensesList.push(entry); 
                 }
@@ -1216,7 +1236,7 @@ window.renderBudgetTracking = () => {
         const isIncome = (e.type || '').toUpperCase().includes('INCOM');
         if (isIncome) {
             cycleIncome += e.amount;
-        } else { 
+        } else if (e.type !== 'TRANSFER') { 
             const cat = (e.category || 'Uncategorized').toUpperCase(); 
             grouped[cat] = (grouped[cat] || 0) - e.amount; 
         }
@@ -1269,9 +1289,8 @@ window.renderAccounts = async () => {
         }
         groupedByType[groupKey].push({ ...acc, _index: index });
     });
-    
-    const typeLabels = { 'bank': 'Banks & E-Wallets', 'onhand': 'On-hand Cash', 'investment': 'Investments', 'custom': 'Custom' };
-    
+
+    const typeLabels = { 'bank': 'Banks & E-Wallets', 'onhand': 'On-hand Cash', 'investment': 'Investments', 'receivable': 'Receivables (Owed to me)', 'payable': 'Payables (I owe them)', 'custom': 'Custom' };
     const defaultOrder = ['bank', 'onhand', 'investment'];
     const allTypes = Object.keys(groupedByType);
     const customTypes = allTypes.filter(t => t.startsWith('custom:') || (!defaultOrder.includes(t) && !['bank', 'onhand', 'investment'].includes(t)));
@@ -1356,7 +1375,7 @@ window.renderAccounts = async () => {
                                         <button onclick="window.deleteAccount(${acc._index})" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size: 16px;">✕</button>
                                     </div>
                                 </div>
-                                <div style="cursor:pointer;" onclick="window.editAccount(${acc._index})">
+                                <div style="cursor:pointer;" onclick="window.openAccountLedger('${acc.id}')">
                                     <p class="text-muted" style="font-size: 13px;">${acc.name || 'Unnamed'}</p>
                                     <h2 class="acc-balance" style="color: ${balanceColor};">${convertedAmount < 0 ? '-' : ''}${window.formatMoneyWithSymbol(Math.abs(convertedAmount), userCurrencySymbol)}</h2>
                                     ${originalDisplay ? `<p class="text-muted" style="font-size: 11px; margin-top: 4px;">${originalDisplay}</p>` : ''}
@@ -1607,6 +1626,106 @@ window.closeAccountModal = () => {
     if(overlay) overlay.classList.remove('active');
     window.editingAccountIndex = undefined;
 }
+
+window.openAccountLedger = (accountId) => {
+    const acc = window.accountsData.find(a => a.id === accountId);
+    if (!acc) return;
+
+    // 1. Set Header Information
+    document.getElementById('ledger-account-name').innerText = acc.name;
+    let typeStr = acc.type.charAt(0).toUpperCase() + acc.type.slice(1);
+    if (acc.type === 'custom') typeStr = acc.customType || 'Custom';
+    document.getElementById('ledger-account-type').innerText = typeStr;
+
+    // 2. Set and Format Balance (Respecting Currency & Privacy settings)
+    const balEl = document.getElementById('ledger-account-balance');
+    const userCurrencySymbol = window.userSettings?.currency || '₱';
+    balEl.style.color = acc.balance < 0 ? 'var(--accent-red)' : 'var(--text)';
+    
+    const cache = window.getPriceCache ? window.getPriceCache() : {};
+    let convertedAmount = acc.balance;
+    const accCurrency = acc.currency || (window.userSettings?.currency || '₱').replace('₱', 'PHP');
+    const userCurrency = (window.userSettings?.currency || '₱').replace('₱', 'PHP');
+
+    if (accCurrency !== userCurrency) {
+        const rate = cache[accCurrency]?.rate || 1;
+        convertedAmount = acc.balance * rate;
+    }
+    // formatMoneyWithSymbol automatically handles the 'true' flag for privacy mode redaction!
+    balEl.innerText = `${convertedAmount < 0 ? '-' : ''}${window.formatMoneyWithSymbol(Math.abs(convertedAmount), userCurrencySymbol, true)}`;
+
+    // 3. Filter and Sort Transactions
+    const relatedTxs = window.appData.filter(t => {
+        if (t.type === 'TRANSFER') {
+            return t.account_id === acc.id || t.to_account_id === acc.id;
+        }
+        return t.account_id === acc.id;
+    }).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    // 4. Render Transaction List
+    const listEl = document.getElementById('ledger-transactions-list');
+    if (relatedTxs.length === 0) {
+        listEl.innerHTML = '<li class="text-muted" style="text-align:center; padding: 32px 0;">No activity recorded for this account.</li>';
+    } else {
+        listEl.innerHTML = relatedTxs.map(entry => {
+            let displayAmt = 0;
+            let isPositive = true;
+            let desc = entry.name;
+            let catHtml = `<span class="tx-cat">${entry.category || 'Uncategorized'}</span>`;
+
+            // Custom formatting depending on if money is coming IN or going OUT of this specific ledger
+            if (entry.type === 'TRANSFER') {
+                if (entry.account_id === acc.id) { // Money left
+                    displayAmt = entry.amount;
+                    isPositive = false;
+                    const toAcc = window.accountsData.find(a => a.id === entry.to_account_id)?.name || 'External';
+                    desc = entry.name || `Transfer to ${toAcc}`;
+                    catHtml = `<span class="tx-cat" style="background: var(--surface-hover); border-color: var(--border);">↗ Sent</span>`;
+                } else if (entry.to_account_id === acc.id) { // Money entered
+                    displayAmt = entry.amount;
+                    isPositive = true;
+                    const fromAcc = window.accountsData.find(a => a.id === entry.account_id)?.name || 'External';
+                    desc = entry.name || `Transfer from ${fromAcc}`;
+                    catHtml = `<span class="tx-cat" style="background: var(--surface-hover); border-color: var(--border);">↙ Received</span>`;
+                }
+            } else {
+                displayAmt = Math.abs(entry.amount);
+                isPositive = entry.amount >= 0;
+            }
+
+            const amountColor = (isPositive && displayAmt !== 0) ? 'var(--primary)' : 'var(--text)';
+            const sign = isPositive ? '+' : '-';
+            const starColor = entry.favorite ? '#FFD700' : 'var(--border)';
+            
+            // Format timestamp explicitly to include Date & Time
+            const dateObj = new Date(entry.timestamp);
+            const timeString = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+
+            return `
+            <li class="tx-item" data-id="${entry._id}" style="padding-right: 8px;" onclick="window.openReceiptModal(${JSON.stringify(entry).replace(/"/g, '&quot;')})">
+                <div class="tx-left">
+                    ${catHtml}
+                    <span class="tx-name">${desc}</span>
+                </div>
+                <div class="tx-right" style="margin-left: auto; padding-right: 12px; text-align: right;">
+                    <span class="tx-amount" style="color: ${amountColor}">${sign}${window.formatMoney(displayAmt)}</span>
+                    <span class="text-muted" style="font-size: 11px; display: block; margin-top: 2px;">${timeString}</span>
+                </div>
+                <button class="star-btn" style="position: static; padding: 4px; color: ${starColor}; fill: ${starColor};" onclick="event.stopPropagation(); window.toggleTxFavorite('${entry.id}', ${entry._id})">
+                    <svg class="tx-star" viewBox="0 0 24 24" style="width: 20px; height: 20px; color: inherit; fill: inherit;"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+                </button>
+            </li>`;
+        }).join('');
+    }
+
+    // Refresh privacy icons inside the modal
+    document.querySelectorAll('.privacy-toggle-btn').forEach(btn => btn.innerHTML = window.getPrivacyIcon());
+    document.getElementById('account-ledger-overlay').classList.add('active');
+};
+
+window.closeAccountLedger = () => {
+    document.getElementById('account-ledger-overlay').classList.remove('active');
+};
 
 window.loadLegal = async (filename, title) => {
     document.getElementById('legal-title').innerText = title;
@@ -2475,6 +2594,70 @@ document.addEventListener('DOMContentLoaded', () => {
             window.renderActivity?.();
             if(window.renderTripsView && window.userSettings.activeTripId) window.renderTripsView();
         }
+    });
+
+    window.openTransferModal = () => {
+        const overlay = document.getElementById('transfer-overlay');
+        const fromSel = document.getElementById('transfer-from');
+        const toSel = document.getElementById('transfer-to');
+        
+        let opts = '<option value="">-- External --</option>';
+        opts += window.accountsData.map(a => `<option value="${a.id}">${a.name} (${window.formatMoney(a.balance)})</option>`).join('');
+        
+        fromSel.innerHTML = opts;
+        toSel.innerHTML = opts;
+        
+        document.getElementById('transfer-amount').value = '';
+        document.getElementById('transfer-notes').value = '';
+        
+        if (overlay) overlay.classList.add('active');
+    };
+
+    window.closeTransferModal = () => {
+        document.getElementById('transfer-overlay').classList.remove('active');
+    };
+
+    document.getElementById('save-transfer-btn')?.addEventListener('click', async () => {
+        const amount = parseFloat(document.getElementById('transfer-amount').value);
+        const fromId = document.getElementById('transfer-from').value || null;
+        const toId = document.getElementById('transfer-to').value || null;
+        const notes = document.getElementById('transfer-notes').value.trim();
+
+        if (!amount || isNaN(amount) || amount <= 0) return alert("Enter a valid amount.");
+        if (!fromId && !toId) return alert("You must select at least one internal account.");
+        if (fromId === toId) return alert("Cannot transfer to the same account.");
+
+        const transaction = {
+            user_id: window.currentUser.id,
+            fingerprint: `${new Date().toISOString()}_transfer_${amount}`,
+            type: 'TRANSFER',
+            category: 'TRANSFER',
+            name: notes || 'Account Ledger Transfer',
+            amount: amount,
+            notes: notes,
+            account_id: fromId,
+            to_account_id: toId,
+            timestamp: new Date().toISOString()
+        };
+
+        const { error } = await window.supabase.from('transactions').insert([transaction]);
+        if (error) return alert('Error saving transfer');
+
+        // Apply local math immediately
+        if (fromId) {
+            const fromAcc = window.accountsData.find(a => a.id === fromId);
+            if (fromAcc) fromAcc.balance -= amount;
+        }
+        if (toId) {
+            const toAcc = window.accountsData.find(a => a.id === toId);
+            if (toAcc) toAcc.balance += amount;
+        }
+
+        if (fromId || toId) await window.saveAccountsToCloud();
+
+        window.closeTransferModal();
+        await window.loadCloudData();
+        window.bootUI();
     });
 
     document.getElementById('dashboard-metric-selector')?.addEventListener('change', (e) => {

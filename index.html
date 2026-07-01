@@ -161,6 +161,12 @@
                             </div>
                             <span>Add Income</span>
                         </button>
+                        <button class="action-card" onclick="window.openTransferModal()">
+                            <div class="action-icon" style="color: var(--primary);">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"></path><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><path d="M7 23l-4-4 4-4"></path><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+                            </div>
+                            <span>Transfer</span>
+                        </button>
                         <button class="action-card nav-proxy" data-target="statistics">
                             <div class="action-icon">
                                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
@@ -769,7 +775,16 @@
         <div class="account-modal-content card">
             <header style="display: flex; justify-content: space-between; margin-bottom: 24px;"><h3>Add Account</h3><button class="close-modal-btn" onclick="closeAccountModal()">✕</button></header>
             <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Account Name</label><input type="text" id="acc-name" class="form-input" placeholder="e.g., MariBank"></div>
-            <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Type</label><select id="acc-type" class="form-input"><option value="bank">Bank / E-Wallet</option><option value="onhand">On-hand Cash</option><option value="investment">Investment</option><option value="custom">Custom</option></select></div>
+            <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Type</label>
+                <select id="acc-type" class="form-input">
+                    <option value="bank">Bank / E-Wallet</option>
+                    <option value="onhand">On-hand Cash</option>
+                    <option value="investment">Investment</option>
+                    <option value="receivable">Receivable (Owed to me)</option>
+                    <option value="payable">Payable (I owe them)</option>
+                    <option value="custom">Custom</option>
+                </select>
+            </div>
             <div class="form-group" style="margin-bottom: 16px; display: none;" id="custom-type-group"><label class="text-muted">Custom Type</label><input type="text" id="acc-custom-type" class="form-input" placeholder="e.g., Crypto Wallet"></div>
             <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Balance</label><input type="number" id="acc-balance" class="form-input" placeholder="0.00"></div>
             <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Theme Color</label><input type="color" id="acc-color" class="form-input" value="#00D26A" style="height: 48px; padding: 4px;"></div>
@@ -853,6 +868,60 @@
         </div>
     </div>
 
+    <div id="transfer-overlay" class="modal-overlay">
+        <div class="account-modal-content card">
+            <header style="display: flex; justify-content: space-between; margin-bottom: 24px;"><h3>Transfer / Ledger</h3><button class="close-modal-btn" onclick="window.closeTransferModal()">✕</button></header>
+            
+            <p class="text-muted" style="font-size: 13px; margin-bottom: 16px;">Move money between accounts, or log loans/repayments to your Receivable ledgers.</p>
+
+            <div class="form-group" style="margin-bottom: 16px;">
+                <label class="text-muted">Amount</label>
+                <input type="number" id="transfer-amount" class="form-input" placeholder="0.00" step="0.01">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                <div class="form-group">
+                    <label class="text-muted">From (Deduct)</label>
+                    <select id="transfer-from" class="form-input"><option value="">-- External --</option></select>
+                </div>
+                <div class="form-group">
+                    <label class="text-muted">To (Add)</label>
+                    <select id="transfer-to" class="form-input"><option value="">-- External --</option></select>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 24px;"><label class="text-muted">Notes / Details</label><input type="text" id="transfer-notes" class="form-input" placeholder="e.g., Lent money for lunch"></div>
+            
+            <button id="save-transfer-btn" class="primary-btn" style="width: 100%;">Record Transfer</button>
+        </div>
+    </div>
+
+    <div id="account-ledger-overlay" class="modal-overlay">
+        <div class="account-modal-content card" style="max-height: 90vh; display: flex; flex-direction: column;">
+            <header style="display: flex; justify-content: space-between; margin-bottom: 16px; flex-shrink: 0;">
+                <div>
+                    <h3 id="ledger-account-name">Account Name</h3>
+                    <p id="ledger-account-type" class="text-muted" style="font-size: 13px;">Type</p>
+                </div>
+                <button class="close-modal-btn" onclick="window.closeAccountLedger()">✕</button>
+            </header>
+            
+            <div style="text-align: center; margin-bottom: 24px; flex-shrink: 0;">
+                <p class="text-muted" style="font-size: 13px; margin-bottom: 4px;">Current Balance</p>
+                <div style="display: flex; justify-content: center; align-items: center; gap: 12px;">
+                    <h1 id="ledger-account-balance" class="massive-balance" style="font-size: 36px; margin: 0;">₱0.00</h1>
+                    <button class="icon-btn privacy-toggle-btn" onclick="window.togglePrivacyMode()" style="color: var(--text-secondary); cursor: pointer; padding: 4px; background: none; border: none;"></button>
+                </div>
+            </div>
+
+            <div style="flex: 1; overflow-y: auto; padding-right: 8px;">
+                <h4 style="margin-bottom: 12px; font-size: 14px; position: sticky; top: 0; background: var(--surface); padding-bottom: 8px; z-index: 10; border-bottom: 1px solid var(--border);">Transaction History</h4>
+                <ul id="ledger-transactions-list" class="minimal-list interactive-list">
+                    </ul>
+            </div>
+        </div>
+    </div>
+    
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>

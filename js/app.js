@@ -693,7 +693,10 @@ window.updateDashboard = () => {
 
     if (metric === 'running') {
         displayTotal = parseFloat(window.userSettings.balance) || 0;
-        sortedData.forEach(entry => displayTotal += (entry.amount || 0));
+        // Check that it's NOT a transfer before adding it to the running balance
+        sortedData.forEach(entry => {
+            if (entry.type !== 'TRANSFER') displayTotal += (entry.amount || 0);
+        });
         subtitle = "Running Balance";
     } else if (metric === 'net_worth') {
         subtitle = "Net Worth (Accounts)";
@@ -706,29 +709,32 @@ window.updateDashboard = () => {
         subtitle = "Remaining Budget (Today)";
         const now = new Date(); const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         let cycleIncome = 0;
-        sortedData.filter(e => new Date(e.timestamp) >= cutoff && !e.trip_id).forEach(e => {
+        // Quarantine transfers from being counted as daily income/expense
+        sortedData.filter(e => new Date(e.timestamp) >= cutoff && !e.trip_id && e.type !== 'TRANSFER').forEach(e => {
             if (e.amount > 0) cycleIncome += e.amount;
         });
-        const totalSpent = sortedData.filter(e => new Date(e.timestamp) >= cutoff && e.amount < 0 && !e.trip_id).reduce((sum, e) => sum + Math.abs(e.amount), 0);
+        const totalSpent = sortedData.filter(e => new Date(e.timestamp) >= cutoff && e.amount < 0 && !e.trip_id && e.type !== 'TRANSFER').reduce((sum, e) => sum + Math.abs(e.amount), 0);
         displayTotal = cycleIncome - totalSpent;
     } else if (metric === 'remaining_weekly') {
         subtitle = "Remaining Budget (This Week)";
         const now = new Date(); const day = now.getDay() || 7;
         const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day + 1);
         let cycleIncome = 0;
-        sortedData.filter(e => new Date(e.timestamp) >= cutoff && !e.trip_id).forEach(e => {
+        // Quarantine transfers from being counted as weekly income/expense
+        sortedData.filter(e => new Date(e.timestamp) >= cutoff && !e.trip_id && e.type !== 'TRANSFER').forEach(e => {
             if (e.amount > 0) cycleIncome += e.amount;
         });
-        const totalSpent = sortedData.filter(e => new Date(e.timestamp) >= cutoff && e.amount < 0 && !e.trip_id).reduce((sum, e) => sum + Math.abs(e.amount), 0);
+        const totalSpent = sortedData.filter(e => new Date(e.timestamp) >= cutoff && e.amount < 0 && !e.trip_id && e.type !== 'TRANSFER').reduce((sum, e) => sum + Math.abs(e.amount), 0);
         displayTotal = cycleIncome - totalSpent;
     } else if (metric === 'remaining_monthly') {
         subtitle = "Remaining Budget (This Month)";
         const now = new Date(); const cutoff = new Date(now.getFullYear(), now.getMonth(), 1);
         let cycleIncome = 0;
-        sortedData.filter(e => new Date(e.timestamp) >= cutoff && !e.trip_id).forEach(e => {
+        // Quarantine transfers from being counted as monthly income/expense
+        sortedData.filter(e => new Date(e.timestamp) >= cutoff && !e.trip_id && e.type !== 'TRANSFER').forEach(e => {
             if (e.amount > 0) cycleIncome += e.amount;
         });
-        const totalSpent = sortedData.filter(e => new Date(e.timestamp) >= cutoff && e.amount < 0 && !e.trip_id).reduce((sum, e) => sum + Math.abs(e.amount), 0);
+        const totalSpent = sortedData.filter(e => new Date(e.timestamp) >= cutoff && e.amount < 0 && !e.trip_id && e.type !== 'TRANSFER').reduce((sum, e) => sum + Math.abs(e.amount), 0);
         displayTotal = cycleIncome - totalSpent;
     }
 

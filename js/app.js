@@ -474,15 +474,15 @@ window.generateTxHTML = (entry) => {
 
         return `
             <li class="tx-item" data-id="${entry._id}" style="padding-right: 8px;">
-                <div class="tx-left">
+                <div class="tx-left" style="min-width: 0; overflow: hidden;">
                     <span class="tx-cat" style="background: var(--surface-hover); border-color: var(--border);">⇄ Transfer</span>
-                    <span class="tx-name">${entry.name || `${fromName} → ${toName}`}</span>
+                    <span class="tx-name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${entry.name || `${fromName} → ${toName}`}</span>
                 </div>
-                <div class="tx-right" style="margin-left: auto; padding-right: 12px;">
+                <div class="tx-right" style="margin-left: auto; padding-right: 12px; flex-shrink: 0; text-align: right;">
                     <span class="tx-date">${window.formatListDate(entry.timestamp)}</span>
-                    <span class="tx-amount" style="color: var(--text-secondary);">${window.formatMoney(entry.amount)}${origText}</span>
+                    <span class="tx-amount" style="color: var(--text-secondary); white-space: nowrap;">${window.formatMoney(entry.amount)}${origText}</span>
                 </div>
-                <button class="star-btn" style="position: static; padding: 4px; color: ${starColor}; fill: ${starColor};" onclick="event.stopPropagation(); window.toggleTxFavorite('${entry.id}', ${entry._id})">
+                <button class="star-btn" style="position: static; padding: 4px; color: ${starColor}; fill: ${starColor}; flex-shrink: 0;" onclick="event.stopPropagation(); window.toggleTxFavorite('${entry.id}', ${entry._id})">
                     <svg class="tx-star" viewBox="0 0 24 24" style="width: 20px; height: 20px; color: inherit; fill: inherit;"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
                 </button>
             </li>`;
@@ -495,15 +495,15 @@ window.generateTxHTML = (entry) => {
     
     return `
         <li class="tx-item" data-id="${entry._id}" style="padding-right: 8px;">
-            <div class="tx-left">
+            <div class="tx-left" style="min-width: 0; overflow: hidden;">
                 <span class="tx-cat">${entry.category || 'Uncategorized'}</span>
-                <span class="tx-name">${entry.name || 'Unnamed Transaction'}</span>
+                <span class="tx-name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${entry.name || 'Unnamed Transaction'}</span>
             </div>
-            <div class="tx-right" style="margin-left: auto; padding-right: 12px;">
+            <div class="tx-right" style="margin-left: auto; padding-right: 12px; flex-shrink: 0; text-align: right;">
                 <span class="tx-date">${window.formatListDate(entry.timestamp)}</span>
-                <span class="tx-amount" style="color: ${amountColor}">${sign}${window.formatMoney(entry.amount)}${origText}</span>
+                <span class="tx-amount" style="color: ${amountColor}; white-space: nowrap;">${sign}${window.formatMoney(entry.amount)}${origText}</span>
             </div>
-            <button class="star-btn" style="position: static; padding: 4px; color: ${starColor}; fill: ${starColor};" onclick="event.stopPropagation(); window.toggleTxFavorite('${entry.id}', ${entry._id})">
+            <button class="star-btn" style="position: static; padding: 4px; color: ${starColor}; fill: ${starColor}; flex-shrink: 0;" onclick="event.stopPropagation(); window.toggleTxFavorite('${entry.id}', ${entry._id})">
                 <svg class="tx-star" viewBox="0 0 24 24" style="width: 20px; height: 20px; color: inherit; fill: inherit;"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
             </button>
         </li>`;
@@ -902,6 +902,10 @@ window.renderActivity = () => {
     const maxAmt = document.getElementById('filter-amount-max')?.value ? parseFloat(document.getElementById('filter-amount-max').value) : null;
     const startDate = document.getElementById('filter-date-start')?.value ? new Date(document.getElementById('filter-date-start').value).setHours(0,0,0,0) : null;
     const endDate = document.getElementById('filter-date-end')?.value ? new Date(document.getElementById('filter-date-end').value).setHours(23,59,59,999) : null;
+    
+    // NEW: Capture the states of the new dropdowns
+    const typeFilter = document.getElementById('filter-type')?.value || 'all';
+    const tripFilter = document.getElementById('filter-trip')?.value || 'all';
 
     const filteredData = sortedData.filter(entry => {
         const searchableText = ((entry.name || '') + ' ' + (entry.category || '') + ' ' + (entry.notes || '')).toLowerCase();
@@ -916,7 +920,19 @@ window.renderActivity = () => {
             if (startDate && entryDate < startDate) return false;
             if (endDate && entryDate > endDate) return false;
         }
+        
         if (window.activeCategoryFilters.size > 0 && !window.activeCategoryFilters.has(entry.category)) return false;
+
+        // NEW: Apply Type Filter logic (excluding internal Transfers)
+        if (typeFilter !== 'all') {
+            const isIncome = (entry.type || '').toUpperCase().includes('INCOM');
+            if (typeFilter === 'income' && (!isIncome || entry.type === 'TRANSFER')) return false;
+            if (typeFilter === 'expense' && (isIncome || entry.type === 'TRANSFER')) return false;
+        }
+
+        // NEW: Apply Trip Status logic
+        if (tripFilter === 'trip' && !entry.trip_id) return false;
+        if (tripFilter === 'non-trip' && entry.trip_id) return false;
 
         return true;
     });
@@ -2493,7 +2509,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    ['search-input', 'filter-date-start', 'filter-date-end', 'filter-amount-min', 'filter-amount-max'].forEach(id => {
+    ['search-input', 'filter-date-start', 'filter-date-end', 'filter-amount-min', 'filter-amount-max', 'filter-type', 'filter-trip'].forEach(id => {
         const el = document.getElementById(id); if (el) el.addEventListener('input', window.renderActivity);
     });
 

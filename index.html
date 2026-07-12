@@ -411,15 +411,42 @@
                 </div>
                 
                 <div id="advanced-filters-panel" class="card" style="display: none; margin-bottom: 24px; padding: 20px;">
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px;">
+                    <!-- Row 1: Dates -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 16px;">
                         <div><label class="text-muted" style="font-size: 12px; margin-bottom: 4px; display: block;">Start Date</label><input type="date" id="filter-date-start" class="form-input"></div>
                         <div><label class="text-muted" style="font-size: 12px; margin-bottom: 4px; display: block;">End Date</label><input type="date" id="filter-date-end" class="form-input"></div>
+                    </div>
+
+                    <!-- Row 2: Amount Limits -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 16px;">
                         <div><label class="text-muted" style="font-size: 12px; margin-bottom: 4px; display: block;">Min Amount</label><input type="number" id="filter-amount-min" class="form-input" placeholder="0.00"></div>
                         <div><label class="text-muted" style="font-size: 12px; margin-bottom: 4px; display: block;">Max Amount</label><input type="number" id="filter-amount-max" class="form-input" placeholder="0.00"></div>
                     </div>
-                    <label class="text-muted" style="font-size: 12px; margin-top: 16px; display: block;">Filter by Category</label>
+
+                    <!-- Row 3: Switches -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div>
+                            <label class="text-muted" style="font-size: 12px; margin-bottom: 4px; display: block;">Type</label>
+                            <select id="filter-type" class="form-input">
+                                <option value="all">All Types</option>
+                                <option value="income">Income Only</option>
+                                <option value="expense">Expense Only</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-muted" style="font-size: 12px; margin-bottom: 4px; display: block;">Trip Status</label>
+                            <select id="filter-trip" class="form-input">
+                                <option value="all">All Logs</option>
+                                <option value="non-trip">Normal (Non-Trip) Only</option>
+                                <option value="trip">Trip-Related Only</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <label class="text-muted" style="font-size: 12px; margin-top: 24px; display: block;">Filter by Category</label>
                     <div id="filter-categories-container" class="chip-group" style="margin-top: 8px;"></div>
                 </div>
+                                
 
                 <div class="card" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; margin-bottom: 24px; padding: 16px;">
                     <div style="text-align: center;">

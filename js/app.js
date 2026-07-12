@@ -35,7 +35,7 @@ window.togglePrivacyMode = async () => {
 
 // --- MULTI-CURRENCY ENGINE ---
 window.initCurrencyDropdowns = () => {
-    const currencies = ['PHP', 'USD', 'EUR', 'GBP', 'JPY', 'INR', 'RUB', 'KRW', 'THB', 'VND', 'SGD', 'MYR', 'IDR', 'AUD', 'CAD'];
+    const currencies = ['PHP', 'USD', 'EUR', 'GBP', 'JPY', 'HKD', 'INR', 'RUB', 'KRW', 'THB', 'VND', 'SGD', 'MYR', 'IDR', 'AUD', 'CAD'];
     const opts = currencies.map(c => `<option value="${c}">${c}</option>`).join('');
     ['exp-currency', 'inc-currency', 'edit-tx-currency', 'transfer-currency'].forEach(id => {
         const el = document.getElementById(id);
@@ -1186,8 +1186,8 @@ window.saveTransactionEdit = async () => {
     if (selCur !== baseCur) {
         finalAmount = window.convertCurrency(newAmount, selCur, baseCur);
         exchangeRate = finalAmount / newAmount;
-        localStorage.setItem('lastUsedCurrency', selCur);
     }
+    localStorage.setItem('lastUsedCurrency', selCur);
     
     const signedFinalAmount = isIncome ? finalAmount : -finalAmount;
     const signedOrigAmount = isIncome ? newAmount : -newAmount;
@@ -2676,8 +2676,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (selCur !== baseCur) {
             finalAmount = window.convertCurrency(amount, selCur, baseCur);
             exchangeRate = finalAmount / amount;
-            localStorage.setItem('lastUsedCurrency', selCur);
         }
+        localStorage.setItem('lastUsedCurrency', selCur);
 
         const transaction = {
             user_id: window.currentUser.id,
@@ -2701,14 +2701,30 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error saving expense:', error);
             alert('Error saving expense');
         } else {
+            // if (accountId) {
+            //     const accIndex = window.accountsData.findIndex(a => a.id === accountId);
+            //     if (accIndex !== -1) {
+            //         window.accountsData[accIndex].balance -= finalAmount;
+            //         await window.saveAccountsToCloud();
+            //     }
+            // }
             if (accountId) {
                 const accIndex = window.accountsData.findIndex(a => a.id === accountId);
                 if (accIndex !== -1) {
-                    window.accountsData[accIndex].balance -= finalAmount;
+                    const targetAcc = window.accountsData[accIndex];
+                    const accCur = targetAcc.currency || baseCur;
+                    
+                    let amountToDeduct = amount; // Start with raw input (e.g., 10)
+                    if (selCur !== accCur) {
+                        // Convert directly from the transaction currency to the Account's currency
+                        amountToDeduct = window.convertCurrency(amount, selCur, accCur);
+                    }
+                    
+                    targetAcc.balance -= amountToDeduct;
                     await window.saveAccountsToCloud();
                 }
             }
-            
+
             if (tripId) {
                 const trip = window.tripsData?.find(t => t.id === tripId);
                 if (trip && trip.budget_source_type === 'goal') {
@@ -2758,8 +2774,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (selCur !== baseCur) {
             finalAmount = window.convertCurrency(amount, selCur, baseCur);
             exchangeRate = finalAmount / amount;
-            localStorage.setItem('lastUsedCurrency', selCur);
         }
+        localStorage.setItem('lastUsedCurrency', selCur);
 
         const transaction = {
             user_id: window.currentUser.id,
@@ -2782,10 +2798,25 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error saving income:', error);
             alert('Error saving income');
         } else {
+            // if (accountId) {
+            //     const accIndex = window.accountsData.findIndex(a => a.id === accountId);
+            //     if (accIndex !== -1) {
+            //         window.accountsData[accIndex].balance += finalAmount;
+            //         await window.saveAccountsToCloud();
+            //     }
+            // }
             if (accountId) {
                 const accIndex = window.accountsData.findIndex(a => a.id === accountId);
                 if (accIndex !== -1) {
-                    window.accountsData[accIndex].balance += finalAmount;
+                    const targetAcc = window.accountsData[accIndex];
+                    const accCur = targetAcc.currency || baseCur;
+                    
+                    let amountToAdd = amount;
+                    if (selCur !== accCur) {
+                        amountToAdd = window.convertCurrency(amount, selCur, accCur);
+                    }
+                    
+                    targetAcc.balance += amountToAdd;
                     await window.saveAccountsToCloud();
                 }
             }
@@ -2855,8 +2886,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (selCur !== baseCur) {
             finalAmount = window.convertCurrency(amount, selCur, baseCur);
             exchangeRate = finalAmount / amount;
-            localStorage.setItem('lastUsedCurrency', selCur);
         }
+        localStorage.setItem('lastUsedCurrency', selCur);
 
         const transaction = {
             user_id: window.currentUser.id,
@@ -2877,13 +2908,32 @@ document.addEventListener('DOMContentLoaded', () => {
         const { error } = await window.supabase.from('transactions').insert([transaction]);
         if (error) return alert('Error saving transfer');
 
+        // if (fromId) {
+        //     const fromAcc = window.accountsData.find(a => a.id === fromId);
+        //     if (fromAcc) fromAcc.balance -= finalAmount;
+        // }
+        // if (toId) {
+        //     const toAcc = window.accountsData.find(a => a.id === toId);
+        //     if (toAcc) toAcc.balance += finalAmount;
+        // }
+        // Apply local math immediately with strict currency matching
         if (fromId) {
             const fromAcc = window.accountsData.find(a => a.id === fromId);
-            if (fromAcc) fromAcc.balance -= finalAmount;
+            if (fromAcc) {
+                const fromCur = fromAcc.currency || baseCur;
+                let deductAmt = amount;
+                if (selCur !== fromCur) deductAmt = window.convertCurrency(amount, selCur, fromCur);
+                fromAcc.balance -= deductAmt;
+            }
         }
         if (toId) {
             const toAcc = window.accountsData.find(a => a.id === toId);
-            if (toAcc) toAcc.balance += finalAmount;
+            if (toAcc) {
+                const toCur = toAcc.currency || baseCur;
+                let addAmt = amount;
+                if (selCur !== toCur) addAmt = window.convertCurrency(amount, selCur, toCur);
+                toAcc.balance += addAmt;
+            }
         }
 
         if (fromId || toId) await window.saveAccountsToCloud();

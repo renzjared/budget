@@ -162,18 +162,27 @@ window.formatMoney = (amount) => {
     if (sym.length > 2) {
         sym = window.getCurrencySymbol(sym);
     }
-    return `${sym}${Math.abs(amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+    return `${sym}${Math.abs(amount || 0).toLocaleString(undefined, {
+        minimumFractionDigits: 2, 
+        maximumFractionDigits: 2 
+    })}`;
 };
 
 window.formatMoneyWithSymbol = (amount, symbol) => {
-    return `${symbol}${Math.abs(amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+    return `${symbol}${Math.abs(amount || 0).toLocaleString(undefined, {
+        minimumFractionDigits: 2, 
+        maximumFractionDigits: 2 
+    })}`;
 };
 
 // Format money with currency conversion if needed
 window.formatMoneyConverted = (amount, fromCurrency, toCurrency) => {
     const convertedAmount = window.convertCurrency(amount, fromCurrency, toCurrency);
     const symbol = window.getCurrencySymbol(toCurrency);
-    return `${symbol}${Math.abs(convertedAmount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+    return `${symbol}${Math.abs(convertedAmount || 0).toLocaleString(undefined, {
+        minimumFractionDigits: 2, 
+        maximumFractionDigits: 2 
+    })}`;
 };
 
 window.formatReceiptDateTime = (dateStr) => {

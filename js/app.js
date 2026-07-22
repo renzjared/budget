@@ -176,65 +176,6 @@ window.renderQuickAddWidget = () => {
         : '<span class="text-muted" style="font-size: 12px;">Keep logging! Your most repeated recent transactions will appear here.</span>';
 };
 
-// window.setupAutocomplete = (inputId, fieldType) => {
-//     const input = document.getElementById(inputId);
-//     if (!input) return;
-
-//     const parent = input.parentElement;
-//     parent.style.position = 'relative';
-
-//     const dropdown = document.createElement('div');
-//     dropdown.className = 'autocomplete-dropdown';
-//     parent.appendChild(dropdown);
-
-//     input.addEventListener('input', (e) => {
-//         const val = e.target.value.toLowerCase().trim();
-//         dropdown.innerHTML = '';
-        
-//         if (!val) {
-//             dropdown.style.display = 'none';
-//             return;
-//         }
-
-//         const recentTxs = (window.appData || []).slice(0, 200);
-        
-//         const uniqueValues = new Set();
-//         recentTxs.forEach(tx => {
-//             const text = tx[fieldType]; 
-//             if (text && text.toLowerCase().includes(val)) {
-//                 uniqueValues.add(text);
-//             }
-//         });
-
-//         const suggestions = Array.from(uniqueValues).slice(0, 5);
-
-//         if (suggestions.length > 0) {
-//             suggestions.forEach(suggestion => {
-//                 const div = document.createElement('div');
-//                 div.className = 'autocomplete-item';
-                
-//                 const regex = new RegExp(`(${val})`, "gi");
-//                 div.innerHTML = suggestion.replace(regex, "<strong style='color: var(--primary)'>$1</strong>");
-                
-//                 div.addEventListener('click', () => {
-//                     input.value = suggestion;
-//                     dropdown.style.display = 'none';
-//                 });
-//                 dropdown.appendChild(div);
-//             });
-//             dropdown.style.display = 'block';
-//         } else {
-//             dropdown.style.display = 'none';
-//         }
-//     });
-
-//     document.addEventListener('click', (e) => {
-//         if (e.target !== input && e.target !== dropdown) {
-//             dropdown.style.display = 'none';
-//         }
-//     });
-// };
-
 window.setupAutocomplete = (inputId, fieldType) => {
     const input = document.getElementById(inputId);
     if (!input) return;
@@ -258,14 +199,14 @@ window.setupAutocomplete = (inputId, fieldType) => {
         const recentTxs = (window.appData || []).slice(0, 200);
         
         const uniqueValues = new Set();
-        const txMap = new Map(); // Store the most recent transaction for each suggestion
+        const txMap = new Map();
         
         recentTxs.forEach(tx => {
             const text = tx[fieldType]; 
             if (text && text.toLowerCase().includes(val)) {
                 if (!uniqueValues.has(text)) {
                     uniqueValues.add(text);
-                    txMap.set(text, tx); // Save the full transaction object
+                    txMap.set(text, tx); 
                 }
             }
         });
@@ -295,28 +236,37 @@ window.setupAutocomplete = (inputId, fieldType) => {
                             const catInput = document.getElementById(`${prefix}-category`);
                             const merInput = document.getElementById(`${prefix}-merchant`);
                             const curInput = document.getElementById(`${prefix}-currency`);
+                            const accInput = document.getElementById(`${prefix}-account`);
                             
-                            // 1. Auto-fill Currency & Amount
+                            // 1. Auto-fill Currency & Amount (FORCED OVERWRITE)
                             if (curInput && recentTx.original_currency) {
                                 curInput.value = recentTx.original_currency;
+                                curInput.dispatchEvent(new Event('change'));
                             }
-                            if (amtInput && !amtInput.value) {
+                            if (amtInput) {
                                 const fillAmt = (recentTx.original_amount !== undefined && recentTx.original_amount !== null) 
                                     ? Math.abs(recentTx.original_amount) 
                                     : Math.abs(recentTx.amount || 0);
                                 amtInput.value = fillAmt;
                             }
                             
-                            // 2. Auto-fill Category (Ensuring it exists in the current dropdown)
+                            // 2. Auto-fill Category (FORCED OVERWRITE)
                             if (catInput && recentTx.category) {
                                 if (Array.from(catInput.options).some(opt => opt.value === recentTx.category)) {
                                     catInput.value = recentTx.category;
+                                    catInput.dispatchEvent(new Event('change'));
                                 }
                             }
                             
-                            // 3. Auto-fill Merchant
-                            if (merInput && !merInput.value && recentTx.merchant) {
+                            // 3. Auto-fill Merchant (FORCED OVERWRITE)
+                            if (merInput && recentTx.merchant !== undefined) {
                                 merInput.value = recentTx.merchant;
+                            }
+                            
+                            // 4. Auto-fill Account (FORCED OVERWRITE)
+                            if (accInput && recentTx.account_id) {
+                                accInput.value = recentTx.account_id;
+                                accInput.dispatchEvent(new Event('change'));
                             }
                         }
                     }
@@ -464,7 +414,7 @@ window.generateTxHTML = (entry) => {
     let origText = '';
     if (entry.original_currency && entry.original_currency !== baseCode && entry.original_amount !== undefined && entry.original_amount !== null) {
         const origSym = window.getCurrencySymbol(entry.original_currency);
-        origText = ` <span style="font-size: 11px; color: var(--text-secondary); margin-left: 4px; font-weight: 400;">(${origSym}${Math.abs(entry.original_amount).toLocaleString(undefined, {minimumFractionDigits: 2})})</span>`;
+        origText = `<span style="font-size: 11px; color: var(--text-secondary); font-weight: 400; display: block; margin-top: 2px;">(${origSym}${Math.abs(entry.original_amount).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})})</span>`;
     }
 
     if (entry.type === 'TRANSFER') {
@@ -474,13 +424,14 @@ window.generateTxHTML = (entry) => {
 
         return `
             <li class="tx-item" data-id="${entry._id}" style="padding-right: 8px;">
-                <div class="tx-left" style="min-width: 0; overflow: hidden;">
-                    <span class="tx-cat" style="background: var(--surface-hover); border-color: var(--border);">⇄ Transfer</span>
-                    <span class="tx-name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${entry.name || `${fromName} → ${toName}`}</span>
+                <div class="tx-left" style="flex: 1; min-width: 0; overflow: hidden; display: flex; flex-direction: column; margin-right: 12px;">
+                    <span class="tx-cat" style="background: var(--surface-hover); border-color: var(--border); width: fit-content;">⇄ Transfer</span>
+                    <span class="tx-name" style="display: block; width: 100%; white-space: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, black calc(100% - 24px), transparent 100%); mask-image: linear-gradient(to right, black calc(100% - 24px), transparent 100%);">${entry.name || `${fromName} → ${toName}`}</span>
                 </div>
-                <div class="tx-right" style="margin-left: auto; padding-right: 12px; flex-shrink: 0; text-align: right;">
-                    <span class="tx-date">${window.formatListDate(entry.timestamp)}</span>
-                    <span class="tx-amount" style="color: var(--text-secondary); white-space: nowrap;">${window.formatMoney(entry.amount)}${origText}</span>
+                <div class="tx-right" style="flex-shrink: 0; text-align: right; display: flex; flex-direction: column; align-items: flex-end; justify-content: center;">
+                    <span class="tx-date" style="margin-bottom: 2px;">${window.formatListDate(entry.timestamp)}</span>
+                    <span class="tx-amount" style="color: var(--text-secondary); white-space: nowrap;">${window.formatMoney(entry.amount)}</span>
+                    ${origText}
                 </div>
                 <button class="star-btn" style="position: static; padding: 4px; color: ${starColor}; fill: ${starColor}; flex-shrink: 0;" onclick="event.stopPropagation(); window.toggleTxFavorite('${entry.id}', ${entry._id})">
                     <svg class="tx-star" viewBox="0 0 24 24" style="width: 20px; height: 20px; color: inherit; fill: inherit;"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
@@ -495,13 +446,14 @@ window.generateTxHTML = (entry) => {
     
     return `
         <li class="tx-item" data-id="${entry._id}" style="padding-right: 8px;">
-            <div class="tx-left" style="min-width: 0; overflow: hidden;">
-                <span class="tx-cat">${entry.category || 'Uncategorized'}</span>
-                <span class="tx-name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${entry.name || 'Unnamed Transaction'}</span>
+            <div class="tx-left" style="flex: 1; min-width: 0; overflow: hidden; display: flex; flex-direction: column; margin-right: 12px;">
+                <span class="tx-cat" style="width: fit-content;">${entry.category || 'Uncategorized'}</span>
+                <span class="tx-name" style="display: block; width: 100%; white-space: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, black calc(100% - 24px), transparent 100%); mask-image: linear-gradient(to right, black calc(100% - 24px), transparent 100%);">${entry.name || 'Unnamed Transaction'}</span>
             </div>
-            <div class="tx-right" style="margin-left: auto; padding-right: 12px; flex-shrink: 0; text-align: right;">
-                <span class="tx-date">${window.formatListDate(entry.timestamp)}</span>
-                <span class="tx-amount" style="color: ${amountColor}; white-space: nowrap;">${sign}${window.formatMoney(entry.amount)}${origText}</span>
+            <div class="tx-right" style="flex-shrink: 0; text-align: right; display: flex; flex-direction: column; align-items: flex-end; justify-content: center;">
+                <span class="tx-date" style="margin-bottom: 2px;">${window.formatListDate(entry.timestamp)}</span>
+                <span class="tx-amount" style="color: ${amountColor}; white-space: nowrap;">${sign}${window.formatMoney(entry.amount)}</span>
+                ${origText}
             </div>
             <button class="star-btn" style="position: static; padding: 4px; color: ${starColor}; fill: ${starColor}; flex-shrink: 0;" onclick="event.stopPropagation(); window.toggleTxFavorite('${entry.id}', ${entry._id})">
                 <svg class="tx-star" viewBox="0 0 24 24" style="width: 20px; height: 20px; color: inherit; fill: inherit;"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
@@ -903,7 +855,6 @@ window.renderActivity = () => {
     const startDate = document.getElementById('filter-date-start')?.value ? new Date(document.getElementById('filter-date-start').value).setHours(0,0,0,0) : null;
     const endDate = document.getElementById('filter-date-end')?.value ? new Date(document.getElementById('filter-date-end').value).setHours(23,59,59,999) : null;
     
-    // NEW: Capture the states of the new dropdowns
     const typeFilter = document.getElementById('filter-type')?.value || 'all';
     const tripFilter = document.getElementById('filter-trip')?.value || 'all';
 
@@ -923,14 +874,12 @@ window.renderActivity = () => {
         
         if (window.activeCategoryFilters.size > 0 && !window.activeCategoryFilters.has(entry.category)) return false;
 
-        // NEW: Apply Type Filter logic (excluding internal Transfers)
         if (typeFilter !== 'all') {
             const isIncome = (entry.type || '').toUpperCase().includes('INCOM');
             if (typeFilter === 'income' && (!isIncome || entry.type === 'TRANSFER')) return false;
             if (typeFilter === 'expense' && (isIncome || entry.type === 'TRANSFER')) return false;
         }
 
-        // NEW: Apply Trip Status logic
         if (tripFilter === 'trip' && !entry.trip_id) return false;
         if (tripFilter === 'non-trip' && entry.trip_id) return false;
 
@@ -1008,7 +957,6 @@ window.editTransaction = () => {
     const isIncome = (entry.type || '').toUpperCase().includes('INCOM');
     const baseCode = window.getCurrencyCodeFromSymbol(window.userSettings?.currency || '₱');
     
-    // Load original amount if available
     const displayAmount = (entry.original_amount !== undefined && entry.original_amount !== null) ? Math.abs(entry.original_amount) : Math.abs(entry.amount);
     
     document.getElementById('edit-tx-name').value = entry.name || '';
@@ -1017,12 +965,10 @@ window.editTransaction = () => {
     document.getElementById('edit-tx-merchant').value = entry.merchant || '';
     document.getElementById('edit-tx-notes').value = entry.notes || '';
     
-    // 1. Initialize Trip Logic (This automatically checks the box and builds the dropdowns!)
     if (window.setupTxTripToggle) {
         window.setupTxTripToggle('edit', entry.trip_id);
     }
     
-    // 2. Ensure the saved category exists in the dropdown (so it isn't blank), then select it
     const catSelect = document.getElementById('edit-tx-category');
     let found = false;
     Array.from(catSelect.options).forEach(opt => { if(opt.value === entry.category) found = true; });
@@ -1227,7 +1173,6 @@ window.saveTransactionEdit = async () => {
         console.error('Error updating transaction:', error);
         alert('Error saving changes');
     } else {
-        // Adjust local account balances logic if you want to support balance correction on edit.
         window.closeEditTransactionModal();
         await window.loadCloudData();
         window.updateDashboard();
@@ -1881,20 +1826,21 @@ window.openAccountLedger = (accountId) => {
             let origText = '';
             if (entry.original_currency && entry.original_currency !== baseCode && entry.original_amount !== undefined && entry.original_amount !== null) {
                 const origSym = window.getCurrencySymbol(entry.original_currency);
-                origText = ` <span style="font-size: 11px; color: var(--text-secondary); margin-left: 4px; font-weight: 400;">(${origSym}${Math.abs(entry.original_amount).toLocaleString(undefined, {minimumFractionDigits: 2})})</span>`;
+                origText = `<span style="font-size: 11px; color: var(--text-secondary); display: block; margin-top: 2px; font-weight: 400;">(${origSym}${Math.abs(entry.original_amount).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})})</span>`;
             }
 
             return `
             <li class="tx-item" data-id="${entry._id}" style="padding-right: 8px;" onclick="window.openReceiptModal(${JSON.stringify(entry).replace(/"/g, '&quot;')})">
-                <div class="tx-left">
-                    ${catHtml}
-                    <span class="tx-name">${desc}</span>
+                <div class="tx-left" style="flex: 1; min-width: 0; overflow: hidden; display: flex; flex-direction: column; margin-right: 12px;">
+                    <div style="width: fit-content;">${catHtml}</div>
+                    <span class="tx-name" style="display: block; width: 100%; white-space: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, black calc(100% - 24px), transparent 100%); mask-image: linear-gradient(to right, black calc(100% - 24px), transparent 100%);">${desc}</span>
                 </div>
-                <div class="tx-right" style="margin-left: auto; padding-right: 12px; text-align: right;">
-                    <span class="tx-amount" style="color: ${amountColor}">${sign}${window.formatMoney(displayAmt)}${origText}</span>
+                <div class="tx-right" style="flex-shrink: 0; text-align: right; display: flex; flex-direction: column; align-items: flex-end; justify-content: center;">
+                    <span class="tx-amount" style="color: ${amountColor}; white-space: nowrap;">${sign}${window.formatMoney(displayAmt)}</span>
                     <span class="text-muted" style="font-size: 11px; display: block; margin-top: 2px;">${timeString}</span>
+                    ${origText}
                 </div>
-                <button class="star-btn" style="position: static; padding: 4px; color: ${starColor}; fill: ${starColor};" onclick="event.stopPropagation(); window.toggleTxFavorite('${entry.id}', ${entry._id})">
+                <button class="star-btn" style="position: static; padding: 4px; color: ${starColor}; fill: ${starColor}; flex-shrink: 0;" onclick="event.stopPropagation(); window.toggleTxFavorite('${entry.id}', ${entry._id})">
                     <svg class="tx-star" viewBox="0 0 24 24" style="width: 20px; height: 20px; color: inherit; fill: inherit;"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
                 </button>
             </li>`;
@@ -2077,12 +2023,13 @@ window.renderTripsView = (forceShowPast = false) => {
 
     if (activeTrip && !forceShowPast) {
         const txs = window.appData.filter(t => t.trip_id === activeTrip.id);
-        const spent = txs.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
+        
+        // ONLY sum expenditures (handles negative expenses and positive refunds, completely ignores INCOMES)
+        const spent = txs.filter(t => t.type !== 'TRANSFER' && !(t.type || '').toUpperCase().includes('INCOM')).reduce((sum, t) => sum - t.amount, 0);
         
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
-        const spentToday = txs.filter(t => t.amount < 0 && new Date(t.timestamp) >= todayStart).reduce((sum, t) => sum + Math.abs(t.amount), 0);
-
+        const spentToday = txs.filter(t => t.type !== 'TRANSFER' && !(t.type || '').toUpperCase().includes('INCOM') && new Date(t.timestamp) >= todayStart).reduce((sum, t) => sum - t.amount, 0);
         let limit = 0;
         let limitSourceText = '';
 
@@ -2094,7 +2041,8 @@ window.renderTripsView = (forceShowPast = false) => {
             limit = goal ? goal.target_amount : 0;
             limitSourceText = goal ? `Goal: ${goal.name}` : 'Goal Wallet';
         } else {
-            limit = txs.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
+            // STRICTLY sum only incoming transactions for the funding limit
+            limit = txs.filter(t => (t.type || '').toUpperCase().includes('INCOM')).reduce((sum, t) => sum + t.amount, 0);
             limitSourceText = 'Income Logged to Trip';
         }
 
@@ -2106,8 +2054,9 @@ window.renderTripsView = (forceShowPast = false) => {
         const remText = remaining >= 0 ? `${window.formatMoney(remaining, true)} Left` : `${window.formatMoney(Math.abs(remaining), true)} Over`;
 
         const catProgressHtml = (activeTrip.categories || []).map(cat => {
-            const allocated = limit * (cat.percent / 100);
-            const catSpent = txs.filter(t => t.amount < 0 && (t.category || '').toUpperCase() === cat.name.toUpperCase()).reduce((sum, t) => sum + Math.abs(t.amount), 0);
+            const allocated = limit * (cat.percent / 100);    
+            // Ignore incomes here as well
+            const catSpent = txs.filter(t => t.type !== 'TRANSFER' && !(t.type || '').toUpperCase().includes('INCOM') && (t.category || '').toUpperCase() === cat.name.toUpperCase()).reduce((sum, t) => sum - t.amount, 0);
             const catPct = allocated > 0 ? (catSpent / allocated) * 100 : (catSpent > 0 ? 100 : 0);
             const over = catPct > 100;
             const cColor = over ? 'var(--accent-red)' : 'var(--primary)';
@@ -2210,9 +2159,11 @@ window.renderTripsView = (forceShowPast = false) => {
     } else {
         html += `<div style="display: flex; flex-direction: column; gap: 16px;">` + pastTrips.map(trip => {
             const txs = window.appData.filter(t => t.trip_id === trip.id);
-            const spent = txs.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
-            const isActiveLabel = trip.status === 'active' ? `<span style="color:var(--primary); font-size:12px; font-weight:700; margin-left:8px;">(Active)</span>` : '';
             
+            // Ignore incomes for past trips
+            const spent = txs.filter(t => t.type !== 'TRANSFER' && !(t.type || '').toUpperCase().includes('INCOM')).reduce((sum, t) => sum - t.amount, 0);
+            
+            const isActiveLabel = trip.status === 'active' ? `<span style="color:var(--primary); font-size:12px; font-weight:700; margin-left:8px;">(Active)</span>` : '';
             return `
                 <div class="card" style="display: flex; justify-content: space-between; align-items: center; padding: 20px;">
                     <div>
@@ -2701,7 +2652,7 @@ document.addEventListener('DOMContentLoaded', () => {
             type: 'EXPENDITURE',
             category: category,
             name: name,
-            amount: -finalAmount,          // Converted base amount
+            amount: -finalAmount,          
             original_currency: selCur,     
             original_amount: -amount,      
             exchange_rate: exchangeRate,   
@@ -2717,22 +2668,14 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error saving expense:', error);
             alert('Error saving expense');
         } else {
-            // if (accountId) {
-            //     const accIndex = window.accountsData.findIndex(a => a.id === accountId);
-            //     if (accIndex !== -1) {
-            //         window.accountsData[accIndex].balance -= finalAmount;
-            //         await window.saveAccountsToCloud();
-            //     }
-            // }
             if (accountId) {
                 const accIndex = window.accountsData.findIndex(a => a.id === accountId);
                 if (accIndex !== -1) {
                     const targetAcc = window.accountsData[accIndex];
                     const accCur = targetAcc.currency || baseCur;
                     
-                    let amountToDeduct = amount; // Start with raw input (e.g., 10)
+                    let amountToDeduct = amount; 
                     if (selCur !== accCur) {
-                        // Convert directly from the transaction currency to the Account's currency
                         amountToDeduct = window.convertCurrency(amount, selCur, accCur);
                     }
                     
@@ -2799,7 +2742,7 @@ document.addEventListener('DOMContentLoaded', () => {
             type: 'INCOMING',
             category: category,
             name: name,
-            amount: finalAmount,           // Converted base amount
+            amount: finalAmount,           
             original_currency: selCur,     
             original_amount: amount,      
             exchange_rate: exchangeRate,   
@@ -2814,13 +2757,6 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error saving income:', error);
             alert('Error saving income');
         } else {
-            // if (accountId) {
-            //     const accIndex = window.accountsData.findIndex(a => a.id === accountId);
-            //     if (accIndex !== -1) {
-            //         window.accountsData[accIndex].balance += finalAmount;
-            //         await window.saveAccountsToCloud();
-            //     }
-            // }
             if (accountId) {
                 const accIndex = window.accountsData.findIndex(a => a.id === accountId);
                 if (accIndex !== -1) {
@@ -2866,8 +2802,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const fromSel = document.getElementById('transfer-from');
         const toSel = document.getElementById('transfer-to');
         
+        const getAccountLastUsed = (accId) => {
+            const txs = window.appData.filter(t => t.account_id === accId || t.to_account_id === accId);
+            if (!txs.length) return 0;
+            return Math.max(...txs.map(t => new Date(t.timestamp).getTime()));
+        };
+
+        const sortedAccounts = [...window.accountsData].sort((a, b) => {
+            if (a.favorite && !b.favorite) return -1;
+            if (!a.favorite && b.favorite) return 1;
+            return getAccountLastUsed(b.id) - getAccountLastUsed(a.id);
+        });
+        
         let opts = '<option value="">-- External --</option>';
-        opts += window.accountsData.map(a => `<option value="${a.id}">${a.name} (${window.formatMoney(a.balance)})</option>`).join('');
+        opts += sortedAccounts.map(a => `<option value="${a.id}">${a.favorite ? '★ ' : ''}${a.name} (${window.formatMoney(a.balance)})</option>`).join('');
         
         fromSel.innerHTML = opts;
         toSel.innerHTML = opts;
@@ -2911,7 +2859,7 @@ document.addEventListener('DOMContentLoaded', () => {
             type: 'TRANSFER',
             category: 'TRANSFER',
             name: notes || 'Account Ledger Transfer',
-            amount: finalAmount,           // Converted base amount
+            amount: finalAmount,           
             original_currency: selCur,     
             original_amount: amount,      
             exchange_rate: exchangeRate,   
@@ -2924,15 +2872,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const { error } = await window.supabase.from('transactions').insert([transaction]);
         if (error) return alert('Error saving transfer');
 
-        // if (fromId) {
-        //     const fromAcc = window.accountsData.find(a => a.id === fromId);
-        //     if (fromAcc) fromAcc.balance -= finalAmount;
-        // }
-        // if (toId) {
-        //     const toAcc = window.accountsData.find(a => a.id === toId);
-        //     if (toAcc) toAcc.balance += finalAmount;
-        // }
-        // Apply local math immediately with strict currency matching
         if (fromId) {
             const fromAcc = window.accountsData.find(a => a.id === fromId);
             if (fromAcc) {

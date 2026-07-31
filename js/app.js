@@ -225,11 +225,9 @@ window.setupAutocomplete = (inputId, fieldType) => {
                     input.value = suggestion;
                     dropdown.style.display = 'none';
                     
-                    // --- NEW: AUTO-FILL RELATED FIELDS ---
                     if (fieldType === 'name') {
                         const recentTx = txMap.get(suggestion);
                         if (recentTx) {
-                            // Determine if we are in Expense, Income, or Edit modal
                             const prefix = inputId.replace('-name', ''); 
                             
                             const amtInput = document.getElementById(`${prefix}-amount`);
@@ -238,7 +236,6 @@ window.setupAutocomplete = (inputId, fieldType) => {
                             const curInput = document.getElementById(`${prefix}-currency`);
                             const accInput = document.getElementById(`${prefix}-account`);
                             
-                            // 1. Auto-fill Currency & Amount (FORCED OVERWRITE)
                             if (curInput && recentTx.original_currency) {
                                 curInput.value = recentTx.original_currency;
                                 curInput.dispatchEvent(new Event('change'));
@@ -249,21 +246,15 @@ window.setupAutocomplete = (inputId, fieldType) => {
                                     : Math.abs(recentTx.amount || 0);
                                 amtInput.value = fillAmt;
                             }
-                            
-                            // 2. Auto-fill Category (FORCED OVERWRITE)
                             if (catInput && recentTx.category) {
                                 if (Array.from(catInput.options).some(opt => opt.value === recentTx.category)) {
                                     catInput.value = recentTx.category;
                                     catInput.dispatchEvent(new Event('change'));
                                 }
                             }
-                            
-                            // 3. Auto-fill Merchant (FORCED OVERWRITE)
                             if (merInput && recentTx.merchant !== undefined) {
                                 merInput.value = recentTx.merchant;
                             }
-                            
-                            // 4. Auto-fill Account (FORCED OVERWRITE)
                             if (accInput && recentTx.account_id) {
                                 accInput.value = recentTx.account_id;
                                 accInput.dispatchEvent(new Event('change'));
@@ -479,21 +470,19 @@ window.populateAccountDropdowns = (targetSelectId) => {
     let html = '<option value="">-- None --</option>';
     sortedAccounts.forEach(acc => {
         const favIndicator = acc.favorite ? '★ ' : '';
-        html += `<option value="${acc.id}">${favIndicator}${acc.name} (${window.formatMoney(acc.balance)})</option>`;
+        const sym = acc.currency ? window.getCurrencySymbol(acc.currency) : window.getCurrencySymbol(window.userSettings?.currency || '₱');
+        html += `<option value="${acc.id}">${favIndicator}${acc.name} (${window.formatMoneyWithSymbol(acc.balance, sym)})</option>`;
     });
     selectEl.innerHTML = html;
 
     let defaultVal = '';
     const behavior = window.userSettings.defaultAccountBehavior || 'blank';
     
-    if (behavior === 'custom') {
-        const customId = window.userSettings.defaultAccountId;
-        if (window.accountsData.find(a => a.id === customId)) defaultVal = customId;
+    if (behavior === 'custom' && window.userSettings.defaultAccountId) {
+        if (window.accountsData.find(a => a.id === window.userSettings.defaultAccountId)) defaultVal = window.userSettings.defaultAccountId;
     } else if (behavior === 'recent') {
         const recentTx = window.appData.find(t => t.account_id);
-        if (recentTx && window.accountsData.find(a => a.id === recentTx.account_id)) {
-            defaultVal = recentTx.account_id;
-        }
+        if (recentTx && window.accountsData.find(a => a.id === recentTx.account_id)) defaultVal = recentTx.account_id;
     }
     
     selectEl.value = defaultVal;
@@ -2024,25 +2013,27 @@ window.renderTripsView = (forceShowPast = false) => {
     if (activeTrip && !forceShowPast) {
         const txs = window.appData.filter(t => t.trip_id === activeTrip.id);
         
-        // ONLY sum expenditures (handles negative expenses and positive refunds, completely ignores INCOMES)
-        const spent = txs.filter(t => t.type !== 'TRANSFER' && !(t.type || '').toUpperCase().includes('INCOM')).reduce((sum, t) => sum - t.amount, 0);
+        // Sum expenses natively via `sum - t.amount` (correctly deducting refunds)
+        const spent = txs.filter(t => t.type !== 'TRANSFER' && !(t.type || '').toUpperCase().includes('INCOM'))
+                         .reduce((sum, t) => sum - (parseFloat(t.amount) || 0), 0);
         
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
-        const spentToday = txs.filter(t => t.type !== 'TRANSFER' && !(t.type || '').toUpperCase().includes('INCOM') && new Date(t.timestamp) >= todayStart).reduce((sum, t) => sum - t.amount, 0);
+        const spentToday = txs.filter(t => t.type !== 'TRANSFER' && !(t.type || '').toUpperCase().includes('INCOM') && new Date(t.timestamp) >= todayStart)
+                            .reduce((sum, t) => sum - (parseFloat(t.amount) || 0), 0);
         let limit = 0;
         let limitSourceText = '';
 
         if (activeTrip.budget_source_type === 'fixed') {
-            limit = activeTrip.fixed_budget_amount || 0;
+            limit = parseFloat(activeTrip.fixed_budget_amount) || 0;
             limitSourceText = 'Fixed Allowance';
         } else if (activeTrip.budget_source_type === 'goal') {
             const goal = window.userGoals.find(g => g.id === activeTrip.budget_source_id);
-            limit = goal ? goal.target_amount : 0;
+            limit = goal ? parseFloat(goal.target_amount) : 0;
             limitSourceText = goal ? `Goal: ${goal.name}` : 'Goal Wallet';
         } else {
-            // STRICTLY sum only incoming transactions for the funding limit
-            limit = txs.filter(t => (t.type || '').toUpperCase().includes('INCOM')).reduce((sum, t) => sum + t.amount, 0);
+            limit = txs.filter(t => (t.type || '').toUpperCase().includes('INCOM'))
+                       .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
             limitSourceText = 'Income Logged to Trip';
         }
 
@@ -2054,9 +2045,9 @@ window.renderTripsView = (forceShowPast = false) => {
         const remText = remaining >= 0 ? `${window.formatMoney(remaining, true)} Left` : `${window.formatMoney(Math.abs(remaining), true)} Over`;
 
         const catProgressHtml = (activeTrip.categories || []).map(cat => {
-            const allocated = limit * (cat.percent / 100);    
-            // Ignore incomes here as well
-            const catSpent = txs.filter(t => t.type !== 'TRANSFER' && !(t.type || '').toUpperCase().includes('INCOM') && (t.category || '').toUpperCase() === cat.name.toUpperCase()).reduce((sum, t) => sum - t.amount, 0);
+            const allocated = limit * (parseFloat(cat.percent) / 100);    
+            const catSpent = txs.filter(t => t.type !== 'TRANSFER' && !(t.type || '').toUpperCase().includes('INCOM') && (t.category || '').toUpperCase() === cat.name.toUpperCase())
+                                .reduce((sum, t) => sum - (parseFloat(t.amount) || 0), 0);
             const catPct = allocated > 0 ? (catSpent / allocated) * 100 : (catSpent > 0 ? 100 : 0);
             const over = catPct > 100;
             const cColor = over ? 'var(--accent-red)' : 'var(--primary)';
@@ -2159,24 +2150,28 @@ window.renderTripsView = (forceShowPast = false) => {
     } else {
         html += `<div style="display: flex; flex-direction: column; gap: 16px;">` + pastTrips.map(trip => {
             const txs = window.appData.filter(t => t.trip_id === trip.id);
-            
-            // Ignore incomes for past trips
-            const spent = txs.filter(t => t.type !== 'TRANSFER' && !(t.type || '').toUpperCase().includes('INCOM')).reduce((sum, t) => sum - t.amount, 0);
-            
+            const spent = txs.filter(t => t.type !== 'TRANSFER' && !(t.type || '').toUpperCase().includes('INCOM'))
+                             .reduce((sum, t) => sum - (parseFloat(t.amount) || 0), 0);
             const isActiveLabel = trip.status === 'active' ? `<span style="color:var(--primary); font-size:12px; font-weight:700; margin-left:8px;">(Active)</span>` : '';
+            
             return `
-                <div class="card" style="display: flex; justify-content: space-between; align-items: center; padding: 20px;">
-                    <div>
-                        <h3 style="margin-bottom: 4px;">${trip.name} ${isActiveLabel}</h3>
-                        <p class="text-muted" style="font-size: 13px;">${window.getTripDates(trip.id)}</p>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 24px;">
+                <div class="card" style="display: flex; flex-direction: column; gap: 16px; padding: 20px; border-left: 4px solid var(--primary);">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div>
+                            <h3 style="margin-bottom: 4px;">${trip.name} ${isActiveLabel}</h3>
+                            <p class="text-muted" style="font-size: 13px;">${window.getTripDates(trip.id)}</p>
+                        </div>
                         <div style="text-align: right;">
                             <p class="text-muted" style="font-size: 12px; margin-bottom: 2px;">Total Spent</p>
-                            <h4 style="font-size: 16px;">${window.formatMoney(spent, true)}</h4>
+                            <h4 style="font-size: 18px; color: var(--primary);">${window.formatMoney(spent, true)}</h4>
                         </div>
-                        <button class="text-btn" style="color: var(--primary);" onclick="window.openTravelSetupModal('${trip.id}')">Edit</button>
-                        <button class="text-btn" style="color: var(--accent-red);" onclick="window.openDeleteTripModal('${trip.id}', '${trip.name.replace(/'/g, "\\'")}')">Delete</button>
+                    </div>
+                    
+                    <div style="display: flex; gap: 8px; border-top: 1px solid var(--border); padding-top: 16px; flex-wrap: wrap;">
+                        <button class="primary-btn" style="flex: 1; min-width: 120px; font-size: 13px;" onclick="window.openTripInsights('${trip.id}')">✨ View Insights</button>
+                        <button class="secondary-btn" style="flex: 1; min-width: 120px; font-size: 13px;" onclick="window.openTripDetails('${trip.id}')">📊 Budget & Logs</button>
+                        <button class="icon-btn" style="color: var(--text-secondary);" onclick="window.openTravelSetupModal('${trip.id}')" title="Edit Setup">✎</button>
+                        <button class="icon-btn" style="color: var(--accent-red);" onclick="window.openDeleteTripModal('${trip.id}', '${trip.name.replace(/'/g, "\\'")}')" title="Delete">✕</button>
                     </div>
                 </div>
             `;
@@ -2195,6 +2190,605 @@ window.openDeleteTripModal = (tripId, tripName) => {
 window.closeDeleteTripModal = () => {
     document.getElementById('delete-trip-overlay').classList.remove('active');
     window.tripToDeleteId = null;
+};
+
+// --- TRIP DETAILS MODAL ---
+window.openTripDetails = (tripId) => {
+    const trip = window.tripsData.find(t => t.id === tripId);
+    if (!trip) return;
+
+    const overlay = document.getElementById('trip-details-overlay');
+    const card = overlay.querySelector('.modal-card');
+    
+    // Make background opaque & lock z-index properly
+    if (card) { card.style.background = 'var(--surface, #ffffff)'; card.style.position = 'relative'; card.style.zIndex = '100'; }
+    const receiptOverlay = document.getElementById('receipt-overlay');
+    if (receiptOverlay) receiptOverlay.style.zIndex = '9999';
+
+    const txs = window.appData.filter(t => t.trip_id === tripId);
+    const spent = txs.filter(t => t.type !== 'TRANSFER' && !(t.type || '').toUpperCase().includes('INCOM'))
+                     .reduce((sum, t) => sum - (parseFloat(t.amount) || 0), 0);
+    
+    let limit = 0;
+    if (trip.budget_source_type === 'fixed') limit = parseFloat(trip.fixed_budget_amount) || 0;
+    else if (trip.budget_source_type === 'goal') {
+        const goal = window.userGoals.find(g => g.id === trip.budget_source_id);
+        limit = goal ? parseFloat(goal.target_amount) : 0;
+    } else {
+        limit = txs.filter(t => (t.type || '').toUpperCase().includes('INCOM'))
+                   .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+    }
+
+    const remaining = limit - spent;
+    
+    const dates = txs.map(t => new Date(t.timestamp).setHours(0,0,0,0));
+    const uniqueDates = [...new Set(dates)];
+    const numDays = Math.max(1, uniqueDates.length);
+    const avgDaily = spent / numDays;
+
+    document.getElementById('details-trip-name').innerText = trip.name;
+    document.getElementById('details-trip-dates').innerText = window.getTripDates(tripId);
+    document.getElementById('details-trip-budget').innerText = window.formatMoney(limit, true);
+    
+    const spentEl = document.getElementById('details-trip-spent');
+    spentEl.innerText = window.formatMoney(spent, true);
+    spentEl.style.color = (limit > 0 && spent > limit) ? 'var(--accent-red)' : 'var(--primary)';
+
+    const remEl = document.getElementById('details-trip-left');
+    remEl.innerText = window.formatMoney(Math.abs(remaining), true) + (remaining < 0 ? ' Over' : ' Left');
+    remEl.style.color = remaining < 0 ? 'var(--accent-red)' : 'var(--text)';
+    
+    document.getElementById('details-trip-avg').innerText = window.formatMoney(avgDaily, true) + '/day';
+
+    const catHtml = (trip.categories || []).map(cat => {
+        const allocated = limit * (parseFloat(cat.percent) / 100);
+        const catSpent = txs.filter(t => t.type !== 'TRANSFER' && !(t.type || '').toUpperCase().includes('INCOM') && (t.category || '').toUpperCase() === cat.name.toUpperCase())
+                            .reduce((sum, t) => sum - (parseFloat(t.amount) || 0), 0);
+        const catPct = allocated > 0 ? (catSpent / allocated) * 100 : (catSpent > 0 ? 100 : 0);
+        const over = catPct > 100;
+        const cColor = over ? 'var(--accent-red)' : 'var(--primary)';
+
+        return `
+            <div style="margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px;">
+                    <span style="font-weight: 600;">${cat.name}</span>
+                    <span style="font-weight: 700; color: ${cColor};">${window.formatMoney(catSpent, true)} / ${window.formatMoney(allocated, true)}</span>
+                </div>
+                <div style="width: 100%; height: 6px; background-color: var(--border); border-radius: 4px; overflow: hidden;">
+                    <div style="height: 100%; width: ${Math.min(catPct, 100)}%; background-color: ${cColor}; transition: width 0.3s ease;"></div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    document.getElementById('details-trip-categories').innerHTML = catHtml || '<p class="text-muted">No categories configured.</p>';
+
+    const logsList = document.getElementById('details-trip-logs');
+    if (txs.length) {
+        logsList.innerHTML = txs.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp)).map(window.generateTxHTML).join('');
+        logsList.onclick = (e) => {
+            const li = e.target.closest('.tx-item');
+            if (li) {
+                const entryId = parseInt(li.getAttribute('data-id'));
+                const entry = window.appData.find(x => x._id === entryId);
+                if (entry) window.openReceiptModal(entry);
+            }
+        };
+    } else {
+        logsList.innerHTML = '<li class="text-muted">No activity logged.</li>';
+    }
+
+    overlay.classList.add('active');
+};
+
+// --- SPOTIFY WRAPPED INSIGHTS ---
+window.currentInsightSlide = 0;
+window.totalInsightSlides = 0;
+window.isNavigatingInsights = false;
+
+window.toggleWrappedCensor = () => {
+    const isCensored = document.getElementById('censor-insights-toggle')?.checked;
+    document.querySelectorAll('.wrapped-money').forEach(el => {
+        el.innerText = isCensored ? '••••••' : el.getAttribute('data-raw');
+    });
+};
+
+const wrappedMoney = (amount) => {
+    const formatted = window.formatMoney(amount, true);
+    const isCensored = document.getElementById('censor-insights-toggle')?.checked;
+    return `<span class="wrapped-money" data-raw="${formatted}">${isCensored ? '••••••' : formatted}</span>`;
+};
+
+window.openTripInsights = (tripId) => {
+    // Dynamically inject CSS once to ensure slides render correctly
+    if (!document.getElementById('wrapped-dynamic-styles')) {
+        const style = document.createElement('style');
+        style.id = 'wrapped-dynamic-styles';
+        style.innerHTML = `
+            .wrapped-container { width: 100%; max-width: 400px; aspect-ratio: 9/16; max-height: 85vh; border-radius: 20px; position: relative; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; margin: 0 auto; background: #111; }
+            .wrapped-slide { position: absolute; inset: 0; display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 32px; color: #fff; z-index: 2; box-sizing: border-box; }
+            .wrapped-slide.active { display: flex !important; animation: slideUpFade 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+            .wrapped-shape { position: absolute; opacity: 0.15; pointer-events: none; }
+            .shape-circle { width: 150px; height: 150px; border-radius: 50%; background: #fff; top: -40px; right: -40px; }
+            .shape-square { width: 200px; height: 200px; background: #fff; transform: rotate(45deg); bottom: -80px; left: -80px; }
+            .shape-triangle { width: 0; height: 0; border-left: 90px solid transparent; border-right: 90px solid transparent; border-bottom: 180px solid #fff; top: 15%; left: -40px; transform: rotate(20deg); }
+            @keyframes slideUpFade { 0% { opacity: 0; transform: translateY(30px) scale(0.95); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+            .watermark { position: absolute; bottom: 20px; left: 0; width: 100%; text-align: center; font-size: 12px; opacity: 0.7; z-index: 10; letter-spacing: 3px; font-weight: 600; color: white; text-shadow: 0 1px 4px rgba(0,0,0,0.6); }
+            .wrapped-value { font-size: 42px; font-weight: 900; line-height: 1.1; margin: 20px 0; letter-spacing: -1.5px; text-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+            .wrapped-label { font-size: 15px; font-weight: 700; opacity: 0.85; text-transform: uppercase; letter-spacing: 2px; }
+            .wrapped-sub { font-size: 18px; font-weight: 500; opacity: 0.95; margin-bottom: 8px; line-height: 1.4; }
+            .wrapped-list-item { font-size: 16px; font-weight: 700; display: flex; justify-content: space-between; width: 100%; border-bottom: 1px solid rgba(255,255,255,0.25); padding: 12px 0; }
+            .wrapped-list-item span:last-child { font-weight: 500; opacity: 0.8; text-align: right; }
+            .wrapped-list-item:last-child { border-bottom: none; }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // Inject Censor Toggle Button into DOM
+    if (!document.getElementById('censor-insights-container')) {
+        const overlayDiv = document.querySelector('#trip-insights-overlay > div');
+        if (overlayDiv) {
+            const toggleHtml = `
+                <div id="censor-insights-container" style="display:flex; align-items:center; gap: 8px; margin-top: 16px; color: white; z-index: 10;">
+                    <input type="checkbox" id="censor-insights-toggle" onchange="window.toggleWrappedCensor()" style="width: 16px; height: 16px; cursor: pointer;">
+                    <label for="censor-insights-toggle" style="font-size: 14px; cursor: pointer;">Hide Amounts (Censor)</label>
+                </div>
+            `;
+            overlayDiv.insertAdjacentHTML('beforeend', toggleHtml);
+        }
+    }
+
+    const trip = window.tripsData.find(t => t.id === tripId);
+    if (!trip) return;
+
+    const captureArea = document.getElementById('wrapped-capture-area');
+    if (captureArea) {
+        let headerEl = document.getElementById('wrapped-card-header');
+        if (!headerEl) {
+            headerEl = document.createElement('div');
+            headerEl.id = 'wrapped-card-header';
+            // Positioned at the top, z-index 20 keeps it above slides, gradient ensures text readability
+            headerEl.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; padding: 24px 20px; box-sizing: border-box; display: flex; justify-content: space-between; align-items: flex-start; z-index: 20; background: linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, transparent 100%); pointer-events: none;';
+            captureArea.appendChild(headerEl); 
+        }
+        
+        // Grab user profile data (with fallbacks)
+        const avatarUrl = window.currentUser?.user_metadata?.avatar_url || 'https://ui-avatars.com/api/?name=' + (window.userProfile?.username || 'U') + '&background=random';
+        const username = window.userProfile?.username || 'User';
+
+        headerEl.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <img src="${avatarUrl}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255,255,255,0.2);">
+                <span style="font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.95); text-shadow: 0 1px 3px rgba(0,0,0,0.8);">@${username}</span>
+            </div>
+            <div style="text-align: right; text-shadow: 0 1px 3px rgba(0,0,0,0.8);">
+                <h4 style="margin: 0; font-size: 15px; font-weight: 800; color: white;">${trip.name}</h4>
+                <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.8);">Trip Insights</span>
+            </div>
+        `;
+    }
+
+    // Grab strict expenses (no incomes, no transfers)
+    const expenses = window.appData.filter(t => t.trip_id === tripId && t.type !== 'TRANSFER' && !(t.type || '').toUpperCase().includes('INCOM'));
+    
+    if (expenses.length === 0) {
+        alert("Not enough expense data to generate insights for this trip!");
+        return;
+    }
+
+    const totalSpent = expenses.reduce((sum, t) => sum - (parseFloat(t.amount) || 0), 0);
+    const avgTxValue = totalSpent / Math.max(1, expenses.length);
+    
+    const dates = expenses.map(t => new Date(t.timestamp).setHours(0,0,0,0));
+    const numDays = Math.max(1, [...new Set(dates)].length);
+    const avgDaily = totalSpent / numDays;
+
+    let limit = trip.budget_source_type === 'fixed' ? (parseFloat(trip.fixed_budget_amount) || 0) : 
+                trip.budget_source_type === 'goal' ? (parseFloat(window.userGoals.find(g => g.id === trip.budget_source_id)?.target_amount) || 0) :
+                window.appData.filter(t => t.trip_id === tripId && (t.type || '').toUpperCase().includes('INCOM')).reduce((sum, t) => sum + (parseFloat(t.amount)||0), 0);
+
+    const largestTx = expenses.reduce((max, t) => Math.abs(t.amount) > Math.abs(max.amount) ? t : max, expenses[0]);
+
+// Grouping Helper (safely removing trails, preserving original case and hyphens)
+    const groupItems = (items, key) => {
+            const counts = {}; const sums = {}; const sampleName = {};
+            items.forEach(t => {
+                let raw = t[key];
+                if (!raw) return;
+                
+                let displayClean = raw.trim();
+                
+                // Only clean trailing numbers for names/merchants, NOT dates
+                if (key !== 'dateStr') {
+                    // Removes endings like " - 1", " 2", " #3" but preserves "MNL-HKG" and "7-11"
+                    displayClean = displayClean.replace(/\s+(?:-\s*\d+|#\d+|\d+)$/, '').trim();
+                }
+                
+                if (displayClean === '') displayClean = 'Unknown';
+                
+                // Group mathematically using uppercase
+                let norm = displayClean.toUpperCase();
+                
+                counts[norm] = (counts[norm] || 0) + 1;
+                sums[norm] = (sums[norm] || 0) - (parseFloat(t.amount) || 0); 
+                
+                // Save the first properly-cased version we encounter
+                if (!sampleName[norm]) sampleName[norm] = displayClean; 
+            });
+            return { counts, sums, sampleName };
+    };
+
+    const groupedMerchants = groupItems(expenses, 'merchant');
+    const topMerchants = Object.entries(groupedMerchants.counts).sort((a,b) => b[1] - a[1]);
+    
+    const groupedCats = groupItems(expenses, 'category');
+    const topCats = Object.entries(groupedCats.sums).sort((a,b) => b[1] - a[1]);
+
+    // Hall of fame logic: Top item globally + top items in other categories
+    const itemsByCategory = {};
+    expenses.forEach(t => {
+        const cat = t.category || 'Uncategorized';
+        if (!itemsByCategory[cat]) itemsByCategory[cat] = [];
+        itemsByCategory[cat].push(t);
+    });
+
+    const topItemPerCat = [];
+    for (const cat in itemsByCategory) {
+        const grouped = groupItems(itemsByCategory[cat], 'name');
+        let topItem = null; let maxVal = -1;
+        for (const name in grouped.sums) {
+            if (grouped.sums[name] > maxVal) { maxVal = grouped.sums[name]; topItem = grouped.sampleName[name]; }
+        }
+        if (topItem) topItemPerCat.push({ cat, name: topItem, amount: maxVal });
+    }
+    topItemPerCat.sort((a,b) => b.amount - a.amount);
+    
+    const overallTopItem = topItemPerCat.length > 0 ? topItemPerCat[0] : null;
+    const runnerUps = topItemPerCat.length > 1 ? topItemPerCat.slice(1, 4) : [];
+
+    // Timeline logic
+    const txsWithMetrics = expenses.map(t => {
+        const d = new Date(t.timestamp);
+        return {
+            ...t, 
+            dateStr: d.toLocaleDateString('en-US', {weekday: 'short', month: 'short', day: 'numeric'}),
+            isWeekend: (d.getDay() === 0 || d.getDay() === 6),
+            hour: d.getHours()
+        }
+    });
+
+    const topDaysCount = Object.entries(groupItems(txsWithMetrics, 'dateStr').counts).sort((a,b) => b[1] - a[1]);
+    const topDaysAmount = Object.entries(groupItems(txsWithMetrics, 'dateStr').sums).sort((a,b) => b[1] - a[1]);
+    const weekendPct = Math.round((txsWithMetrics.filter(t => t.isWeekend).reduce((sum, t) => sum - (parseFloat(t.amount)||0), 0) / totalSpent) * 100);
+
+    let slides = [];
+
+    // Slide 1: Welcome & Total (with top 3 categories highlighted)
+    let catListHtml = topCats.slice(0, 3).map((c) => `<span style="display:inline-block; background:rgba(0,0,0,0.2); padding: 4px 12px; border-radius: 12px; margin: 4px; font-size: 13px;">${groupedCats.sampleName[c[0]] || c[0]}</span>`).join('');
+    slides.push(`
+            <div class="wrapped-slide active" style="background: linear-gradient(45deg, #FF416C, #FF4B2B);">
+                <div class="wrapped-shape shape-circle"></div><div class="wrapped-shape shape-triangle"></div>
+                <p class="wrapped-label">Your Trip Unwrapped</p>
+                <h2 class="wrapped-value" style="font-size:32px;">${trip.name}</h2>
+                <h2 class="wrapped-value" style="color: #FFD700; margin-top: 0;">${wrappedMoney(totalSpent)}</h2>
+                <p class="wrapped-sub">across <b>${expenses.length}</b> transactions.</p>
+                <div style="margin-top: 16px;">${catListHtml}</div>
+            </div>
+    `);
+
+    // Slide 2: Hall of Fame (Most spent on item + top items in other categories)
+    if (overallTopItem) {
+        let runnerUpHtml = runnerUps.length > 0 ? runnerUps.map(r => `<div class="wrapped-list-item" style="padding: 8px 0; font-size:14px;"><span>${r.name} <span style="font-size:11px; opacity:0.6; display:block;">${r.cat}</span></span><span>${wrappedMoney(r.amount)}</span></div>`).join('') : '';
+        slides.push(`
+            <div class="wrapped-slide" style="background: linear-gradient(135deg, #8E2DE2, #4A00E0);">
+                <div class="wrapped-shape shape-square"></div>
+                <p class="wrapped-label">The Hall of Fame</p>
+                <p class="wrapped-sub" style="font-size:14px;">You spent the most on:</p>
+                <h2 class="wrapped-value" style="font-size:28px;">${overallTopItem.name}</h2>
+                <p style="color: #FFD700; font-weight:bold; font-size:20px;">${wrappedMoney(overallTopItem.amount)} <span style="opacity:0.7; font-weight:normal; font-size:14px;">(${overallTopItem.cat})</span></p>
+                ${runnerUpHtml ? `<div style="width:100%; margin-top:24px; text-align:left;"><p class="wrapped-sub" style="font-size:13px; border-bottom:1px solid rgba(255,255,255,0.3); padding-bottom:8px;">Top Spends in Other Categories:</p>${runnerUpHtml}</div>` : ''}
+            </div>
+        `);
+    }
+
+    // Slide 3: Velocity / Average
+    slides.push(`
+        <div class="wrapped-slide" style="background: linear-gradient(225deg, #00B4DB, #0083B0);">
+            <div class="wrapped-shape shape-circle" style="bottom:-40px; top:auto;"></div>
+            <p class="wrapped-label">The Pace</p>
+            <p class="wrapped-sub">You were burning through</p>
+            <h2 class="wrapped-value">${wrappedMoney(avgDaily)}</h2>
+            <p class="wrapped-sub">every single day for ${numDays} days.</p>
+        </div>
+    `);
+
+    // Slide 4: Budget Check
+    if (limit > 0) {
+        const pct = Math.round((totalSpent / limit) * 100);
+        slides.push(`
+            <div class="wrapped-slide" style="background: linear-gradient(45deg, #f12711, #f5af19);">
+                <div class="wrapped-shape shape-triangle" style="transform: rotate(180deg);"></div>
+                <p class="wrapped-label">The Budget Check</p>
+                <h2 class="wrapped-value">${pct}%</h2>
+                <p class="wrapped-sub">of your ${wrappedMoney(limit)} budget was consumed.</p>
+                <p style="font-size: 14px; margin-top: 16px;">${pct > 100 ? "Whoops... you went a little overboard! 💸" : "Great job staying within limits! 🏆"}</p>
+            </div>
+        `);
+    }
+
+    // Slide 4.5: NEW Category Overview (Counts vs Amounts)
+        const topCatsCount = Object.entries(groupedCats.counts).sort((a,b) => b[1] - a[1]).slice(0, 5);
+        const topCatsSum = Object.entries(groupedCats.sums).sort((a,b) => b[1] - a[1]).slice(0, 5);
+
+        let topCatsCountHtml = topCatsCount.map((c, i) => `<div class="wrapped-list-item" style="font-size:13px; padding: 4px 0;"><span>#${i+1} ${groupedCats.sampleName[c[0]] || c[0]}</span><span>${c[1]}x</span></div>`).join('');
+        let topCatsSumHtml = topCatsSum.map((c, i) => `<div class="wrapped-list-item" style="font-size:13px; padding: 4px 0;"><span>#${i+1} ${groupedCats.sampleName[c[0]] || c[0]}</span><span>${wrappedMoney(c[1])}</span></div>`).join('');
+
+        slides.push(`
+            <div class="wrapped-slide" style="background: linear-gradient(135deg, #11998e, #38ef7d);">
+                <div class="wrapped-shape shape-square" style="transform: rotate(15deg);"></div>
+                <p class="wrapped-label">Category Breakdown</p>
+                
+                <div style="width: 100%; text-align: left; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 12px; margin-bottom: 12px; margin-top: 16px;">
+                    <p style="font-size:11px; opacity:0.8; text-transform:uppercase; margin-bottom:8px; font-weight:bold;">Most Frequent (Swipes)</p>
+                    ${topCatsCountHtml}
+                </div>
+                
+                <div style="width: 100%; text-align: left; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 12px;">
+                    <p style="font-size:11px; opacity:0.8; text-transform:uppercase; margin-bottom:8px; font-weight:bold;">Highest Spend (Amount)</p>
+                    ${topCatsSumHtml}
+                </div>
+            </div>
+        `);
+
+// Dynamic Category Deep Dives (Filter Count > 1)
+        const sortedCats = Object.entries(groupedCats.sums).sort((a,b) => b[1] - a[1]);
+        sortedCats.forEach((catEntry, idx) => {
+            const catKey = catEntry[0];
+            const catTotal = catEntry[1];
+            const catName = groupedCats.sampleName[catKey] || catKey; // FIX: Pull original casing
+            
+            const catTxs = itemsByCategory[catName] || expenses.filter(e => (e.category||'').toUpperCase() === catKey);
+            
+            // FIX: Isolate grouping to pull out the sampleName properly
+            const catMerchGroup = groupItems(catTxs, 'merchant');
+            const catMerchants = Object.entries(catMerchGroup.counts).filter(m => m[1] > 1).sort((a,b) => b[1] - a[1]).slice(0, 3);
+            
+            const catItemGroup = groupItems(catTxs, 'name');
+            const catItems = Object.entries(catItemGroup.counts).filter(i => i[1] > 1).sort((a,b) => b[1] - a[1]).slice(0, 3);
+                
+            // Don't render a slide if the category is totally barren of repeat transactions
+            if (catMerchants.length === 0 && catItems.length === 0) return;
+
+            let merchHtml = catMerchants.length ? catMerchants.map((m, i) => `<div class="wrapped-list-item" style="font-size:14px; padding: 6px 0;"><span>#${i+1} ${catMerchGroup.sampleName[m[0]] || m[0]}</span><span>${m[1]}x</span></div>`).join('') : '<p style="font-size:13px; opacity:0.6;">No repeat merchants</p>';
+            let itemHtml = catItems.length ? catItems.map((item, i) => `<div class="wrapped-list-item" style="font-size:14px; padding: 6px 0;"><span>#${i+1} ${catItemGroup.sampleName[item[0]] || item[0]}</span><span>${item[1]}x</span></div>`).join('') : '<p style="font-size:13px; opacity:0.6;">No repeat items</p>';
+
+            const bgColors = [
+                'linear-gradient(135deg, #11998e, #38ef7d)', 'linear-gradient(45deg, #FF0099, #493240)', 'linear-gradient(135deg, #b92b27, #1565C0)',
+                'linear-gradient(45deg, #FF8008, #FFA081)', 'linear-gradient(135deg, #1D976C, #93F9B9)', 'linear-gradient(45deg, #4CB8C4, #3CD3AD)'
+            ];
+            const bgActive = bgColors[idx % bgColors.length];
+
+            slides.push(`
+                <div class="wrapped-slide" style="background: ${bgActive};">
+                    <div class="wrapped-shape shape-square" style="opacity:0.1; top:-50px; right:-50px; left:auto;"></div>
+                    <p class="wrapped-label">By Category</p>
+                    <h2 class="wrapped-value" style="font-size: 32px; margin-bottom: 4px;">${catName}</h2>
+                    <p class="wrapped-sub" style="font-size: 14px; margin-bottom: 24px;">Total: ${wrappedMoney(catTotal)}</p>
+                    
+                    <div style="width: 100%; text-align: left; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 12px; margin-bottom: 12px;">
+                        <p style="font-size:12px; opacity:0.8; text-transform:uppercase; margin-bottom:8px; font-weight:bold;">Top Merchants</p>
+                        ${merchHtml}
+                    </div>
+                    
+                    <div style="width: 100%; text-align: left; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 12px;">
+                        <p style="font-size:12px; opacity:0.8; text-transform:uppercase; margin-bottom:8px; font-weight:bold;">Top Items</p>
+                        ${itemHtml}
+                    </div>
+                </div>
+            `);
+        });
+        
+    // Slide 6: Biggest Flex (Largest Tx)
+    slides.push(`
+        <div class="wrapped-slide" style="background: linear-gradient(135deg, #7F00FF, #E100FF);">
+            <div class="wrapped-shape shape-square" style="transform: rotate(15deg);"></div>
+            <p class="wrapped-label">The Big Flex</p>
+            <p class="wrapped-sub">Your single heaviest swipe:</p>
+            <h2 class="wrapped-value">${wrappedMoney(Math.abs(largestTx.amount))}</h2>
+            <p class="wrapped-sub">on ${largestTx.name}</p>
+        </div>
+    `);
+
+    // Slide 7: Most Expensive Day vs Busiest Day
+    if (topDaysAmount.length > 0 && topDaysCount.length > 0) {
+        slides.push(`
+            <div class="wrapped-slide" style="background: linear-gradient(135deg, #b92b27, #1565C0);">
+                <div class="wrapped-shape shape-square" style="top: -50px; left: auto; right: -50px;"></div>
+                <p class="wrapped-label">Timeline</p>
+                <div style="margin: 24px 0;">
+                    <p class="wrapped-sub" style="font-size: 14px;">Most Expensive Day</p>
+                    <h3 style="font-size: 24px; font-weight: 800;">${topDaysAmount[0][0]}</h3>
+                    <p style="font-size: 13px; opacity: 0.8;">${wrappedMoney(topDaysAmount[0][1])} spent</p>
+                </div>
+                <div style="margin: 24px 0;">
+                    <p class="wrapped-sub" style="font-size: 14px;">Busiest Day</p>
+                    <h3 style="font-size: 24px; font-weight: 800;">${topDaysCount[0][0]}</h3>
+                    <p style="font-size: 13px; opacity: 0.8;">${topDaysCount[0][1]} transactions</p>
+                </div>
+            </div>
+        `);
+    }
+
+// Slide 7.5: Frequent Flyers (Top Merchant per Category, Top 5 Overall)
+// Slide 7.5: Frequent Flyers (Top Merchant per Category, Top 5 Overall, Branch Merging)
+        const topMerchantsPerCat = [];
+
+        // 1. Find the most visited merchant in each category
+        for (const cat in itemsByCategory) {
+            const catTxs = itemsByCategory[cat];
+            
+            // Custom grouping specifically for this slide to merge branches
+            const branchCounts = {};
+            const branchSums = {};
+            const branchNames = {};
+            
+            catTxs.forEach(t => {
+                if (!t.merchant) return;
+                
+                // Safely grab the base name before any " - " (e.g., "FamilyMart - 1" -> "FamilyMart")
+                // This will not break "MNL-HKG" because there are no spaces around that hyphen.
+                let baseName = t.merchant.split(' - ')[0].trim();
+                if (!baseName) return;
+                
+                let norm = baseName.toUpperCase();
+                branchCounts[norm] = (branchCounts[norm] || 0) + 1;
+                branchSums[norm] = (branchSums[norm] || 0) - (parseFloat(t.amount) || 0);
+                
+                // Save original casing for the UI
+                if (!branchNames[norm]) branchNames[norm] = baseName;
+            });
+            
+            let topMerch = null;
+            let maxCount = 0;
+            
+            for (const mKey in branchCounts) {
+                if (branchCounts[mKey] > maxCount) {
+                    maxCount = branchCounts[mKey];
+                    topMerch = {
+                        name: branchNames[mKey],
+                        count: maxCount,
+                        amount: branchSums[mKey],
+                        category: cat
+                    };
+                }
+            }
+            
+            // 2. Only include if visited more than once (kills the 1-transaction bug)
+            if (topMerch && topMerch.count > 1) {
+                topMerchantsPerCat.push(topMerch);
+            }
+        }
+
+        // 3. Sort these category champions by visit count and take the top 5
+        const frequentMerchants = topMerchantsPerCat
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5);
+
+        if (frequentMerchants.length > 0) {
+            let freqHtml = frequentMerchants.map((m, i) => {
+                return `
+                    <div class="wrapped-list-item" style="padding: 12px 0;">
+                        <div>
+                            <span style="font-size: 15px; display: block;">#${i+1} ${m.name}</span>
+                            <span style="font-size: 11px; opacity: 0.7; font-weight: normal;">${m.category}</span>
+                        </div>
+                        <div style="text-align: right;">
+                            <span style="display: block; font-weight: 800; font-size: 16px;">${m.count} visits</span>
+                            <span style="font-size: 12px; opacity: 0.7;">${wrappedMoney(m.amount)} total</span>
+                        </div>
+                    </div>`;
+            }).join('');
+
+            slides.push(`
+                <div class="wrapped-slide" style="background: linear-gradient(135deg, #f2709c, #ff9472);">
+                    <div class="wrapped-shape shape-circle" style="width: 200px; height: 200px; top: -80px; right: auto; left: -80px;"></div>
+                    <p class="wrapped-label">Frequent Flyers</p>
+                    <p class="wrapped-sub" style="margin-bottom: 24px; font-size: 14px;">Your top destinations across categories:</p>
+                    <div style="width: 100%; text-align: left; background: rgba(0,0,0,0.2); padding: 16px; border-radius: 12px;">
+                        ${freqHtml}
+                    </div>
+                </div>
+            `);
+        }
+
+        
+    // Slide 8: Habits
+    slides.push(`
+        <div class="wrapped-slide" style="background: linear-gradient(45deg, #FF8008, #FFA081);">
+            <div class="wrapped-shape shape-triangle"></div>
+            <p class="wrapped-label">Habits</p>
+            <p class="wrapped-sub" style="margin-bottom: 24px;">You dropped ${weekendPct}% of your money on the Weekend.</p>
+            <h3 style="font-size: 24px; margin: 12px 0;">${wrappedMoney(avgTxValue)} avg/tx</h3>
+            <p style="font-size: 13px; opacity: 0.8;">That's your average swipe value.</p>
+        </div>
+    `);
+
+    // Slide 9: Outro
+    slides.push(`
+        <div class="wrapped-slide" style="background: linear-gradient(135deg, #1D976C, #93F9B9);">
+            <div class="wrapped-shape shape-circle"></div>
+            <p class="wrapped-label">That's a Wrap!</p>
+            <h2 class="wrapped-value">End of Trip.</h2>
+            <p class="wrapped-sub" style="margin-top:20px; font-size:14px; color:#111;">Hope the memories were worth it!</p>
+        </div>
+    `);
+
+    const slidesContainer = document.getElementById('wrapped-slides-container');
+    slidesContainer.innerHTML = slides.join('');
+
+    window.currentInsightSlide = 0;
+    window.totalInsightSlides = slides.length;
+    
+    document.getElementById('insights-prev-btn').style.display = 'block';
+    document.getElementById('insights-next-btn').style.display = 'block';
+    window.updateInsightProgressBars();
+
+    document.getElementById('trip-insights-overlay').classList.add('active');
+};
+
+window.updateInsightProgressBars = () => {
+    const pBarContainer = document.getElementById('wrapped-progress-bar');
+    if (!pBarContainer) return;
+    let pBars = '';
+    for (let i = 0; i < window.totalInsightSlides; i++) {
+        const bg = i <= window.currentInsightSlide ? 'rgba(255,255,255,1)' : 'rgba(255,255,255,0.3)';
+        pBars += `<div style="flex: 1; height: 4px; border-radius: 2px; background: ${bg}; transition: background 0.3s ease;"></div>`;
+    }
+    pBarContainer.innerHTML = pBars;
+};
+
+// Debounce navigation to prevent double advancing
+window.navigateInsights = (direction) => {
+    if (window.isNavigatingInsights) return;
+    window.isNavigatingInsights = true;
+    setTimeout(() => { window.isNavigatingInsights = false; }, 400);
+
+    const slides = document.querySelectorAll('.wrapped-slide');
+    if (!slides.length) return;
+
+    slides.forEach(s => s.classList.remove('active'));
+    
+    window.currentInsightSlide += direction;
+    if (window.currentInsightSlide < 0) window.currentInsightSlide = window.totalInsightSlides - 1;
+    if (window.currentInsightSlide >= window.totalInsightSlides) window.currentInsightSlide = 0;
+    
+    slides[window.currentInsightSlide].classList.add('active');
+    window.updateInsightProgressBars();
+};
+
+window.closeInsights = () => {
+    document.getElementById('trip-insights-overlay').classList.remove('active');
+};
+
+window.shareInsights = () => {
+    if (typeof html2canvas === 'undefined') return alert("Image engine still loading.");
+    
+    const captureArea = document.getElementById('wrapped-capture-area');
+    if(!captureArea) return;
+
+    const origRadius = captureArea.style.borderRadius;
+    captureArea.style.borderRadius = "0px";
+    
+    html2canvas(captureArea, { scale: 2, useCORS: true, backgroundColor: null }).then(canvas => {
+        captureArea.style.borderRadius = origRadius;
+        const link = document.createElement('a');
+        link.download = `Trip_Insight_${Date.now()}.png`;
+        link.href = canvas.toDataURL('image/png'); 
+        link.click();
+    }).catch(err => {
+        captureArea.style.borderRadius = origRadius;
+        console.error("Could not generate insight image", err);
+        alert("Failed to generate image to share.");
+    });
 };
 
 
@@ -2634,7 +3228,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Currency Math
         const selCur = document.getElementById('exp-currency').value;
         const baseCur = window.getCurrencyCodeFromSymbol(window.userSettings?.currency || '₱');
         let finalAmount = amount;
@@ -2724,7 +3317,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Currency Math
         const selCur = document.getElementById('inc-currency').value;
         const baseCur = window.getCurrencyCodeFromSymbol(window.userSettings?.currency || '₱');
         let finalAmount = amount;
@@ -2797,40 +3389,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    window.openTransferModal = () => {
-        const overlay = document.getElementById('transfer-overlay');
-        const fromSel = document.getElementById('transfer-from');
-        const toSel = document.getElementById('transfer-to');
-        
-        const getAccountLastUsed = (accId) => {
-            const txs = window.appData.filter(t => t.account_id === accId || t.to_account_id === accId);
-            if (!txs.length) return 0;
-            return Math.max(...txs.map(t => new Date(t.timestamp).getTime()));
-        };
-
-        const sortedAccounts = [...window.accountsData].sort((a, b) => {
-            if (a.favorite && !b.favorite) return -1;
-            if (!a.favorite && b.favorite) return 1;
-            return getAccountLastUsed(b.id) - getAccountLastUsed(a.id);
-        });
-        
-        let opts = '<option value="">-- External --</option>';
-        opts += sortedAccounts.map(a => `<option value="${a.id}">${a.favorite ? '★ ' : ''}${a.name} (${window.formatMoney(a.balance)})</option>`).join('');
-        
-        fromSel.innerHTML = opts;
-        toSel.innerHTML = opts;
-        
-        document.getElementById('transfer-amount').value = '';
-        document.getElementById('transfer-notes').value = '';
-        
-        window.setDefaultCurrencyDropdown('transfer-currency');
-        if (overlay) overlay.classList.add('active');
-    };
-
-    window.closeTransferModal = () => {
-        document.getElementById('transfer-overlay').classList.remove('active');
-    };
-
     document.getElementById('save-transfer-btn')?.addEventListener('click', async () => {
         const amount = parseFloat(document.getElementById('transfer-amount').value);
         const fromId = document.getElementById('transfer-from').value || null;
@@ -2841,7 +3399,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!fromId && !toId) return alert("You must select at least one internal account.");
         if (fromId === toId) return alert("Cannot transfer to the same account.");
 
-        // Currency Math
         const selCur = document.getElementById('transfer-currency').value;
         const baseCur = window.getCurrencyCodeFromSymbol(window.userSettings?.currency || '₱');
         let finalAmount = amount;
@@ -3188,6 +3745,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     document.getElementById('goal-allocation-overlay')?.addEventListener('click', (e) => {
         if (e.target.id === 'goal-allocation-overlay') window.closeGoalAllocationModal();
+    });
+    
+    // Close Trip Details when clicking outside
+    document.getElementById('trip-details-overlay')?.addEventListener('click', (e) => {
+        if (e.target.id === 'trip-details-overlay') e.target.classList.remove('active');
+    });
+
+    // Handle insight clicks safely via delegated bounds check
+    document.getElementById('wrapped-capture-area')?.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return; // Do not trigger on internal buttons
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        if (x < rect.width / 2) window.navigateInsights(-1);
+        else window.navigateInsights(1);
     });
     
     const mobileMenuBtn = document.getElementById('mobile-menu-btn');

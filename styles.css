@@ -446,3 +446,74 @@ body.travel-theme {
     grid-template-columns: repeat(4, 1fr) !important;
     gap: 16px;
 }
+
+/* WRAPPED INSIGHTS UI */
+.wrapped-container {
+    width: 100%; 
+    max-width: 360px; 
+    aspect-ratio: 9/16;
+    max-height: 80vh;
+    border-radius: 16px; 
+    position: relative;
+    overflow: hidden; 
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    background: #111; /* fallback */
+}
+
+.wrapped-slide {
+    position: absolute; inset: 0; 
+    display: none; flex-direction: column;
+    justify-content: center; align-items: center; 
+    text-align: center; padding: 32px;
+    color: #fff; z-index: 2;
+}
+
+.wrapped-slide.active { 
+    display: flex; 
+    animation: slideUpFade 0.5s ease forwards;
+}
+
+.wrapped-bg {
+    position: absolute; inset: 0; z-index: 1;
+    background-size: 200% 200%;
+    animation: panGradient 6s ease infinite;
+}
+
+/* Gradients */
+.bg-1 { background-image: linear-gradient(45deg, #FF416C, #FF4B2B); }
+.bg-2 { background-image: linear-gradient(135deg, #8E2DE2, #4A00E0); }
+.bg-3 { background-image: linear-gradient(225deg, #00B4DB, #0083B0); }
+.bg-4 { background-image: linear-gradient(45deg, #f12711, #f5af19); }
+.bg-5 { background-image: linear-gradient(135deg, #11998e, #38ef7d); }
+.bg-6 { background-image: linear-gradient(45deg, #FF0099, #493240); }
+.bg-7 { background-image: linear-gradient(135deg, #b92b27, #1565C0); }
+
+@keyframes panGradient {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+@keyframes slideUpFade {
+    0% { opacity: 0; transform: translateY(20px) scale(0.95); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Geometric Shapes */
+.wrapped-shape { position: absolute; opacity: 0.2; pointer-events: none; }
+.shape-circle { width: 120px; height: 120px; border-radius: 50%; background: #fff; top: -30px; right: -30px; }
+.shape-square { width: 180px; height: 180px; background: #fff; transform: rotate(45deg); bottom: -60px; left: -60px; }
+.shape-triangle { width: 0; height: 0; border-left: 70px solid transparent; border-right: 70px solid transparent; border-bottom: 140px solid #fff; top: 10%; left: -30px; transform: rotate(15deg); }
+
+.watermark {
+    position: absolute; bottom: 16px; left: 0; width: 100%;
+    text-align: center; font-size: 11px; opacity: 0.6; 
+    z-index: 10; letter-spacing: 2px; font-weight: 500;
+    color: white; text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
+
+.wrapped-value { font-size: 42px; font-weight: 900; line-height: 1.1; margin: 16px 0; letter-spacing: -1px; text-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+.wrapped-label { font-size: 14px; font-weight: 500; opacity: 0.9; text-transform: uppercase; letter-spacing: 1px; }
+.wrapped-sub { font-size: 16px; font-weight: 600; opacity: 0.9; margin-bottom: 8px; }
+.wrapped-list-item { font-size: 18px; font-weight: 700; display: flex; justify-content: space-between; width: 100%; border-bottom: 1px solid rgba(255,255,255,0.2); padding: 12px 0; }
+.wrapped-list-item span:last-child { font-weight: 400; opacity: 0.8; }

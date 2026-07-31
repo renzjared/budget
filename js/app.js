@@ -2804,6 +2804,21 @@ document.addEventListener('DOMContentLoaded', () => {
     window.setupAutocomplete('edit-tx-name', 'name');
     window.setupAutocomplete('edit-tx-merchant', 'merchant');
 
+    window.openTransferModal = () => {
+        const overlay = document.getElementById('transfer-overlay');
+        // Populate both the 'From' and 'To' account dropdowns
+        window.populateAccountDropdowns('transfer-from');
+        window.populateAccountDropdowns('transfer-to');
+        window.setDefaultCurrencyDropdown('transfer-currency');
+        
+        if (overlay) overlay.classList.add('active');
+    };
+
+    window.closeTransferModal = () => {
+        const overlay = document.getElementById('transfer-overlay');
+        if (overlay) overlay.classList.remove('active');
+    };
+    
     window.openGoalModal = (goalId = null) => {
         const modal = document.getElementById('goal-overlay');
         const title = document.getElementById('goal-modal-title');

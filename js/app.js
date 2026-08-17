@@ -431,14 +431,22 @@ window.generateTxHTML = (entry) => {
     }
 
     const isPositiveEffect = (entry.amount || 0) >= 0;
-    const amountColor = (isPositiveEffect && entry.amount !== 0) ? 'var(--primary)' : 'var(--text)';
+    let amountColor = (isPositiveEffect && entry.amount !== 0) ? 'var(--primary)' : 'var(--text)';
     const sign = isPositiveEffect ? '+' : '-';
     const starColor = entry.favorite ? '#FFD700' : 'var(--border)';
+    
+    let catHtml = `<span class="tx-cat" style="width: fit-content;">${entry.category || 'Uncategorized'}</span>`;
+
+    // Overrides the color and category tag specifically for Ledgers
+    if (entry.type === 'LEDGER_ITEM') {
+        amountColor = 'var(--text-secondary)'; 
+        catHtml = `<span class="tx-cat" style="background: var(--surface-hover); border-color: var(--border); width: fit-content;">📝 Ledger</span>`;
+    }
     
     return `
         <li class="tx-item" data-id="${entry._id}" style="padding-right: 8px;">
             <div class="tx-left" style="flex: 1; min-width: 0; overflow: hidden; display: flex; flex-direction: column; margin-right: 12px;">
-                <span class="tx-cat" style="width: fit-content;">${entry.category || 'Uncategorized'}</span>
+                ${catHtml}
                 <span class="tx-name" style="display: block; width: 100%; white-space: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, black calc(100% - 24px), transparent 100%); mask-image: linear-gradient(to right, black calc(100% - 24px), transparent 100%);">${entry.name || 'Unnamed Transaction'}</span>
             </div>
             <div class="tx-right" style="flex-shrink: 0; text-align: right; display: flex; flex-direction: column; align-items: flex-end; justify-content: center;">
@@ -525,7 +533,7 @@ window.applyCustomSelectUI = (selectEl, sortedAccounts) => {
     const updateBox = () => {
         const val = selectEl.value;
         if (!val) {
-            box.innerHTML = `<span style="color: var(--text-secondary)">-- Select Account --</span><span style="font-size: 10px;">▼</span>`;
+            box.innerHTML = `<span style="color: var(--text-secondary)">-- Select Account --</span><span style="font-size: 10px; color: var(--text-secondary);">▼</span>`;
             return;
         }
         const acc = window.accountsData.find(a => a.id === val);
@@ -533,9 +541,14 @@ window.applyCustomSelectUI = (selectEl, sortedAccounts) => {
             const sym = acc.currency ? window.getCurrencySymbol(acc.currency) : window.getCurrencySymbol(window.userSettings?.currency || '₱');
             const isFav = acc.favorite;
             const balColor = acc.balance < 0 ? 'var(--accent-red)' : 'var(--text-secondary)';
+            
+            // FIX: Injected the ▼ arrow alongside the balance so it looks like a real dropdown
             box.innerHTML = `
                 <span style="font-weight: 600; color: ${isFav ? '#FFD700' : 'var(--text)'}">${isFav ? '★ ' : ''}${acc.name}</span>
-                <span style="font-family: monospace; font-size: 13px; color: ${balColor};">${acc.balance < 0 ? '-' : ''}${window.formatMoneyWithSymbol(Math.abs(acc.balance), sym)}</span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-family: monospace; font-size: 13px; color: ${balColor};">${acc.balance < 0 ? '-' : ''}${window.formatMoneyWithSymbol(Math.abs(acc.balance), sym)}</span>
+                    <span style="font-size: 10px; color: var(--text-secondary);">▼</span>
+                </div>
             `;
         }
     };

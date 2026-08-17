@@ -11,16 +11,32 @@ window.LedgersEngine = {
     },
 
     // Dynamically injects all necessary modals to prevent HTML bloat
-// Dynamically injects all necessary modals to prevent HTML bloat
     injectModals: () => {
         const modalsHTML = `
+            <!-- Dashboard Ledger Select Modal -->
+            <div id="dashboard-ledger-select-overlay" class="modal-overlay" style="z-index: 9999;">
+                <!-- FIX: overflow: visible ensures dropdown list doesn't get clipped -->
+                <div class="account-modal-content card" style="overflow: visible;">
+                    <header style="display: flex; justify-content: space-between; margin-bottom: 24px;">
+                        <h3 style="margin: 0;">Select Ledger</h3>
+                        <button class="close-modal-btn" onclick="document.getElementById('dashboard-ledger-select-overlay').classList.remove('active')">✕</button>
+                    </header>
+                    <div class="form-group" style="margin-bottom: 24px;">
+                        <!-- FIX: Added gap below label -->
+                        <label class="text-muted" style="display: block; margin-bottom: 12px;">Which ledger do you want to view/manage?</label>
+                        <select id="dashboard-ledger-select" class="form-input"></select>
+                    </div>
+                    <button class="primary-btn" style="width: 100%;" onclick="window.LedgersEngine.openSelectedLedger()">Open Ledger</button>
+                </div>
+            </div>
+
             <!-- Create Ledger Modal -->
             <div id="new-ledger-overlay" class="modal-overlay">
                 <div class="account-modal-content card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-                        <h3 style="margin:0;">Create New Ledger</h3>
-                        <button class="icon-btn" onclick="document.getElementById('new-ledger-overlay').classList.remove('active')">✕</button>
-                    </div>
+                    <header style="display: flex; justify-content: space-between; margin-bottom: 24px;">
+                        <h3 style="margin: 0;">Create New Ledger</h3>
+                        <button class="close-modal-btn" onclick="document.getElementById('new-ledger-overlay').classList.remove('active')">✕</button>
+                    </header>
                     <div class="form-group" style="margin-bottom: 16px;">
                         <label class="text-muted">Person or Entity Name</label>
                         <input type="text" id="new-ledger-name" class="form-input" placeholder="e.g., John Doe">
@@ -33,19 +49,21 @@ window.LedgersEngine = {
                 </div>
             </div>
 
-            <!-- Ledger Details & Receipt Modal -->
+            <!-- Ledger Details Modal -->
             <div id="ledger-details-overlay" class="modal-overlay">
                 <div class="account-modal-content card" style="max-width: 600px; width: 95%; max-height: 90vh; display: flex; flex-direction: column;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                    <header style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px;">
                         <div>
                             <h2 id="ledger-detail-name" style="margin-bottom: 4px;">Ledger Name</h2>
                             <p id="ledger-detail-status" class="text-muted" style="font-size: 13px; font-weight: bold; margin: 0;"></p>
                         </div>
-                        <div style="display: flex; gap: 8px;">
-                            <button class="icon-btn" onclick="window.LedgersEngine.generateReceipt()" title="Download Statement">📄</button>
-                            <button class="icon-btn" onclick="document.getElementById('ledger-details-overlay').classList.remove('active')">✕</button>
+                        <div style="display: flex; gap: 12px; align-items: center;">
+                            <button class="icon-btn" onclick="window.LedgersEngine.previewReceipt()" title="Statement of Account" style="color: var(--primary);">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                            </button>
+                            <button class="close-modal-btn" onclick="document.getElementById('ledger-details-overlay').classList.remove('active')">✕</button>
                         </div>
-                    </div>
+                    </header>
                     
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
                         <button class="secondary-btn" onclick="window.LedgersEngine.openAddItem()">+ Add Item</button>
@@ -54,18 +72,39 @@ window.LedgersEngine = {
 
                     <div style="overflow-y: auto; flex: 1; padding-right: 8px;">
                         <h4 style="margin: 16px 0 8px 0; font-size: 14px;">Ledger History</h4>
-                        <ul id="ledger-history-list" class="minimal-list"></ul>
+                        <ul id="ledger-history-list" class="minimal-list interactive-list"></ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statement Preview Modal -->
+            <div id="ledger-receipt-preview-overlay" class="modal-overlay" style="z-index: 10000;">
+                <div class="receipt-container" style="max-width: 800px; width: 95%;">
+                    <button class="close-modal-btn" onclick="document.getElementById('ledger-receipt-preview-overlay').classList.remove('active')">✕</button>
+                    
+                    <div style="width: 100%; overflow-x: auto; border-radius: 8px;">
+                        <div id="ledger-receipt-capture" style="background: white; color: black; min-width: 600px; padding: 40px; font-family: 'DM Sans', sans-serif;">
+                            <!-- Statement HTML generated here -->
+                        </div>
                     </div>
                     
-                    <!-- Hidden Receipt Canvas Area -->
-                    <div id="ledger-receipt-capture" style="position: absolute; left: -9999px; top: -9999px; background: white; color: black; width: 800px; padding: 40px; border-radius: 8px; font-family: 'DM Sans', sans-serif;"></div>
+                    <div style="display: flex; gap: 12px; margin-top: 16px;">
+                        <button class="secondary-btn" style="flex: 1;" onclick="document.getElementById('ledger-receipt-preview-overlay').classList.remove('active')">Cancel</button>
+                        <button class="primary-btn" style="flex: 2; display: flex; justify-content: center; align-items: center; gap: 8px;" onclick="window.LedgersEngine.downloadReceipt()">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            Download PDF/Image
+                        </button>
+                    </div>
                 </div>
             </div>
 
             <!-- Add Ledger Item Modal -->
             <div id="ledger-item-overlay" class="modal-overlay" style="z-index: 9999;">
                 <div class="account-modal-content card">
-                    <h3 style="margin-bottom: 20px;">Log Ledger Item</h3>
+                    <header style="display: flex; justify-content: space-between; margin-bottom: 24px;">
+                        <h3 style="margin: 0;">Log Ledger Item</h3>
+                        <button class="close-modal-btn" onclick="document.getElementById('ledger-item-overlay').classList.remove('active')">✕</button>
+                    </header>
                     <div class="form-group" style="display: flex; gap: 8px; margin-bottom: 16px;">
                         <button id="btn-lent-them" class="primary-btn" style="flex: 1;" onclick="window.LedgersEngine.setItemDirection(1)">I Lent Them</button>
                         <button id="btn-lent-me" class="secondary-btn" style="flex: 1;" onclick="window.LedgersEngine.setItemDirection(-1)">They Lent Me</button>
@@ -76,11 +115,17 @@ window.LedgersEngine = {
                     </div>
                     <div class="form-group" style="margin-bottom: 16px;">
                         <label class="text-muted">Cost / Amount</label>
-                        <input type="number" id="ledger-item-amount" class="form-input" placeholder="0.00">
+                        <input type="number" id="ledger-item-amount" class="form-input" placeholder="0.00" step="0.01">
                     </div>
+                    
+                    <div class="form-group" style="margin-bottom: 16px;">
+                        <label class="text-muted" id="ledger-item-account-label">Funds Taken From (Optional)</label>
+                        <select id="ledger-item-account" class="form-input"></select>
+                    </div>
+
                     <div class="form-group" style="margin-bottom: 16px;">
                         <label class="text-muted">Notes (Optional)</label>
-                        <input type="text" id="ledger-item-notes" class="form-input">
+                        <input type="text" id="ledger-item-notes" class="form-input" placeholder="Additional details...">
                     </div>
                     <div style="display: flex; gap: 12px; margin-top: 24px;">
                         <button class="secondary-btn" style="flex: 1;" onclick="document.getElementById('ledger-item-overlay').classList.remove('active')">Cancel</button>
@@ -92,14 +137,17 @@ window.LedgersEngine = {
             <!-- Add Ledger Payment Modal -->
             <div id="ledger-payment-overlay" class="modal-overlay" style="z-index: 9999;">
                 <div class="account-modal-content card">
-                    <h3 style="margin-bottom: 20px;">Log Payment</h3>
+                    <header style="display: flex; justify-content: space-between; margin-bottom: 24px;">
+                        <h3 style="margin: 0;">Log Payment</h3>
+                        <button class="close-modal-btn" onclick="document.getElementById('ledger-payment-overlay').classList.remove('active')">✕</button>
+                    </header>
                     <div class="form-group" style="display: flex; gap: 8px; margin-bottom: 16px;">
                         <button id="btn-paid-me" class="primary-btn" style="flex: 1;" onclick="window.LedgersEngine.setPaymentDirection(1)">They Paid Me</button>
                         <button id="btn-paid-them" class="secondary-btn" style="flex: 1;" onclick="window.LedgersEngine.setPaymentDirection(-1)">I Paid Them</button>
                     </div>
                     <div class="form-group" style="margin-bottom: 16px;">
                         <label class="text-muted">Amount Paid</label>
-                        <input type="number" id="ledger-payment-amount" class="form-input" placeholder="0.00">
+                        <input type="number" id="ledger-payment-amount" class="form-input" placeholder="0.00" step="0.01">
                     </div>
                     <div class="form-group" style="margin-bottom: 16px;">
                         <label id="ledger-payment-account-label" class="text-muted">Received To Account</label>
@@ -155,6 +203,26 @@ window.LedgersEngine = {
         }).join('');
     },
 
+    openDashboardSelect: () => {
+        const ledgers = window.accountsData.filter(a => a.type === 'ledger');
+        if (ledgers.length === 0) {
+            alert('No ledgers exist yet. Please create one in the Ledgers tab first.');
+            return window.switchView('ledgers-view');
+        }
+        const selectEl = document.getElementById('dashboard-ledger-select');
+        selectEl.innerHTML = ledgers.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+        window.applyCustomSelectUI(selectEl, ledgers);
+        document.getElementById('dashboard-ledger-select-overlay').classList.add('active');
+    },
+
+    openSelectedLedger: () => {
+        const id = document.getElementById('dashboard-ledger-select').value;
+        if (!id) return;
+        document.getElementById('dashboard-ledger-select-overlay').classList.remove('active');
+        window.switchView('ledgers-view'); 
+        window.LedgersEngine.openDetails(id);
+    },
+
     openNewLedgerModal: () => {
         const currencySelect = document.getElementById('new-ledger-currency');
         currencySelect.innerHTML = document.getElementById('exp-currency').innerHTML;
@@ -191,6 +259,10 @@ window.LedgersEngine = {
         const ledger = window.accountsData.find(a => a.id === id);
         if (!ledger) return;
 
+        // FIX: Force the receipt popup to render above the ledger details
+        const receiptOverlay = document.getElementById('receipt-overlay');
+        if (receiptOverlay) receiptOverlay.style.zIndex = '10005';
+
         const sym = ledger.currency ? window.getCurrencySymbol(ledger.currency) : window.getCurrencySymbol(window.userSettings?.currency || '₱');
         
         document.getElementById('ledger-detail-name').innerText = ledger.name;
@@ -201,7 +273,6 @@ window.LedgersEngine = {
         statusEl.innerText = isClear ? 'All Settled' : (isOwed ? `Owes you ${window.formatMoneyWithSymbol(Math.abs(ledger.balance), sym)}` : `You owe ${window.formatMoneyWithSymbol(Math.abs(ledger.balance), sym)}`);
         statusEl.style.color = isClear ? 'var(--text-secondary)' : (isOwed ? 'var(--primary)' : 'var(--accent-red)');
 
-        // Gather all ledger items and related transfers
         const txs = window.appData.filter(t => 
             (t.type === 'LEDGER_ITEM' && t.account_id === id) || 
             (t.type === 'TRANSFER' && (t.account_id === id || t.to_account_id === id))
@@ -221,24 +292,21 @@ window.LedgersEngine = {
                     amtColor = t.amount > 0 ? 'var(--primary)' : 'var(--accent-red)';
                     sign = t.amount > 0 ? '+' : '-';
                 } else {
-                    // Transfer / Payment logic
                     if (t.to_account_id === id) {
-                        // Money went from Bank TO Ledger (I paid them)
                         title = 'You paid them';
                         sub = t.notes || 'Payment Sent';
-                        amtColor = 'var(--primary)'; // Pushes balance positive
+                        amtColor = 'var(--primary)'; 
                         sign = '+';
                     } else {
-                        // Money went from Ledger TO Bank (They paid me)
                         title = 'They paid you';
                         sub = t.notes || 'Payment Received';
-                        amtColor = 'var(--accent-red)'; // Pushes balance negative
+                        amtColor = 'var(--accent-red)';
                         sign = '-';
                     }
                 }
 
                 return `
-                    <li style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border);">
+                    <li class="tx-item" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 8px; border-bottom: 1px solid var(--border); cursor: pointer;" onclick="window.LedgersEngine.openReceipt(${t._id})">
                         <div>
                             <span style="display: block; font-weight: 600;">${title}</span>
                             <span style="font-size: 11px; color: var(--text-secondary);">${date} • ${sub}</span>
@@ -252,19 +320,28 @@ window.LedgersEngine = {
         document.getElementById('ledger-details-overlay').classList.add('active');
     },
 
+    openReceipt: (localId) => {
+        const entry = window.appData.find(x => x._id === localId);
+        if (entry) window.openReceiptModal(entry);
+    },
+
     setItemDirection: (dir) => {
         window.LedgersEngine.itemDirection = dir;
         const btnLentThem = document.getElementById('btn-lent-them');
         const btnLentMe = document.getElementById('btn-lent-me');
+        const label = document.getElementById('ledger-item-account-label');
+
         if (dir === 1) {
             btnLentThem.className = 'primary-btn';
             btnLentMe.className = 'secondary-btn';
+            label.innerText = 'Funds Taken From (Optional)';
         } else {
             btnLentThem.className = 'secondary-btn';
             btnLentMe.className = 'primary-btn';
             btnLentMe.style.backgroundColor = 'var(--accent-red)';
             btnLentMe.style.borderColor = 'var(--accent-red)';
             btnLentMe.style.color = 'white';
+            label.innerText = 'Funds Added To (Optional)';
         }
     },
 
@@ -273,6 +350,12 @@ window.LedgersEngine = {
         document.getElementById('ledger-item-amount').value = '';
         document.getElementById('ledger-item-notes').value = '';
         window.LedgersEngine.setItemDirection(1);
+        
+        const selectEl = document.getElementById('ledger-item-account');
+        const realAccounts = window.accountsData.filter(a => a.type !== 'ledger');
+        selectEl.innerHTML = '<option value="">-- None --</option>' + realAccounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+        window.applyCustomSelectUI(selectEl, realAccounts);
+        
         document.getElementById('ledger-item-overlay').classList.add('active');
     },
 
@@ -284,6 +367,7 @@ window.LedgersEngine = {
         const name = document.getElementById('ledger-item-name').value.trim();
         const rawAmount = parseFloat(document.getElementById('ledger-item-amount').value);
         const notes = document.getElementById('ledger-item-notes').value.trim();
+        const linkedAccId = document.getElementById('ledger-item-account').value;
 
         if (!name || !rawAmount || isNaN(rawAmount)) return alert("Name and Amount required.");
 
@@ -296,9 +380,10 @@ window.LedgersEngine = {
             type: 'LEDGER_ITEM',
             category: 'LEDGER',
             name: name,
-            amount: finalAmount, // Native ledger currency logic applied
+            amount: finalAmount, 
             notes: notes,
             account_id: id,
+            to_account_id: linkedAccId || null, 
             timestamp: new Date().toISOString()
         };
 
@@ -306,12 +391,23 @@ window.LedgersEngine = {
         if (error) return alert("Error saving item.");
 
         ledger.balance += finalAmount;
+
+        if (linkedAccId) {
+            const realAcc = window.accountsData.find(a => a.id === linkedAccId);
+            if (realAcc) {
+                // If I lent them (+), money left my bank (-)
+                // If they lent me (-), money entered my bank (+)
+                realAcc.balance -= finalAmount; 
+            }
+        }
+
         await window.saveAccountsToCloud();
         await window.loadCloudData();
         
         document.getElementById('ledger-item-overlay').classList.remove('active');
         window.LedgersEngine.renderList();
         window.LedgersEngine.openDetails(id);
+        window.bootUI();
     },
 
     setPaymentDirection: (dir) => {
@@ -339,12 +435,9 @@ window.LedgersEngine = {
         document.getElementById('ledger-payment-notes').value = '';
         window.LedgersEngine.setPaymentDirection(1);
         
-        // Populate real accounts (exclude ledgers)
         const selectEl = document.getElementById('ledger-payment-account');
         const realAccounts = window.accountsData.filter(a => a.type !== 'ledger');
-        selectEl.innerHTML = realAccounts.map(a => `<option value="${a.id}">${a.name} (${window.formatMoney(a.balance)})</option>`).join('');
-        
-        // Let Custom UI Wrapper beautify it
+        selectEl.innerHTML = realAccounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
         window.applyCustomSelectUI(selectEl, realAccounts);
 
         document.getElementById('ledger-payment-overlay').classList.add('active');
@@ -374,8 +467,6 @@ window.LedgersEngine = {
             toId = ledgerId;
         }
 
-        // We assume the amount entered is in the Ledger's native currency for simplicity here.
-        // Transfer logic natively deducts from 'From' and adds to 'To'.
         const tx = {
             user_id: window.currentUser.id,
             fingerprint: `${new Date().toISOString()}_ledgerpayment_${rawAmount}`,
@@ -394,7 +485,7 @@ window.LedgersEngine = {
 
         if (window.LedgersEngine.paymentDirection === 1) {
             ledger.balance -= rawAmount;
-            realAcc.balance += rawAmount; // Convert if different currencies later via convertCurrency
+            realAcc.balance += rawAmount; 
         } else {
             realAcc.balance -= rawAmount;
             ledger.balance += rawAmount;
@@ -406,20 +497,21 @@ window.LedgersEngine = {
         document.getElementById('ledger-payment-overlay').classList.remove('active');
         window.LedgersEngine.renderList();
         window.LedgersEngine.openDetails(ledgerId);
-        window.bootUI(); // Refresh main dashboard
+        window.bootUI();
     },
 
-    generateReceipt: () => {
+    previewReceipt: () => {
         const id = window.LedgersEngine.activeLedgerId;
         const ledger = window.accountsData.find(a => a.id === id);
         if (!ledger) return;
 
         const sym = ledger.currency ? window.getCurrencySymbol(ledger.currency) : window.getCurrencySymbol(window.userSettings?.currency || '₱');
+        const username = window.userProfile?.username || 'You';
         
         const txs = window.appData.filter(t => 
             (t.type === 'LEDGER_ITEM' && t.account_id === id) || 
             (t.type === 'TRANSFER' && (t.account_id === id || t.to_account_id === id))
-        ).sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp)); // Oldest to newest
+        ).sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
 
         const items = txs.filter(t => t.type === 'LEDGER_ITEM');
         const payments = txs.filter(t => t.type === 'TRANSFER');
@@ -428,10 +520,10 @@ window.LedgersEngine = {
 
         const itemsRows = items.map(t => `
             <tr>
-                <td style="padding: 12px; border-bottom: 1px solid #E5E7EB;">${formatDt(t.timestamp)}</td>
-                <td style="padding: 12px; border-bottom: 1px solid #E5E7EB;">${t.name} <br><span style="font-size: 11px; color: #6B7280;">${t.notes||''}</span></td>
-                <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; color: #00B85C; font-weight: bold;">${t.amount > 0 ? window.formatMoneyWithSymbol(t.amount, sym) : '-'}</td>
-                <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; color: #FF4A4A; font-weight: bold;">${t.amount < 0 ? window.formatMoneyWithSymbol(Math.abs(t.amount), sym) : '-'}</td>
+                <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; vertical-align: top;">${formatDt(t.timestamp)}</td>
+                <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; vertical-align: top;">${t.name} <br><span style="font-size: 11px; color: #6B7280;">${t.notes||''}</span></td>
+                <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; color: #00B85C; font-weight: bold; text-align: right; vertical-align: top;">${t.amount > 0 ? window.formatMoneyWithSymbol(t.amount, sym) : '-'}</td>
+                <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; color: #FF4A4A; font-weight: bold; text-align: right; vertical-align: top;">${t.amount < 0 ? window.formatMoneyWithSymbol(Math.abs(t.amount), sym) : '-'}</td>
             </tr>
         `).join('');
 
@@ -439,9 +531,9 @@ window.LedgersEngine = {
             const theyPaid = t.to_account_id !== id;
             return `
             <tr>
-                <td style="padding: 12px; border-bottom: 1px solid #E5E7EB;">${formatDt(t.timestamp)}</td>
-                <td style="padding: 12px; border-bottom: 1px solid #E5E7EB;">${theyPaid ? 'Payment Received' : 'Payment Sent'} <br><span style="font-size: 11px; color: #6B7280;">${t.notes||''}</span></td>
-                <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; font-weight: bold; color: #111;">${theyPaid ? '+' : '-'}${window.formatMoneyWithSymbol(t.amount, sym)}</td>
+                <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; vertical-align: top;">${formatDt(t.timestamp)}</td>
+                <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; vertical-align: top;">${theyPaid ? 'Payment Received' : 'Payment Sent'} <br><span style="font-size: 11px; color: #6B7280;">${t.notes||''}</span></td>
+                <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; font-weight: bold; color: #111; text-align: right; vertical-align: top;">${theyPaid ? '+' : '-'}${window.formatMoneyWithSymbol(Math.abs(t.amount), sym)}</td>
             </tr>`;
         }).join('');
 
@@ -462,43 +554,57 @@ window.LedgersEngine = {
                 </div>
             </div>
 
-            <h3 style="font-size: 16px; margin-bottom: 12px; color: #111;">1. Itemized Transactions</h3>
+            <h3 style="font-size: 16px; margin-bottom: 12px; color: #111;">Itemized Transactions</h3>
             <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 32px; text-align: left;">
                 <thead>
                     <tr style="background: #F3F4F6;">
-                        <th style="padding: 12px;">Date</th>
-                        <th style="padding: 12px;">Item / Description</th>
-                        <th style="padding: 12px;">You Lent (+)</th>
-                        <th style="padding: 12px;">They Lent (-)</th>
+                        <th style="padding: 12px; width: 20%;">Date</th>
+                        <th style="padding: 12px; width: 40%;">Description</th>
+                        <th style="padding: 12px; width: 20%; text-align: right;">${username} Lent (+)</th>
+                        <th style="padding: 12px; width: 20%; text-align: right;">${ledger.name} Lent (-)</th>
                     </tr>
                 </thead>
                 <tbody>${itemsRows || '<tr><td colspan="4" style="padding: 12px; text-align: center; color: #6B7280;">No items recorded.</td></tr>'}</tbody>
             </table>
 
-            <h3 style="font-size: 16px; margin-bottom: 12px; color: #111;">2. Payment History</h3>
+            <h3 style="font-size: 16px; margin-bottom: 12px; color: #111;">Payment History</h3>
             <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 32px; text-align: left;">
                 <thead>
                     <tr style="background: #F3F4F6;">
-                        <th style="padding: 12px;">Date</th>
-                        <th style="padding: 12px;">Mode / Notes</th>
-                        <th style="padding: 12px;">Amount Applied</th>
+                        <th style="padding: 12px; width: 20%;">Date</th>
+                        <th style="padding: 12px; width: 60%;">Mode / Notes</th>
+                        <th style="padding: 12px; width: 20%; text-align: right;">Amount Applied</th>
                     </tr>
                 </thead>
                 <tbody>${paymentsRows || '<tr><td colspan="3" style="padding: 12px; text-align: center; color: #6B7280;">No payments recorded.</td></tr>'}</tbody>
             </table>
 
-            <div style="background: #F9FAFB; padding: 24px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="background: #F9FAFB; padding: 24px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
                 <h3 style="margin: 0; font-size: 18px; color: #111;">${statusText}</h3>
                 <h2 style="margin: 0; font-size: 28px; font-weight: 900; color: ${statusColor};">${window.formatMoneyWithSymbol(Math.abs(ledger.balance), sym)}</h2>
             </div>
+            
+            <div style="text-align: center; font-size: 12px; font-weight: 600; color: var(--primary, #00D26A); letter-spacing: 2px; text-transform: uppercase;">
+                renzjared.github.io/budget
+            </div>
         `;
 
+        document.getElementById('ledger-receipt-preview-overlay').classList.add('active');
+    },
+
+    downloadReceipt: () => {
+        const id = window.LedgersEngine.activeLedgerId;
+        const ledger = window.accountsData.find(a => a.id === id);
+        if (!ledger) return;
+
+        const captureDiv = document.getElementById('ledger-receipt-capture');
         if (typeof html2canvas === 'undefined') return alert("Image engine still loading.");
         
         html2canvas(captureDiv, { scale: 2, backgroundColor: '#FFFFFF' }).then(canvas => {
             const link = document.createElement('a');
-            link.download = `Ledger_Statement_${ledger.name.replace(/\s+/g, '_')}.png`;
-            link.href = canvas.toDataURL('image/png'); link.click();
+            link.download = `Statement_${ledger.name.replace(/\s+/g, '_')}.png`;
+            link.href = canvas.toDataURL('image/png'); 
+            link.click();
         });
     }
 };

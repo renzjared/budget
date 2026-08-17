@@ -885,7 +885,7 @@ window.updateDashboard = () => {
     if (metric === 'running') {
         displayTotal = parseFloat(window.userSettings.balance) || 0;
         sortedData.forEach(entry => {
-            if (entry.type !== 'TRANSFER') displayTotal += (entry.amount || 0);
+            if (entry.type !== 'TRANSFER' && entry.type !== 'LEDGER_ITEM') displayTotal += (entry.amount || 0);
         });
         subtitle = "Running Balance";
     } else if (metric === 'net_worth') {
@@ -899,7 +899,7 @@ window.updateDashboard = () => {
         subtitle = "Remaining Budget (Today)";
         const now = new Date(); const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         let cycleIncome = 0;
-        sortedData.filter(e => new Date(e.timestamp) >= cutoff && !e.trip_id && e.type !== 'TRANSFER').forEach(e => {
+        sortedData.filter(e => new Date(e.timestamp) >= cutoff && !e.trip_id && e.type !== 'TRANSFER' && e.type !== 'LEDGER_ITEM').forEach(e => {
             if (e.amount > 0) cycleIncome += e.amount;
         });
         const totalSpent = sortedData.filter(e => new Date(e.timestamp) >= cutoff && e.amount < 0 && !e.trip_id && e.type !== 'TRANSFER').reduce((sum, e) => sum + Math.abs(e.amount), 0);
@@ -909,19 +909,19 @@ window.updateDashboard = () => {
         const now = new Date(); const day = now.getDay() || 7;
         const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day + 1);
         let cycleIncome = 0;
-        sortedData.filter(e => new Date(e.timestamp) >= cutoff && !e.trip_id && e.type !== 'TRANSFER').forEach(e => {
+        sortedData.filter(e => new Date(e.timestamp) >= cutoff && !e.trip_id && e.type !== 'TRANSFER' && e.type !== 'LEDGER_ITEM').forEach(e => {
             if (e.amount > 0) cycleIncome += e.amount;
         });
-        const totalSpent = sortedData.filter(e => new Date(e.timestamp) >= cutoff && e.amount < 0 && !e.trip_id && e.type !== 'TRANSFER').reduce((sum, e) => sum + Math.abs(e.amount), 0);
+        const totalSpent = sortedData.filter(e => new Date(e.timestamp) >= cutoff && e.amount < 0 && !e.trip_id && e.type !== 'TRANSFER' && e.type !== 'LEDGER_ITEM').reduce((sum, e) => sum + Math.abs(e.amount), 0);
         displayTotal = cycleIncome - totalSpent;
     } else if (metric === 'remaining_monthly') {
         subtitle = "Remaining Budget (This Month)";
         const now = new Date(); const cutoff = new Date(now.getFullYear(), now.getMonth(), 1);
         let cycleIncome = 0;
-        sortedData.filter(e => new Date(e.timestamp) >= cutoff && !e.trip_id && e.type !== 'TRANSFER').forEach(e => {
+        sortedData.filter(e => new Date(e.timestamp) >= cutoff && !e.trip_id && e.type !== 'TRANSFER' && e.type !== 'LEDGER_ITEM').forEach(e => {
             if (e.amount > 0) cycleIncome += e.amount;
         });
-        const totalSpent = sortedData.filter(e => new Date(e.timestamp) >= cutoff && e.amount < 0 && !e.trip_id && e.type !== 'TRANSFER').reduce((sum, e) => sum + Math.abs(e.amount), 0);
+        const totalSpent = sortedData.filter(e => new Date(e.timestamp) >= cutoff && e.amount < 0 && !e.trip_id && e.type !== 'TRANSFER' && e.type !== 'LEDGER_ITEM').reduce((sum, e) => sum + Math.abs(e.amount), 0);
         displayTotal = cycleIncome - totalSpent;
     }
 

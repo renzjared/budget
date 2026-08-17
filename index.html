@@ -28,6 +28,10 @@
                 <button class="nav-btn" data-target="accounts">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg> Accounts
                 </button>
+                <button class="nav-btn" data-target="ledgers-view">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                    Ledgers
+                </button>
                 <button class="nav-btn" data-target="statistics">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg> Analytics
                 </button>
@@ -291,6 +295,16 @@
                     <button id="add-account-btn" class="primary-btn">+ Add Account</button>
                 </div>
                 <div id="accounts-container"></div>
+            </section>
+            
+            <section id="ledgers-view" class="view" style="padding-bottom: 80px;">
+                <header class="top-header">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h2>Ledgers</h2>
+                        <button class="primary-btn" onclick="window.LedgersEngine.openNewLedgerModal()">+ New Ledger</button>
+                    </div>
+                </header>
+                <div id="ledgers-list-container" style="display: grid; gap: 16px;"></div>
             </section>
 
             <section id="statistics" class="view">
@@ -796,72 +810,6 @@
         </div>
     </div>
 
-    <!-- Past Trip Details Modal -->
-    <div id="trip-details-overlay" class="modal-overlay">
-        <div class="modal-card" style="max-width: 600px; width: 95%; max-height: 90vh; display: flex; flex-direction: column;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-                <div>
-                    <h2 id="details-trip-name">Trip Name</h2>
-                    <p id="details-trip-dates" class="text-muted" style="font-size: 13px;"></p>
-                </div>
-                <button class="icon-btn" onclick="document.getElementById('trip-details-overlay').classList.remove('active')">✕</button>
-            </div>
-            
-            <div style="overflow-y: auto; flex: 1; padding-right: 8px;">
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 24px;">
-                    <div style="background: var(--bg); padding: 16px; border-radius: 12px;">
-                        <p class="text-muted" style="font-size: 12px; margin-bottom: 4px;">Total Budget</p>
-                        <h3 id="details-trip-budget" style="margin-bottom: 4px;"></h3>
-                    </div>
-                    <div style="background: var(--bg); padding: 16px; border-radius: 12px;">
-                        <p class="text-muted" style="font-size: 12px; margin-bottom: 4px;">Total Spent</p>
-                        <h3 id="details-trip-spent"></h3>
-                    </div>
-                    <div style="background: var(--bg); padding: 16px; border-radius: 12px;">
-                        <p class="text-muted" style="font-size: 12px; margin-bottom: 4px;">Remaining</p>
-                        <h3 id="details-trip-left"></h3>
-                    </div>
-                    <div style="background: var(--bg); padding: 16px; border-radius: 12px;">
-                        <p class="text-muted" style="font-size: 12px; margin-bottom: 4px;">Daily Average</p>
-                        <h3 id="details-trip-avg"></h3>
-                    </div>
-                </div>
-
-                <h4 style="margin-bottom: 16px; font-size: 14px;">Category Breakdown</h4>
-                <div id="details-trip-categories" style="margin-bottom: 24px;"></div>
-                
-                <h4 style="margin-bottom: 16px; font-size: 14px;">Activity Logs</h4>
-                <ul id="details-trip-logs" class="minimal-list interactive-list"></ul>
-            </div>
-        </div>
-    </div>
-
-    <!-- Wrapped Insights Slideshow Modal -->
-    <div id="trip-insights-overlay" class="modal-overlay" style="background: rgba(0,0,0,0.9);">
-        <button style="position: absolute; top: 20px; right: 20px; background: none; border: none; color: white; font-size: 24px; cursor: pointer; z-index: 100;" onclick="window.closeInsights()">✕</button>
-        
-        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%;">
-            <div style="display: flex; align-items: center; justify-content: center; gap: 24px; width: 100%;">
-                <button id="insights-prev-btn" class="icon-btn" style="color: white; font-size: 32px; background: rgba(255,255,255,0.1); border-radius: 50%; padding: 12px; display: none;">‹</button>
-                
-                <div id="wrapped-capture-area" class="wrapped-container">
-                    <!-- Slides injected here -->
-                    <div id="wrapped-slides-container"></div>
-                    
-                    <div class="watermark">renzjared.github.io/budget</div>
-                </div>
-                
-                <button id="insights-next-btn" class="icon-btn" style="color: white; font-size: 32px; background: rgba(255,255,255,0.1); border-radius: 50%; padding: 12px; display: none;">›</button>
-            </div>
-            
-            <button onclick="window.shareInsights()" class="primary-btn" style="margin-top: 24px; background: white; color: black; border-radius: 24px; padding: 12px 32px; font-weight: bold; display: flex; align-items: center; gap: 8px;">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
-                Share This Slide
-            </button>
-            
-            <div id="wrapped-progress-bar" style="display: flex; gap: 4px; margin-top: 16px; width: 100%; max-width: 360px;"></div>
-        </div>
-    </div>
     <div id="edit-transaction-overlay" class="modal-overlay">
         <div class="account-modal-content card">
             <header style="display: flex; justify-content: space-between; margin-bottom: 24px;"><h3>Edit Transaction</h3><button class="close-modal-btn" onclick="closeEditTransactionModal()">✕</button></header>
@@ -1054,5 +1002,6 @@
     <script src="js/state.js" defer></script>
     <script src="js/charts.js" defer></script>
     <script src="js/app.js" defer></script>
+    <script src="js/ledgers.js" defer></script>
 </body>
 </html>

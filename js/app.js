@@ -457,7 +457,7 @@ window.populateAccountDropdowns = (targetSelectId) => {
     if (!selectEl) return;
 
     const getAccountLastUsed = (accId) => {
-        const txs = window.appData.filter(t => t.account_id === accId);
+        const txs = window.appData.filter(t => t.account_id === accId || t.to_account_id === accId);
         if (!txs.length) return 0;
         return Math.max(...txs.map(t => new Date(t.timestamp).getTime()));
     };
@@ -469,24 +469,133 @@ window.populateAccountDropdowns = (targetSelectId) => {
 
     let html = '<option value="">-- None --</option>';
     sortedAccounts.forEach(acc => {
-        const favIndicator = acc.favorite ? '★ ' : '';
         const sym = acc.currency ? window.getCurrencySymbol(acc.currency) : window.getCurrencySymbol(window.userSettings?.currency || '₱');
-        html += `<option value="${acc.id}">${favIndicator}${acc.name} (${window.formatMoneyWithSymbol(acc.balance, sym)})</option>`;
+        html += `<option value="${acc.id}">${acc.favorite ? '★ ' : ''}${acc.name} (${window.formatMoneyWithSymbol(acc.balance, sym)})</option>`;
     });
     selectEl.innerHTML = html;
 
     let defaultVal = '';
-    const behavior = window.userSettings.defaultAccountBehavior || 'blank';
     
-    if (behavior === 'custom' && window.userSettings.defaultAccountId) {
-        if (window.accountsData.find(a => a.id === window.userSettings.defaultAccountId)) defaultVal = window.userSettings.defaultAccountId;
-    } else if (behavior === 'recent') {
-        const recentTx = window.appData.find(t => t.account_id);
-        if (recentTx && window.accountsData.find(a => a.id === recentTx.account_id)) defaultVal = recentTx.account_id;
+    // NEW: Strict separation for Transfer Memory vs Logging Memory
+    if (targetSelectId === 'transfer-from') {
+        defaultVal = localStorage.getItem('lastTransferFrom') || '';
+    } else if (targetSelectId === 'transfer-to') {
+        defaultVal = localStorage.getItem('lastTransferTo') || '';
+    } else {
+        const behavior = window.userSettings.defaultAccountBehavior || 'blank';
+        if (behavior === 'custom' && window.userSettings.defaultAccountId) {
+            if (window.accountsData.find(a => a.id === window.userSettings.defaultAccountId)) defaultVal = window.userSettings.defaultAccountId;
+        } else if (behavior === 'recent') {
+            const recentTx = window.appData.find(t => t.account_id && t.type !== 'TRANSFER');
+            if (recentTx && window.accountsData.find(a => a.id === recentTx.account_id)) defaultVal = recentTx.account_id;
+        }
     }
     
     selectEl.value = defaultVal;
+
+    // Trigger the beautified UI overlay
+    window.applyCustomSelectUI(selectEl, sortedAccounts);
 };
+
+window.applyCustomSelectUI = (selectEl, sortedAccounts) => {
+    // Remove old wrapper if we are refreshing the dropdown list
+    if (selectEl.nextElementSibling && selectEl.nextElementSibling.classList.contains('custom-select-wrapper')) {
+        selectEl.nextElementSibling.remove();
+    }
+
+    // Hide original boring browser select
+    selectEl.style.display = 'none';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'custom-select-wrapper';
+    wrapper.style.position = 'relative';
+    wrapper.style.width = '100%';
+
+    const box = document.createElement('div');
+    box.className = 'form-input custom-select-box';
+    box.style.display = 'flex';
+    box.style.justifyContent = 'space-between';
+    box.style.alignItems = 'center';
+    box.style.cursor = 'pointer';
+
+    const dropdown = document.createElement('div');
+    dropdown.className = 'card custom-select-dropdown';
+    dropdown.style.cssText = 'position: absolute; top: calc(100% + 4px); left: 0; width: 100%; z-index: 9999; display: none; max-height: 240px; overflow-y: auto; padding: 8px 0; box-shadow: 0 8px 24px rgba(0,0,0,0.2); border: 1px solid var(--border);';
+
+    const updateBox = () => {
+        const val = selectEl.value;
+        if (!val) {
+            box.innerHTML = `<span style="color: var(--text-secondary)">-- Select Account --</span><span style="font-size: 10px;">▼</span>`;
+            return;
+        }
+        const acc = window.accountsData.find(a => a.id === val);
+        if (acc) {
+            const sym = acc.currency ? window.getCurrencySymbol(acc.currency) : window.getCurrencySymbol(window.userSettings?.currency || '₱');
+            const isFav = acc.favorite;
+            const balColor = acc.balance < 0 ? 'var(--accent-red)' : 'var(--text-secondary)';
+            box.innerHTML = `
+                <span style="font-weight: 600; color: ${isFav ? '#FFD700' : 'var(--text)'}">${isFav ? '★ ' : ''}${acc.name}</span>
+                <span style="font-family: monospace; font-size: 13px; color: ${balColor};">${acc.balance < 0 ? '-' : ''}${window.formatMoneyWithSymbol(Math.abs(acc.balance), sym)}</span>
+            `;
+        }
+    };
+
+    const renderOpts = () => {
+        dropdown.innerHTML = '';
+        
+        const noneOpt = document.createElement('div');
+        noneOpt.innerHTML = `<span style="color: var(--text-secondary)">-- None --</span>`;
+        noneOpt.style.cssText = 'padding: 12px 16px; cursor: pointer; border-bottom: 1px solid var(--border);';
+        noneOpt.onclick = () => {
+            selectEl.value = '';
+            selectEl.dispatchEvent(new Event('change'));
+            dropdown.style.display = 'none';
+        };
+        dropdown.appendChild(noneOpt);
+
+        sortedAccounts.forEach(acc => {
+            const sym = acc.currency ? window.getCurrencySymbol(acc.currency) : window.getCurrencySymbol(window.userSettings?.currency || '₱');
+            const opt = document.createElement('div');
+            opt.style.cssText = 'display: flex; justify-content: space-between; padding: 12px 16px; cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.2s;';
+            opt.onmouseover = () => opt.style.background = 'var(--surface-hover, rgba(0,0,0,0.05))';
+            opt.onmouseout = () => opt.style.background = 'transparent';
+
+            const balColor = acc.balance < 0 ? 'var(--accent-red)' : 'var(--text-secondary)';
+
+            opt.innerHTML = `
+                <span style="font-weight: 600; color: ${acc.favorite ? '#FFD700' : 'var(--text)'}">${acc.favorite ? '★ ' : ''}${acc.name}</span>
+                <span style="font-family: monospace; font-size: 13px; color: ${balColor};">${acc.balance < 0 ? '-' : ''}${window.formatMoneyWithSymbol(Math.abs(acc.balance), sym)}</span>
+            `;
+            opt.onclick = () => {
+                selectEl.value = acc.id;
+                selectEl.dispatchEvent(new Event('change'));
+                dropdown.style.display = 'none';
+            };
+            dropdown.appendChild(opt);
+        });
+    };
+
+    box.onclick = (e) => {
+        e.stopPropagation();
+        const wasOpen = dropdown.style.display === 'block';
+        document.querySelectorAll('.custom-select-dropdown').forEach(el => el.style.display = 'none');
+        if (!wasOpen) dropdown.style.display = 'block';
+    };
+
+    // Very important: listen to the hidden select changes (fired by our Autocomplete system!)
+    selectEl.addEventListener('change', updateBox);
+    
+    updateBox();
+    renderOpts();
+    wrapper.appendChild(box);
+    wrapper.appendChild(dropdown);
+    selectEl.parentNode.insertBefore(wrapper, selectEl.nextSibling);
+};
+
+// Global listener to close the custom dropdowns when clicking outside
+document.addEventListener('click', () => {
+    document.querySelectorAll('.custom-select-dropdown').forEach(el => el.style.display = 'none');
+});
 
 window.setupReceiptListeners = () => {
     ['recent-logs-list', 'top-expenses-list', 'logs-list-view'].forEach(id => {
@@ -701,32 +810,48 @@ window.renderDashboardInsights = () => {
     const budgetContainer = document.getElementById('dashboard-weekly-budget-container');
     if (!budgetContainer) return;
 
-    const day = now.getDay() || 7; 
-    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day + 1);
-    weekStart.setHours(0,0,0,0);
+    const cycle = window.userSettings.budgetCycle || 'monthly';
+    let cutoff = new Date(now.getFullYear(), now.getMonth(), 1); 
+    let cycleName = 'Monthly';
 
-    let weeklyIncome = 0;
-    const weeklySpent = {};
-    window.appData.filter(e => new Date(e.timestamp) >= weekStart && !e.trip_id).forEach(e => {
+    if (cycle === 'daily') {
+        cutoff = new Date(now.setHours(0,0,0,0));
+        cycleName = 'Daily';
+    } else if (cycle === 'weekly') { 
+        const day = now.getDay() || 7; 
+        cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day + 1);
+        cutoff.setHours(0,0,0,0);
+        cycleName = 'Weekly';
+    }
+
+    // Dynamically update the header title right above the budget container
+    const titleEl = budgetContainer.previousElementSibling;
+    if (titleEl && titleEl.tagName.includes('H')) {
+        titleEl.innerText = `${cycleName} Budget`;
+    }
+
+    let cycleIncome = 0;
+    const cycleSpent = {};
+    window.appData.filter(e => new Date(e.timestamp) >= cutoff && !e.trip_id).forEach(e => {
         const isIncome = (e.type || '').toUpperCase().includes('INCOM');
         if (isIncome) {
-            weeklyIncome += e.amount;
+            cycleIncome += e.amount;
         } else if (e.type !== 'TRANSFER') {
             const cat = (e.category || 'Uncategorized').toUpperCase();
-            weeklySpent[cat] = (weeklySpent[cat] || 0) - e.amount;
+            cycleSpent[cat] = (cycleSpent[cat] || 0) - e.amount;
         }
     });
 
-    if (weeklyIncome === 0) {
-        budgetContainer.innerHTML = '<p class="text-muted" style="text-align:center; padding: 24px 0; font-size: 13px;">No income recorded this week to budget against.</p>';
+    if (cycleIncome === 0) {
+        budgetContainer.innerHTML = '<p class="text-muted" style="text-align:center; padding: 24px 0; font-size: 13px;">No income recorded this cycle to budget against.</p>';
         return;
     }
 
     budgetContainer.innerHTML = window.userSettings.categories.map(cat => {
-        const allocated = weeklyIncome * (cat.percent / 100);
+        const allocated = cycleIncome * (cat.percent / 100);
         if (allocated === 0) return ''; 
         
-        const spent = weeklySpent[cat.name.toUpperCase()] || 0;
+        const spent = cycleSpent[cat.name.toUpperCase()] || 0;
         const pct = (spent / allocated) * 100;
         const over = pct > 100;
         const color = over ? 'var(--accent-red)' : 'var(--primary)';
@@ -2806,11 +2931,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.openTransferModal = () => {
         const overlay = document.getElementById('transfer-overlay');
-        // Populate both the 'From' and 'To' account dropdowns
+        
+        // Utilize the universal populate logic to build the elegant UI correctly
         window.populateAccountDropdowns('transfer-from');
         window.populateAccountDropdowns('transfer-to');
-        window.setDefaultCurrencyDropdown('transfer-currency');
         
+        document.getElementById('transfer-amount').value = '';
+        document.getElementById('transfer-notes').value = '';
+        
+        window.setDefaultCurrencyDropdown('transfer-currency');
         if (overlay) overlay.classList.add('active');
     };
 
@@ -3409,6 +3538,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const fromId = document.getElementById('transfer-from').value || null;
         const toId = document.getElementById('transfer-to').value || null;
         const notes = document.getElementById('transfer-notes').value.trim();
+        // Save these independently to Transfer Memory
+        localStorage.setItem('lastTransferFrom', fromId || '');
+        localStorage.setItem('lastTransferTo', toId || '');
 
         if (!amount || isNaN(amount) || amount <= 0) return alert("Enter a valid amount.");
         if (!fromId && !toId) return alert("You must select at least one internal account.");

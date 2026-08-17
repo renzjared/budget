@@ -875,7 +875,7 @@ window.renderDashboardInsights = () => {
             : `<span style="font-weight:400; color:var(--text-secondary)">over:</span> ${window.formatMoney(Math.abs(remaining))}`;
         
         return `
-            <div style="margin-bottom: 16px;">
+            <div style="margin-bottom: 16px; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'" onclick="window.openBudgetCategoryDetails('${cat.name.replace(/'/g, "\\'")}', ${cutoff.getTime()})">
                 <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px;">
                     <span style="font-weight: 600;">${cat.name} <span style="color:var(--text-secondary); font-weight:400">(${cat.percent}%)</span></span>
                     <span style="font-weight: 700; color: ${color};">${remainingText}</span>
@@ -1473,6 +1473,73 @@ window.renderStatistics = (range = 'all') => {
     renderSankeyFlow();
 };
 
+window.openBudgetCategoryDetails = (catName, cutoffTime) => {
+    let overlay = document.getElementById('budget-category-overlay');
+    
+    // Inject the modal dynamically if it doesn't exist yet
+    if (!overlay) {
+        const modalHTML = `
+        <div id="budget-category-overlay" class="modal-overlay" style="z-index: 9999;">
+            <div class="account-modal-content card" style="max-height: 90vh; display: flex; flex-direction: column;">
+                <header style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; flex-shrink: 0;">
+                    <div>
+                        <h3 id="budget-category-title" style="margin: 0;">Category Name</h3>
+                        <p id="budget-category-subtitle" class="text-muted" style="font-size: 13px; margin: 4px 0 0 0;">Budget Cycle Activity</p>
+                    </div>
+                    <button class="close-modal-btn" onclick="document.getElementById('budget-category-overlay').classList.remove('active')">✕</button>
+                </header>
+                <div style="flex: 1; overflow-y: auto; padding-right: 8px;">
+                    <ul id="budget-category-list" class="minimal-list interactive-list"></ul>
+                </div>
+            </div>
+        </div>`;
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        overlay = document.getElementById('budget-category-overlay');
+        
+        // Ensure Receipt overlay always opens above this modal
+        const receiptOverlay = document.getElementById('receipt-overlay');
+        if (receiptOverlay) receiptOverlay.style.zIndex = '10005';
+        
+        // Add click listener to list for opening receipts
+        document.getElementById('budget-category-list').addEventListener('click', (e) => {
+            const li = e.target.closest('.tx-item');
+            if (li) {
+                const entryId = parseInt(li.getAttribute('data-id'));
+                const entry = window.appData.find(x => x._id === entryId);
+                if (entry) window.openReceiptModal(entry);
+            }
+        });
+        
+        // Close when clicking outside
+        overlay.addEventListener('click', (e) => {
+            if (e.target.id === 'budget-category-overlay') overlay.classList.remove('active');
+        });
+    }
+    
+    document.getElementById('budget-category-title').innerText = catName;
+    
+    // Filter transactions by cycle date and category
+    const cutoff = new Date(cutoffTime);
+    const txs = window.appData.filter(e => {
+        const eDate = new Date(e.timestamp);
+        const isIncome = (e.type || '').toUpperCase().includes('INCOM');
+        return eDate >= cutoff && 
+               !e.trip_id && 
+               e.type !== 'TRANSFER' && 
+               !isIncome && 
+               (e.category || 'Uncategorized').toUpperCase() === catName.toUpperCase();
+    }).sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    const listEl = document.getElementById('budget-category-list');
+    if (txs.length === 0) {
+        listEl.innerHTML = '<li class="text-muted" style="text-align: center; padding: 24px;">No transactions found for this category in the current cycle.</li>';
+    } else {
+        listEl.innerHTML = txs.map(window.generateTxHTML).join('');
+    }
+    
+    overlay.classList.add('active');
+};
+
 window.renderBudgetTracking = () => {
     const container = document.getElementById('budget-progress-container');
     if (!container) return;
@@ -1507,7 +1574,7 @@ window.renderBudgetTracking = () => {
         const color = over ? 'var(--accent-red)' : 'var(--primary)';
         
         return `
-            <div style="margin-bottom: 20px;">
+            <div style="margin-bottom: 20px; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'" onclick="window.openBudgetCategoryDetails('${cat.name.replace(/'/g, "\\'")}', ${cutoff.getTime()})">
                 <div style="display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 8px;">
                     <span style="font-weight: 700;">${cat.name} <span style="font-weight:400; color:var(--text-secondary)">(${cat.percent}%)</span></span>
                     <span style="font-weight: 700; color: ${color};">${window.formatMoney(spent)} <span style="font-weight:400; color:var(--text-secondary)">/ ${window.formatMoney(allocated)}</span></span>

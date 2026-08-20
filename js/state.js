@@ -429,7 +429,9 @@ window.saveAccountsToCloud = async () => {
             favorite: a.favorite || false,
             currency: a.currency || '',
             custom_type: a.customType || null,
-            sort_order: index
+            sort_order: index,
+            icon_type: a.icon_type || null,
+            icon_value: a.icon_value || null
         }));
         
         const { error } = await window.supabase

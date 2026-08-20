@@ -517,3 +517,153 @@ body.travel-theme {
 .wrapped-sub { font-size: 16px; font-weight: 600; opacity: 0.9; margin-bottom: 8px; }
 .wrapped-list-item { font-size: 18px; font-weight: 700; display: flex; justify-content: space-between; width: 100%; border-bottom: 1px solid rgba(255,255,255,0.2); padding: 12px 0; }
 .wrapped-list-item span:last-child { font-weight: 400; opacity: 0.8; }
+
+/* --- MAYA CARD UI --- */
+.maya-card {
+    border-radius: 16px;
+    padding: 24px;
+    color: #ffffff;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 160px;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    border-left: none !important; /* Removes the colored side strip */
+}
+.maya-card:hover { 
+    transform: translateY(-4px); 
+    box-shadow: 0 12px 25px rgba(0,0,0,0.2); 
+}
+.maya-card .card-top { 
+    display: flex; justify-content: space-between; align-items: flex-start; z-index: 2; 
+}
+.maya-card .icon-wrapper { 
+    width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; background: rgba(255,255,255,0.2); box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden;
+}
+.maya-card .card-body { 
+    margin-top: 24px; z-index: 2; 
+}
+.maya-card .card-name { 
+    font-size: 16px; font-weight: 600; margin: 0 0 4px 0; display: flex; align-items: center; gap: 4px; opacity: 0.95;
+}
+.maya-card .card-bal { 
+    font-size: 32px; font-weight: 800; margin: 0; letter-spacing: -1px; 
+}
+.maya-card .card-footer { 
+    margin-top: 16px; font-size: 12px; font-weight: 600; opacity: 0.8; display: flex; justify-content: space-between; z-index: 2; text-transform: uppercase; letter-spacing: 1px; min-height: 16px;
+}
+
+/* Modern clean geometric overlays instead of blur */
+.maya-card::before {
+    content: ''; position: absolute; top: -40px; right: -20px; width: 140px; height: 140px; background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 80%); border-radius: 50%; z-index: 1; pointer-events: none;
+}
+.maya-card::after { 
+    content: ''; position: absolute; bottom: -80px; right: -40px; width: 200px; height: 200px; border: 2px solid rgba(255,255,255,0.1); border-radius: 50%; z-index: 1; pointer-events: none; 
+}
+
+.card-actions-overlay button {
+    background: none; border: none; color: white; opacity: 0.7; cursor: pointer; padding: 4px; transition: opacity 0.2s;
+}
+.card-actions-overlay button:hover { opacity: 1; }
+
+/* --- COMPACT MAYA CARDS (2 per row) --- */
+.maya-card-small {
+    min-height: 120px;
+    padding: 16px;
+}
+.maya-card-small .icon-wrapper { 
+    width: 28px; height: 28px; font-size: 14px; 
+}
+.maya-card-small .card-body { margin-top: 12px; }
+.maya-card-small .card-name { font-size: 14px; }
+.maya-card-small .card-bal { font-size: 20px; }
+.maya-card-small .card-footer { margin-top: 12px; font-size: 10px; }
+.maya-card-small::before { width: 100px; height: 100px; top: -30px; right: -10px; }
+.maya-card-small::after { width: 140px; height: 140px; bottom: -50px; right: -20px; border-width: 1px; }
+
+/* --- NATIVE PDF / PRINT STYLES --- */
+@media print {
+    /* 1. Define physical paper margins */
+    @page {
+        size: portrait;
+        margin: 15mm 20mm;
+    }
+
+    /* 2. Kill all "ghost" heights that create blank pages */
+    html, body {
+        height: auto !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        background: white !important;
+    }
+
+    /* 3. Hide everything except the modal */
+    body > *:not(#ledger-receipt-preview-overlay) {
+        display: none !important;
+    }
+
+    /* 4. Strip modal positioning to flow naturally like a document */
+    #ledger-receipt-preview-overlay {
+        position: static !important;
+        display: block !important;
+        height: auto !important;
+        min-height: 0 !important;
+    }
+
+    #ledger-receipt-preview-overlay .account-modal-content {
+        position: static !important;
+        height: auto !important;
+        max-height: none !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+        border: none !important;
+        display: block !important;
+    }
+
+    /* 5. Hide buttons and headers */
+    #ledger-receipt-preview-overlay header,
+    #ledger-receipt-preview-overlay > div > div:last-child,
+    #ledger-receipt-preview-overlay button {
+        display: none !important;
+    }
+
+    /* 6. Release the scrolling container */
+    #ledger-receipt-preview-overlay .account-modal-content > div:nth-of-type(1) {
+        overflow: visible !important;
+        height: auto !important;
+        background: white !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        display: block !important;
+    }
+
+    #ledger-receipt-capture {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 100% !important;
+        box-shadow: none !important;
+        margin: 0 !important;
+        /* FIX: Restored the 40px padding so text isn't glued to the edges of the PDF */
+        padding: 40px !important;
+        box-sizing: border-box !important;
+        background: white !important;
+        display: block !important;
+        page-break-after: avoid !important;
+    }
+
+    /* 8. Keep tables from slicing rows in half */
+    table { page-break-inside: auto; }
+    tr { page-break-inside: avoid; page-break-after: auto; }
+    thead { display: table-header-group; }
+}

@@ -33,6 +33,134 @@ window.togglePrivacyMode = async () => {
     window.bootUI();
 };
 
+window.openIconSelector = () => {
+    const content = document.getElementById('icon-tab-content');
+    document.getElementById('icon-selector-overlay').classList.add('active');
+    
+    // Default libraries
+    const bankLogos = [
+        { name: 'GCash', url: 'https://upload.wikimedia.org/wikipedia/commons/5/52/GCash_logo.svg' },
+        { name: 'Maya', url: 'https://upload.wikimedia.org/wikipedia/commons/9/9a/Maya_logo.svg' },
+        { name: 'BPI', url: 'https://upload.wikimedia.org/wikipedia/en/c/c2/Bank_of_the_Philippine_Islands_logo.svg' },
+        { name: 'BDO', url: 'https://upload.wikimedia.org/wikipedia/commons/8/8c/BDO_Unibank_logo.svg' },
+        { name: 'UnionBank', url: 'https://upload.wikimedia.org/wikipedia/en/9/91/UnionBank_of_the_Philippines_logo.svg' }
+    ];
+    
+    const svgIcons = [
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>', // Card
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"></path><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"></path><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z"></path></svg>', // Wallet
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"></path><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"></path><path d="M9 21v-4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v4"></path></svg>', // Bank
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>', // Dollar
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>' // Activity
+    ];
+    
+    const emojisList = ['🐷','💰','🏦','💳','📈','💎','🛒','🍔','✈️','🚗','🎁','🏠','⚡','🔥','🚀','💼'];
+
+    const renderTab = (tab) => {
+        if (tab === 'images') {
+            content.innerHTML = `
+                <div style="margin-bottom: 24px;">
+                    <label class="text-muted" style="font-size:12px; margin-bottom:4px; display:block;">Or paste any Image URL:</label>
+                    <div style="display:flex; gap:8px;">
+                        <input type="text" id="custom-icon-url" class="form-input" placeholder="https://...">
+                        <button class="primary-btn" onclick="window.selectIcon('image', document.getElementById('custom-icon-url').value)">Use</button>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+                    ${bankLogos.map(b => `<div onclick="window.selectIcon('image', '${b.url}')" style="cursor:pointer; background:var(--surface-hover); padding:16px; border-radius:12px; text-align:center; transition:transform 0.2s;"><img src="${b.url}" style="width:100%; height:40px; object-fit:contain;"><p style="font-size:11px; margin-top:8px;" class="text-muted">${b.name}</p></div>`).join('')}
+                </div>`;
+        } else if (tab === 'icons') {
+            content.innerHTML = `<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
+                ${svgIcons.map(svg => `<div onclick="window.selectIcon('icon', '${btoa(svg)}')"" style="cursor:pointer; background:var(--surface-hover); padding:20px; border-radius:12px; text-align:center; color:var(--text); transition:transform 0.2s;">${svg}</div>`).join('')}
+            </div>`;
+        } else if (tab === 'emojis') {
+            content.innerHTML = `<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
+                ${emojisList.map(e => `<div onclick="window.selectIcon('emoji', '${e}')" style="cursor:pointer; background:var(--surface-hover); padding:20px; border-radius:12px; text-align:center; font-size:32px; transition:transform 0.2s;">${e}</div>`).join('')}
+            </div>`;
+        } else if (tab === 'letters') {
+            content.innerHTML = `
+                <div style="text-align:center; padding: 24px;">
+                    <label class="text-muted" style="margin-bottom:8px; display:block;">Type a single letter</label>
+                    <input type="text" id="custom-icon-letter" class="form-input" maxlength="1" style="width: 80px; height: 80px; font-size: 32px; text-align: center; text-transform: uppercase; margin: 0 auto 16px auto;">
+                    <button class="primary-btn" onclick="window.selectIcon('letter', document.getElementById('custom-icon-letter').value)">Use Letter</button>
+                </div>`;
+        }
+    };
+
+    document.querySelectorAll('.icon-tab-btn').forEach(btn => {
+        btn.onclick = (e) => {
+            document.querySelectorAll('.icon-tab-btn').forEach(b => { b.style.color = 'var(--text-secondary)'; b.style.fontWeight = 'normal'; });
+            e.target.style.color = 'var(--primary)'; e.target.style.fontWeight = 'bold';
+            renderTab(e.target.getAttribute('data-tab'));
+        };
+    });
+    
+    renderTab('images'); // Load default
+};
+
+window.selectIcon = (type, value) => {
+    if(!value) return;
+    document.getElementById('acc-icon-type').value = type;
+    document.getElementById('acc-icon-value').value = value;
+    
+    const display = document.getElementById('acc-current-icon-display');
+    if (type === 'image') display.innerHTML = `<img src="${value}" style="width:100%; height:100%; border-radius:50%; object-fit:contain; background: white; padding: 4px;">`;
+    else if (type === 'icon') display.innerHTML = atob(value);
+    else if (type === 'emoji') display.innerHTML = value;
+    else if (type === 'letter') display.innerHTML = `<span style="color:var(--text); font-weight:bold;">${value.toUpperCase()}</span>`;
+    
+    document.getElementById('icon-selector-overlay').classList.remove('active');
+};
+
+window.playSuccessSound = () => {
+    try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.15, ctx.currentTime); // Gentle volume
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.15);
+    } catch(e){}
+};
+
+window.showToast = (msg, isError = false) => {
+    let toast = document.getElementById('app-toast');
+    if(!toast) {
+        toast = document.createElement('div');
+        toast.id = 'app-toast';
+        toast.style.cssText = 'position:fixed; bottom:-100px; left:50%; transform:translateX(-50%); background:var(--surface, #ffffff); color:var(--text, #111111); padding:12px 24px; border-radius:24px; box-shadow:0 10px 40px rgba(0,0,0,0.3); z-index:999999; transition:bottom 0.3s cubic-bezier(0.2,0.8,0.2,1); font-weight:600; font-size:14px; border: 2px solid var(--primary); display:flex; align-items:center; gap:8px;';
+        document.body.appendChild(toast);
+    }
+    toast.style.borderColor = isError ? 'var(--accent-red)' : 'var(--primary)';
+    toast.innerHTML = (isError ? '⚠️ ' : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> ') + msg;
+    toast.style.bottom = '40px';
+    if(window.toastTimer) clearTimeout(window.toastTimer);
+    window.toastTimer = setTimeout(() => { toast.style.bottom = '-100px'; }, 3000);
+    if(!isError) window.playSuccessSound();
+};
+
+window.showLoadingToast = (msg) => {
+    let toast = document.getElementById('app-toast');
+    if(!toast) {
+        toast = document.createElement('div');
+        toast.id = 'app-toast';
+        toast.style.cssText = 'position:fixed; bottom:-100px; left:50%; transform:translateX(-50%); background:var(--surface, #ffffff); color:var(--text, #111111); padding:12px 24px; border-radius:24px; box-shadow:0 10px 40px rgba(0,0,0,0.3); z-index:999999; transition:bottom 0.3s cubic-bezier(0.2,0.8,0.2,1); font-weight:600; font-size:14px; border: 2px solid var(--border); display:flex; align-items:center; gap:8px;';
+        document.body.appendChild(toast);
+    }
+    toast.style.borderColor = 'var(--text-secondary)';
+    toast.innerHTML = '⏳ ' + msg;
+    toast.style.bottom = '40px';
+    if(window.toastTimer) clearTimeout(window.toastTimer);
+};
+
 // --- MULTI-CURRENCY ENGINE ---
 window.initCurrencyDropdowns = () => {
     const currencies = ['PHP', 'USD', 'EUR', 'GBP', 'JPY', 'HKD', 'INR', 'RUB', 'KRW', 'THB', 'VND', 'SGD', 'MYR', 'IDR', 'AUD', 'CAD'];
@@ -1038,6 +1166,8 @@ window.openReceiptModal = (entry) => {
     const overlay = document.getElementById('receipt-overlay');
     if(!overlay) return;
     
+    overlay.style.zIndex = '100000';
+
     window.currentEditingTransaction = entry;
     
     const isIncome = (entry.type || '').toUpperCase().includes('INCOM');
@@ -1667,11 +1797,13 @@ window.renderAccounts = async () => {
                 </div>
                 <div class="accounts-grid account-type-grid" data-type="${type}">
                     ${accounts.map((acc, idx) => {
-                        const initial = (acc.name || '?').charAt(0).toUpperCase();
+                        let iconHtml = `<span style="font-weight:bold;">${(acc.name || '?').charAt(0).toUpperCase()}</span>`;
+                        if (acc.icon_type === 'image') iconHtml = `<img src="${acc.icon_value}" style="width:100%; height:100%; border-radius:50%; object-fit:contain; background: white; padding: 4px;">`;
+                        else if (acc.icon_type === 'icon') iconHtml = atob(acc.icon_value);
+                        else if (acc.icon_type === 'emoji') iconHtml = acc.icon_value;
+                        else if (acc.icon_type === 'letter' && acc.icon_value) iconHtml = `<span style="font-weight:bold;">${acc.icon_value.toUpperCase()}</span>`;
+
                         const isFavorite = acc.favorite || false;
-                        const favIcon = isFavorite ? '★' : '☆';
-                        const favColor = isFavorite ? '#FFD700' : 'var(--text-secondary)';
-                        const balanceColor = acc.balance < 0 ? 'var(--accent-red)' : 'var(--text)';
                         const accCurrency = acc.currency || userCurrency;
                         
                         const cache = window.getPriceCache();
@@ -1685,27 +1817,56 @@ window.renderAccounts = async () => {
                             originalDisplay = `${acc.balance < 0 ? '-' : ''}${window.formatMoneyWithSymbol(Math.abs(acc.balance), accCurrency)}`;
                         }
                         
+                        // return `
+                        //     <div class="account-card maya-card" draggable="true" data-account-index="${acc._index}" data-account-type="${type}" style="background: ${acc.color};" onclick="window.openAccountLedger('${acc.id}')">
+                        //         <div class="card-top">
+                        //             <div class="icon-wrapper" style="${(!acc.icon_type || acc.icon_type === 'letter') ? '' : 'background:transparent; box-shadow:none; overflow:visible;'}">${iconHtml}</div>
+                        //             <div class="card-actions-overlay" onclick="event.stopPropagation();">
+                        //                 <button onclick="window.toggleAccountFavorite(${acc._index})">${isFavorite ? '<span style="color:#FFD700; font-size:16px;">★</span>' : '☆'}</button>
+                        //                 <button onclick="window.editAccount(${acc._index})">✎</button>
+                        //                 <button onclick="window.deleteAccount(${acc._index})">✕</button>
+                        //             </div>
+                        //         </div>
+                        //         <div class="card-body">
+                        //             <h3 class="card-name">${acc.name} <span style="opacity: 0.6;">›</span></h3>
+                        //             <h2 class="card-bal">${convertedAmount < 0 ? '-' : ''}${window.formatMoneyWithSymbol(Math.abs(convertedAmount), userCurrencySymbol)}</h2>
+                        //             ${originalDisplay ? `<p style="font-size: 11px; margin-top: 4px; opacity: 0.8;">${originalDisplay}</p>` : ''}
+                        //         </div>
+                        //         <div class="card-footer">
+                        //             <span>${acc.note || ''}</span>
+                        //             ${acc.balance < 0 ? '<span style="color: #ffcccc;">Liability</span>' : '<span></span>'}
+                        //         </div>
+                        //     </div>
+                        // `;
+
+                        // Determine sleek red gradient for liabilities/negative balances
+                        let cardBg = acc.color;
+                        if (convertedAmount < 0 || acc.type === 'payable') {
+                            cardBg = 'linear-gradient(135deg, #FF416C 0%, #FF4B2B 100%)';
+                        }
+                        
                         return `
-                            <div class="account-card" draggable="true" data-account-index="${acc._index}" style="--acc-color: ${acc.color}; cursor: grab;" data-account-type="${type}">
-                                <div class="acc-header">
-                                    <div class="acc-icon-box" style="color: ${acc.color};">${initial}</div>
-                                    <div style="display: flex; gap: 8px;">
-                                        <button onclick="window.toggleAccountFavorite(${acc._index})" style="background:none; border:none; color:${favColor}; cursor:pointer; font-size: 16px; padding: 0;">
-                                            ${favIcon}
-                                        </button>
-                                        <button onclick="window.editAccount(${acc._index})" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size: 16px;">✎</button>
-                                        <button onclick="window.deleteAccount(${acc._index})" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size: 16px;">✕</button>
+                            <div class="account-card maya-card" draggable="true" data-account-index="${acc._index}" data-account-type="${type}" style="background: ${cardBg};" onclick="window.openAccountLedger('${acc.id}')">
+                                <div class="card-top">
+                                    <div class="icon-wrapper" style="${(!acc.icon_type || acc.icon_type === 'letter') ? '' : 'background:transparent; box-shadow:none; overflow:visible;'}">${iconHtml}</div>
+                                    <div class="card-actions-overlay" onclick="event.stopPropagation();">
+                                        <button onclick="window.toggleAccountFavorite(${acc._index})">${isFavorite ? '<span style="color:#FFD700; font-size:16px;">★</span>' : '☆'}</button>
+                                        <button onclick="window.editAccount(${acc._index})">✎</button>
+                                        <button onclick="window.deleteAccount(${acc._index})">✕</button>
                                     </div>
                                 </div>
-                                <div style="cursor:pointer;" onclick="window.openAccountLedger('${acc.id}')">
-                                    <p class="text-muted" style="font-size: 13px;">${acc.name || 'Unnamed'}</p>
-                                    <h2 class="acc-balance" style="color: ${balanceColor};">${convertedAmount < 0 ? '-' : ''}${window.formatMoneyWithSymbol(Math.abs(convertedAmount), userCurrencySymbol)}</h2>
-                                    ${originalDisplay ? `<p class="text-muted" style="font-size: 11px; margin-top: 4px;">${originalDisplay}</p>` : ''}
-                                    <p class="text-muted" style="font-size: 12px; margin-top: 8px;">${acc.note || ''}</p>
-                                    ${acc.balance < 0 ? '<p class="text-muted" style="font-size: 11px; color: var(--accent-red);">Liability</p>' : ''}
+                                <div class="card-body">
+                                    <h3 class="card-name">${acc.name} <span style="opacity: 0.6;">›</span></h3>
+                                    <h2 class="card-bal">${convertedAmount < 0 ? '-' : ''}${window.formatMoneyWithSymbol(Math.abs(convertedAmount), userCurrencySymbol)}</h2>
+                                    ${originalDisplay ? `<p style="font-size: 11px; margin-top: 4px; opacity: 0.8;">${originalDisplay}</p>` : ''}
+                                </div>
+                                <div class="card-footer">
+                                    <span>${acc.note || ''}</span>
+                                    <span></span>
                                 </div>
                             </div>
                         `;
+
                     }).join('')}
                 </div>
             </div>
@@ -1917,7 +2078,10 @@ window.editAccount = (index) => {
     document.getElementById('acc-note').value = acc.note || '';
     document.getElementById('acc-favorite').checked = acc.favorite || false;
     document.getElementById('acc-currency').value = acc.currency || '';
-    
+    document.getElementById('acc-icon-type').value = acc.icon_type || 'letter';
+    document.getElementById('acc-icon-value').value = acc.icon_value || '';
+    window.selectIcon(acc.icon_type || 'letter', acc.icon_value || (acc.name ? acc.name.charAt(0) : '?'));
+
     const customGroup = document.getElementById('custom-type-group');
     if (acc.type === 'custom') {
         document.getElementById('acc-custom-type').value = acc.customType || '';
@@ -3027,6 +3191,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const overlay = document.getElementById('transfer-overlay');
         if (overlay) overlay.classList.remove('active');
     };
+
+    // Global Click Outside to Close Modals
+    document.addEventListener('click', (e) => {
+        if (e.target.classList.contains('modal-overlay')) {
+            if (e.target.id === 'expense-overlay') window.closeExpenseModal?.();
+            else if (e.target.id === 'income-overlay') window.closeIncomeModal?.();
+            else if (e.target.id === 'receipt-overlay') window.closeReceiptModal?.();
+            else if (e.target.id === 'edit-transaction-overlay') window.closeEditTransactionModal?.();
+            else if (e.target.id === 'account-overlay') window.closeAccountModal?.();
+            else if (e.target.id === 'transfer-overlay') window.closeTransferModal?.();
+            else if (e.target.id === 'account-ledger-overlay') window.closeAccountLedger?.();
+            else e.target.classList.remove('active');
+        }
+    });
     
     window.openGoalModal = (goalId = null) => {
         const modal = document.getElementById('goal-overlay');
@@ -3379,7 +3557,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 color: document.getElementById('acc-color')?.value || '#00D26A',
                 note: document.getElementById('acc-note')?.value || '',
                 favorite: document.getElementById('acc-favorite')?.checked || false,
-                currency: document.getElementById('acc-currency')?.value?.toUpperCase() || ''
+                currency: document.getElementById('acc-currency')?.value?.toUpperCase() || '',
+                icon_type: document.getElementById('acc-icon-type').value,
+                icon_value: document.getElementById('acc-icon-value').value
             };
             
             if (typeValue === 'custom') {
@@ -3452,6 +3632,9 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        window.closeExpenseModal();
+        window.showLoadingToast('Logging expense...');
+
         const selCur = document.getElementById('exp-currency').value;
         const baseCur = window.getCurrencyCodeFromSymbol(window.userSettings?.currency || '₱');
         let finalAmount = amount;
@@ -3484,6 +3667,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (error) {
             console.error('Error saving expense:', error);
             alert('Error saving expense');
+            return window.showToast('Error saving expense', true);
         } else {
             if (accountId) {
                 const accIndex = window.accountsData.findIndex(a => a.id === accountId);
@@ -3523,6 +3707,8 @@ document.addEventListener('DOMContentLoaded', () => {
             window.renderBudgetTracking();
             window.renderActivity?.();
             if(window.renderTripsView && window.userSettings.activeTripId) window.renderTripsView();
+            
+            window.showToast('Expense successfully logged!');
         }
     });
 
@@ -3540,6 +3726,9 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Please fill in Name and Amount');
             return;
         }
+
+        window.closeIncomeModal();
+        window.showLoadingToast('Logging income...');
 
         const selCur = document.getElementById('inc-currency').value;
         const baseCur = window.getCurrencyCodeFromSymbol(window.userSettings?.currency || '₱');
@@ -3572,6 +3761,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (error) {
             console.error('Error saving income:', error);
             alert('Error saving income');
+            return window.showToast('Error saving income', true);
         } else {
             if (accountId) {
                 const accIndex = window.accountsData.findIndex(a => a.id === accountId);
@@ -3610,6 +3800,7 @@ document.addEventListener('DOMContentLoaded', () => {
             window.renderBudgetTracking();
             window.renderActivity?.();
             if(window.renderTripsView && window.userSettings.activeTripId) window.renderTripsView();
+            window.showToast('Income successfully logged!');
         }
     });
 
@@ -3626,6 +3817,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!fromId && !toId) return alert("You must select at least one internal account.");
         if (fromId === toId) return alert("Cannot transfer to the same account.");
 
+        window.closeTransferModal();
+        window.showLoadingToast('Processing transfer...');
+        
         const selCur = document.getElementById('transfer-currency').value;
         const baseCur = window.getCurrencyCodeFromSymbol(window.userSettings?.currency || '₱');
         let finalAmount = amount;
@@ -3654,7 +3848,10 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const { error } = await window.supabase.from('transactions').insert([transaction]);
-        if (error) return alert('Error saving transfer');
+        if (error) {
+            window.showToast('Error saving transfer', true);
+            return;
+        }
 
         if (fromId) {
             const fromAcc = window.accountsData.find(a => a.id === fromId);
@@ -3680,6 +3877,7 @@ document.addEventListener('DOMContentLoaded', () => {
         window.closeTransferModal();
         await window.loadCloudData();
         window.bootUI();
+        window.showToast('Transfer complete!');
     });
 
     document.getElementById('dashboard-metric-selector')?.addEventListener('change', (e) => {

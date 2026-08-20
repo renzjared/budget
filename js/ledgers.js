@@ -77,22 +77,29 @@ window.LedgersEngine = {
                 </div>
             </div>
 
-            <!-- Statement Preview Modal -->
-            <div id="ledger-receipt-preview-overlay" class="modal-overlay" style="z-index: 10000;">
-                <div class="receipt-container" style="max-width: 800px; width: 95%;">
-                    <button class="close-modal-btn" onclick="document.getElementById('ledger-receipt-preview-overlay').classList.remove('active')">✕</button>
-                    
-                    <div style="width: 100%; overflow-x: auto; border-radius: 8px;">
-                        <div id="ledger-receipt-capture" style="background: white; color: black; min-width: 600px; padding: 40px; font-family: 'DM Sans', sans-serif;">
+            <div id="ledger-receipt-preview-overlay" class="modal-overlay" style="z-index: 100000;">
+                <!-- FIX 1: Added strict height (height: 85vh;) to prevent the modal from collapsing -->
+                <div class="account-modal-content card" style="max-width: 800px; width: 95%; height: 85vh; max-height: 90vh; display: flex; flex-direction: column; padding: 24px;">
+                    <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-shrink: 0;">
+                        <h3 style="margin: 0;">Statement Preview</h3>
+                        <button class="close-modal-btn" onclick="document.getElementById('ledger-receipt-preview-overlay').classList.remove('active')">✕</button>
+                    </header>
+
+                    <!-- FIX: Set padding to 0 so the inner margins control the spacing -->
+                    <div style="width: 100%; overflow-y: auto; flex: 1; border-radius: 8px; border: 1px solid var(--border); background: #E5E7EB; padding: 0;">
+                        
+                        <!-- FIX: Changed margin to "32px auto" for top/bottom breathing room -->
+                        <div id="ledger-receipt-capture" style="background: white; color: black; width: 100%; max-width: 600px; margin: 32px auto; padding: 40px; font-family: 'DM Sans', sans-serif; box-shadow: 0 4px 12px rgba(0,0,0,0.1); height: max-content; box-sizing: border-box;">
                             <!-- Statement HTML generated here -->
                         </div>
+                        
                     </div>
-                    
-                    <div style="display: flex; gap: 12px; margin-top: 16px;">
+
+                    <div style="display: flex; gap: 12px; margin-top: 24px; flex-shrink: 0;">
                         <button class="secondary-btn" style="flex: 1;" onclick="document.getElementById('ledger-receipt-preview-overlay').classList.remove('active')">Cancel</button>
                         <button class="primary-btn" style="flex: 2; display: flex; justify-content: center; align-items: center; gap: 8px;" onclick="window.LedgersEngine.downloadReceipt()">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                            Download PDF/Image
+                            Save as PDF / Print
                         </button>
                     </div>
                 </div>
@@ -182,21 +189,37 @@ window.LedgersEngine = {
             return;
         }
 
+        // Force 2 columns per row dynamically
+        container.style.gridTemplateColumns = 'repeat(2, 1fr)';
         container.innerHTML = ledgers.map(acc => {
             const sym = acc.currency ? window.getCurrencySymbol(acc.currency) : window.getCurrencySymbol(window.userSettings?.currency || '₱');
             const isOwed = acc.balance > 0;
             const isClear = acc.balance === 0;
-            const statusColor = isClear ? 'var(--text-secondary)' : (isOwed ? 'var(--primary)' : 'var(--accent-red)');
             const statusText = isClear ? 'Settled' : (isOwed ? 'Owes you' : 'You owe');
 
+            let iconHtml = `<span style="font-weight:bold;">${(acc.name || '?').charAt(0).toUpperCase()}</span>`;
+            if (acc.icon_type === 'image') iconHtml = `<img src="${acc.icon_value}" style="width:100%; height:100%; border-radius:50%; object-fit:contain; background: white; padding: 4px;">`;
+            else if (acc.icon_type === 'icon') iconHtml = atob(acc.icon_value);
+            else if (acc.icon_type === 'emoji') iconHtml = acc.icon_value;
+            else if (acc.icon_type === 'letter' && acc.icon_value) iconHtml = `<span style="font-weight:bold;">${acc.icon_value.toUpperCase()}</span>`;
+
+            // Apply red gradient for debts
+            const bgLogic = isClear ? '#2C2C2C' : (isOwed ? '#00D26A' : 'linear-gradient(135deg, #FF416C 0%, #FF4B2B 100%)');
+
             return `
-                <div class="card" style="padding: 20px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid ${statusColor};" onclick="window.LedgersEngine.openDetails('${acc.id}')">
-                    <div>
-                        <h3 style="margin: 0 0 4px 0;">${acc.name}</h3>
-                        <span style="font-size: 13px; color: ${statusColor}; font-weight: 600;">${statusText}</span>
+                <div class="account-card maya-card maya-card-small" style="background: ${bgLogic};" onclick="window.LedgersEngine.openDetails('${acc.id}')">
+                    <div class="card-top">
+                        <div class="icon-wrapper" style="${(!acc.icon_type || acc.icon_type === 'letter') ? '' : 'background:transparent; box-shadow:none; overflow:visible;'}">
+                            ${iconHtml}
+                        </div>
                     </div>
-                    <div style="text-align: right;">
-                        <h3 style="margin: 0; color: ${statusColor};">${window.formatMoneyWithSymbol(Math.abs(acc.balance), sym)}</h3>
+                    <div class="card-body">
+                        <h3 class="card-name">${acc.name} <span style="opacity: 0.6;">›</span></h3>
+                        <h2 class="card-bal">${window.formatMoneyWithSymbol(Math.abs(acc.balance), sym)}</h2>
+                    </div>
+                    <div class="card-footer">
+                        <span>${statusText}</span>
+                        <span></span>
                     </div>
                 </div>
             `;
@@ -368,8 +391,10 @@ window.LedgersEngine = {
         const rawAmount = parseFloat(document.getElementById('ledger-item-amount').value);
         const notes = document.getElementById('ledger-item-notes').value.trim();
         const linkedAccId = document.getElementById('ledger-item-account').value;
-
         if (!name || !rawAmount || isNaN(rawAmount)) return alert("Name and Amount required.");
+
+        document.getElementById('ledger-item-overlay').classList.remove('active');
+        if(window.showLoadingToast) window.showLoadingToast('Logging ledger item...');
 
         // Positive if I lent them, Negative if they lent me
         const finalAmount = rawAmount * window.LedgersEngine.itemDirection;
@@ -388,7 +413,7 @@ window.LedgersEngine = {
         };
 
         const { error } = await window.supabase.from('transactions').insert([tx]);
-        if (error) return alert("Error saving item.");
+        if (error) return window.showToast ? window.showToast('Error saving item', true) : alert("Error");
 
         ledger.balance += finalAmount;
 
@@ -408,6 +433,7 @@ window.LedgersEngine = {
         window.LedgersEngine.renderList();
         window.LedgersEngine.openDetails(id);
         window.bootUI();
+        if (window.showToast) window.showToast('Ledger item logged!');
     },
 
     setPaymentDirection: (dir) => {
@@ -455,6 +481,9 @@ window.LedgersEngine = {
         if (!realAcc) return alert("Please select a valid bank/cash account.");
         if (!rawAmount || isNaN(rawAmount)) return alert("Amount required.");
 
+        document.getElementById('ledger-payment-overlay').classList.remove('active');
+        if(window.showLoadingToast) window.showLoadingToast('Processing payment...');
+
         let fromId, toId;
 
         if (window.LedgersEngine.paymentDirection === 1) {
@@ -481,7 +510,7 @@ window.LedgersEngine = {
         };
 
         const { error } = await window.supabase.from('transactions').insert([tx]);
-        if (error) return alert("Error saving payment.");
+        if (error) return window.showToast ? window.showToast('Error saving payment', true) : alert("Error");
 
         if (window.LedgersEngine.paymentDirection === 1) {
             ledger.balance -= rawAmount;
@@ -498,6 +527,7 @@ window.LedgersEngine = {
         window.LedgersEngine.renderList();
         window.LedgersEngine.openDetails(ledgerId);
         window.bootUI();
+        if (window.showToast) window.showToast('Payment logged!');
     },
 
     previewReceipt: () => {
@@ -593,19 +623,8 @@ window.LedgersEngine = {
     },
 
     downloadReceipt: () => {
-        const id = window.LedgersEngine.activeLedgerId;
-        const ledger = window.accountsData.find(a => a.id === id);
-        if (!ledger) return;
-
-        const captureDiv = document.getElementById('ledger-receipt-capture');
-        if (typeof html2canvas === 'undefined') return alert("Image engine still loading.");
-        
-        html2canvas(captureDiv, { scale: 2, backgroundColor: '#FFFFFF' }).then(canvas => {
-            const link = document.createElement('a');
-            link.download = `Statement_${ledger.name.replace(/\s+/g, '_')}.png`;
-            link.href = canvas.toDataURL('image/png'); 
-            link.click();
-        });
+        window.print();
+        if (window.showToast) window.showToast('Preparing document...');
     }
 };
 

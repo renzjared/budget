@@ -1002,10 +1002,13 @@ window.renderDashboardInsights = () => {
             ? `<span style="font-weight:400; color:var(--text-secondary)">left:</span> ${window.formatMoney(remaining)}` 
             : `<span style="font-weight:400; color:var(--text-secondary)">over:</span> ${window.formatMoney(Math.abs(remaining))}`;
         
+        const spentPctOfIncome = cycleIncome > 0 ? (spent / cycleIncome) * 100 : 0;
+        const spentPctText = Number.isInteger(spentPctOfIncome) ? spentPctOfIncome : spentPctOfIncome.toFixed(1);
+
         return `
             <div style="margin-bottom: 16px; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'" onclick="window.openBudgetCategoryDetails('${cat.name.replace(/'/g, "\\'")}', ${cutoff.getTime()})">
                 <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px;">
-                    <span style="font-weight: 600;">${cat.name} <span style="color:var(--text-secondary); font-weight:400">(${cat.percent}%)</span></span>
+                    <span style="font-weight: 600;">${cat.name} <span style="color:var(--text-secondary); font-weight:400">(${spentPctText}%/${cat.percent}%)</span></span>
                     <span style="font-weight: 700; color: ${color};">${remainingText}</span>
                 </div>
                 <div style="width: 100%; height: 6px; background-color: var(--border); border-radius: 4px; overflow: hidden;">
@@ -1494,6 +1497,9 @@ window.renderStatistics = (range = 'all') => {
 
     window.appData.forEach(entry => {
         if (entry.timestamp) {
+            // FIX: Explicitly exclude ledgers and internal transfers from all cash flow analytics
+            if (entry.type === 'TRANSFER' || entry.type === 'LEDGER_ITEM') return;
+
             const eDate = new Date(entry.timestamp);
             if (eDate < cutoffStart) dataBeforeStart.push(entry);
             if (eDate >= cutoffStart && eDate <= cutoffEnd) {
@@ -1503,14 +1509,14 @@ window.renderStatistics = (range = 'all') => {
                 const isIncome = (entry.type || '').toUpperCase().includes('INCOM');
                 if (isIncome) { 
                     totalIncome += entry.amount; 
-                } else if (entry.type !== 'TRANSFER') { 
+                } else { 
+                    // No need to check for transfers here anymore, they are filtered out above!
                     totalExpense -= entry.amount; 
                     expensesList.push(entry); 
                 }
             }
         }
     });
-
     const safeSet = (id, text) => { const el = document.getElementById(id); if(el) el.innerText = text; };
     safeSet('stat-income', window.formatMoney(totalIncome, true));
     safeSet('stat-expense', window.formatMoney(totalExpense, true));
@@ -1702,11 +1708,14 @@ window.renderBudgetTracking = () => {
         const pct = allocated > 0 ? (spent / allocated) * 100 : (spent > 0 ? 100 : 0);
         const over = pct > 100;
         const color = over ? 'var(--accent-red)' : 'var(--primary)';
-        
+
+        const spentPctOfIncome = cycleIncome > 0 ? (spent / cycleIncome) * 100 : 0;
+        const spentPctText = Number.isInteger(spentPctOfIncome) ? spentPctOfIncome : spentPctOfIncome.toFixed(1);
+
         return `
             <div style="margin-bottom: 20px; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'" onclick="window.openBudgetCategoryDetails('${cat.name.replace(/'/g, "\\'")}', ${cutoff.getTime()})">
                 <div style="display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 8px;">
-                    <span style="font-weight: 700;">${cat.name} <span style="font-weight:400; color:var(--text-secondary)">(${cat.percent}%)</span></span>
+                    <span style="font-weight: 700;">${cat.name} <span style="font-weight:400; color:var(--text-secondary)">(${spentPctText}%/${cat.percent}%)</span></span>
                     <span style="font-weight: 700; color: ${color};">${window.formatMoney(spent)} <span style="font-weight:400; color:var(--text-secondary)">/ ${window.formatMoney(allocated)}</span></span>
                 </div>
                 <div style="width: 100%; height: 8px; background-color: var(--border); border-radius: 4px; overflow: hidden;">

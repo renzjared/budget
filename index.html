@@ -50,8 +50,15 @@
                 <button class="nav-btn" data-target="import">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg> Sync Data
                 </button>
+                <button class="nav-btn" data-target="yield-optimizer">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+                    Savings Planner
+                </button>
                 <button class="nav-btn" data-target="settings">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg> Settings
+                </button>
+                <button class="nav-btn" id="admin-nav-btn" data-target="admin-panel" style="display: none; border-top: 1px solid var(--border); margin-top: 8px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg> Admin Panel
                 </button>
             </nav>
         </aside>
@@ -70,6 +77,13 @@
                         <button id="discord-login-btn" class="primary-btn" style="font-size: 18px; padding: 16px 40px; background-color: #5865F2; color: white;">
                             Login with Discord (sorry, WIP pa other means of auth)
                         </button>
+                        
+                        <!-- NEW: Public Access Button -->
+                        <div style="margin-top: 16px;">
+                            <button class="secondary-btn" style="padding: 12px 32px; border-color: var(--primary); color: var(--primary);" onclick="window.switchView('yield-optimizer')">
+                                Try the High-Yield Optimizer (No account needed) →
+                            </button>
+                        </div>
 
                         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 80px; text-align: left;">
                             <div class="card"><h3 style="margin-bottom:8px">Visual Insights</h3><p class="text-muted">Interactive bar charts and trend analyses for your cash flow.</p></div>
@@ -586,6 +600,74 @@
                 </div>
             </section>
 
+            <section id="admin-panel" class="view" style="padding-bottom: 80px;">
+                <header class="top-header">
+                    <h2>Catalog Admin</h2>
+                    <p class="text-muted" style="font-size: 13px;">Manage Banks, Yields, and Caps globally.</p>
+                </header>
+
+                <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 24px;">
+                    <!-- List of Existing Banks -->
+                    <div class="card">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 16px;">
+                            <h3>Bank Catalog</h3>
+                            <button class="text-btn" onclick="window.AdminEngine.clearForm()">+ New</button>
+                        </div>
+                        <ul id="admin-bank-list" class="minimal-list interactive-list"></ul>
+                    </div>
+
+                    <!-- Editor Form -->
+                    <div class="card" id="admin-editor-card" style="opacity: 0.5; pointer-events: none;">
+                        <input type="hidden" id="admin-id">
+                        
+                        <div style="display: flex; gap: 16px; margin-bottom: 24px; align-items: center;">
+                            <div id="admin-current-icon-display" style="width: 56px; height: 56px; border-radius: 50%; background: var(--surface-hover); display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer; border: 2px dashed var(--primary); flex-shrink: 0;" onclick="window.openIconSelector('admin')">?</div>
+                            <div style="flex: 1;">
+                                <button class="secondary-btn" style="width: 100%;" onclick="window.openIconSelector('admin')">Set Bank Logo / Icon</button>
+                            </div>
+                            <input type="hidden" id="admin-icon-type" value="letter">
+                            <input type="hidden" id="admin-icon-value" value="">
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                            <div class="form-group" style="margin: 0;"><label class="text-muted">Bank Code ID</label><input type="text" id="admin-bank-id" class="form-input" placeholder="e.g., maya_savings"></div>
+                            <div class="form-group" style="margin: 0;"><label class="text-muted">Display Name</label><input type="text" id="admin-name" class="form-input" placeholder="e.g., Maya"></div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                            <div class="form-group" style="margin: 0;"><label class="text-muted">Product Name</label><input type="text" id="admin-product" class="form-input" placeholder="e.g., Personal Savings"></div>
+                            <div class="form-group" style="margin: 0;"><label class="text-muted">Theme Color</label><input type="color" id="admin-color" class="form-input" style="height: 48px; padding: 4px; border-radius: 8px;"></div>
+                            <div class="form-group" style="margin: 0;"><label class="text-muted">Tax Rate</label><input type="number" id="admin-tax" class="form-input" value="0.20" step="0.01"></div>
+                        </div>
+
+                        <!-- NEW: Time Deposit Admin Fields -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; padding: 12px; background: var(--surface-hover); border-radius: 8px;">
+                            <div class="form-group" style="margin: 0; display: flex; align-items: center;">
+                                <input type="checkbox" id="admin-is-td" style="width: 18px; height: 18px; margin-right: 8px; cursor: pointer;">
+                                <label for="admin-is-td" class="text-muted" style="margin: 0; cursor: pointer;">Is Time Deposit?</label>
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label class="text-muted" style="font-size: 11px;">Lockup Period (Days)</label>
+                                <input type="number" id="admin-lockup" class="form-input" placeholder="e.g., 30" value="0">
+                            </div>
+                        </div>
+
+                        <div style="border-top: 1px solid var(--border); padding-top: 16px; margin-bottom: 24px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 16px;">
+                                <h4>Yield Tiers & Caps</h4>
+                                <button class="secondary-btn" style="padding: 4px 12px; font-size: 12px;" onclick="window.AdminEngine.addTierRow()">+ Add Tier</button>
+                            </div>
+                            <div id="admin-tiers-container" style="display: flex; flex-direction: column; gap: 12px;"></div>
+                        </div>
+
+                        <div style="display: flex; gap: 12px;">
+                            <button id="admin-delete-btn" class="secondary-btn" style="flex: 1; border-color: var(--accent-red); color: var(--accent-red); display: none;" onclick="window.AdminEngine.deleteBank()">Delete</button>
+                            <button class="primary-btn" style="flex: 2;" onclick="window.AdminEngine.saveBank()">Save to Cloud Catalog</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <section id="goals" class="view">
                 <header class="top-header">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -632,6 +714,69 @@
                     <div id="legal-content" class="markdown-body text-muted">
                         Loading document...
                     </div>
+                </div>
+            </section>
+
+            <!-- YIELD OPTIMIZER VIEW -->
+            <section id="yield-optimizer" class="view" style="padding-bottom: 80px;">
+                <header class="top-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h2>High-Yield Optimizer</h2>
+                        <p class="text-muted" style="font-size: 13px;">Maximize your interest across PH Digital Banks</p>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="secondary-btn nav-proxy" data-target="landing" id="yield-back-btn" style="display: none;">← Back</button>
+                        <button class="icon-btn" onclick="window.YieldEngine.openSettings()" title="Filter Banks">⚙️</button>
+                    </div>
+                </header>
+
+<div class="card" style="text-align: center; padding: 40px 24px; margin-bottom: 24px;">
+                    <p class="text-muted" style="margin-bottom: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Amount to Invest</p>
+                    <div style="display: flex; justify-content: center; align-items: baseline; gap: 8px; margin-bottom: 16px;">
+                        <span style="font-size: 32px; font-weight: 700; color: var(--text-secondary);">₱</span>
+                        <input type="number" id="yield-input-amount" class="form-input" style="font-size: 48px; font-weight: 800; padding: 0; background: transparent; border: none; border-bottom: 2px dashed var(--border); width: 250px; text-align: center; color: var(--primary);" placeholder="100000" value="100000">
+                    </div>
+                    
+                    <!-- NEW: Time Deposit Toggle -->
+                    <label style="display: flex; justify-content: center; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 24px;">
+                        <input type="checkbox" id="yield-allow-td" checked style="width: 16px; height: 16px;">
+                        <span class="text-muted" style="font-size: 14px;">Include locked Time Deposits</span>
+                    </label>
+
+                    <button class="primary-btn" style="padding: 12px 32px; font-size: 16px;" onclick="window.YieldEngine.calculate()">Optimize Allocation</button>
+                </div>
+
+                <div id="yield-results-container" style="display: none;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-bottom: 24px;">
+                        <div class="card" style="background: var(--surface-hover);">
+                            <p class="text-muted" style="font-size: 12px; margin-bottom: 4px;">Projected Annual Earnings (Net)</p>
+                            <h2 id="yield-total-earnings" style="color: var(--primary); margin: 0;">₱0.00</h2>
+                        </div>
+                        <div class="card" style="background: var(--surface-hover);">
+                            <p class="text-muted" style="font-size: 12px; margin-bottom: 4px;">Blended Interest Rate (Net APY)</p>
+                            <h2 id="yield-blended-rate" style="margin: 0;">0.00%</h2>
+                        </div>
+                    </div>
+                    
+                    <h3 style="margin-bottom: 16px;">Optimal Distribution</h3>
+                    <div id="yield-allocation-list" style="display: flex; flex-direction: column; gap: 12px;"></div>
+                    
+                    <!-- NEW: Growth Projections Table -->
+                    <h3 style="margin-top: 32px; margin-bottom: 16px;">Growth Projection</h3>
+                    <div class="card" style="padding: 0; overflow: hidden; margin-bottom: 16px;">
+                        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;">
+                            <thead>
+                                <tr style="background: var(--surface-hover);">
+                                    <th style="padding: 16px; border-bottom: 1px solid var(--border);">Timeline</th>
+                                    <th style="padding: 16px; text-align: right; border-bottom: 1px solid var(--border);">Projected Balance</th>
+                                    <th style="padding: 16px; text-align: right; border-bottom: 1px solid var(--border);">Net Profit</th>
+                                </tr>
+                            </thead>
+                            <tbody id="yield-projection-tbody"></tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-muted" style="font-size: 11px; text-align: center;">*Computations account for standard 20% Philippine withholding tax. Multi-year projections assume annual compounding of the blended APY.</p>
                 </div>
             </section>
 
@@ -1078,5 +1223,7 @@
     <script src="js/charts.js" defer></script>
     <script src="js/app.js" defer></script>
     <script src="js/ledgers.js" defer></script>
+    <script src="js/yield.js" defer></script>
+    <script src="js/admin.js" defer></script>
 </body>
 </html>

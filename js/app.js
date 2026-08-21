@@ -33,18 +33,40 @@ window.togglePrivacyMode = async () => {
     window.bootUI();
 };
 
-window.openIconSelector = () => {
+window.iconTargetPrefix = 'acc'; // Defaults to account
+
+window.openIconSelector = async (targetPrefix = 'acc') => {
+    window.iconTargetPrefix = targetPrefix;
     const content = document.getElementById('icon-tab-content');
     document.getElementById('icon-selector-overlay').classList.add('active');
     
-    // Default libraries
-    const bankLogos = [
-        { name: 'GCash', url: 'https://upload.wikimedia.org/wikipedia/commons/5/52/GCash_logo.svg' },
-        { name: 'Maya', url: 'https://upload.wikimedia.org/wikipedia/commons/9/9a/Maya_logo.svg' },
-        { name: 'BPI', url: 'https://upload.wikimedia.org/wikipedia/en/c/c2/Bank_of_the_Philippine_Islands_logo.svg' },
-        { name: 'BDO', url: 'https://upload.wikimedia.org/wikipedia/commons/8/8c/BDO_Unibank_logo.svg' },
-        { name: 'UnionBank', url: 'https://upload.wikimedia.org/wikipedia/en/9/91/UnionBank_of_the_Philippines_logo.svg' }
-    ];
+    // Show a quick loading state while fetching the live database logos
+    content.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--text-secondary);">Loading catalog...</div>';
+
+    // 1. Fetch live bank logos from Supabase (Admin Catalog)
+    let bankLogos = [];
+    try {
+        const { data } = await window.supabase.from('banks_catalog').select('name, icon_type, icon_value').order('name');
+        if (data && data.length > 0) {
+            // Only grab banks where the admin explicitly set an image URL
+            bankLogos = data
+                .filter(b => b.icon_type === 'image' && b.icon_value)
+                .map(b => ({ name: b.name, url: b.icon_value }));
+        }
+    } catch (e) {
+        console.error("Failed to load catalog logos:", e);
+    }
+
+    // 2. Fallback to default libraries if the catalog is empty
+    if (bankLogos.length === 0) {
+        bankLogos = [
+            { name: 'GCash', url: 'https://upload.wikimedia.org/wikipedia/commons/5/52/GCash_logo.svg' },
+            { name: 'Maya', url: 'https://upload.wikimedia.org/wikipedia/commons/9/9a/Maya_logo.svg' },
+            { name: 'BPI', url: 'https://upload.wikimedia.org/wikipedia/en/c/c2/Bank_of_the_Philippine_Islands_logo.svg' },
+            { name: 'BDO', url: 'https://upload.wikimedia.org/wikipedia/commons/8/8c/BDO_Unibank_logo.svg' },
+            { name: 'UnionBank', url: 'https://upload.wikimedia.org/wikipedia/en/9/91/UnionBank_of_the_Philippines_logo.svg' }
+        ];
+    }
     
     const svgIcons = [
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>', // Card
@@ -87,6 +109,7 @@ window.openIconSelector = () => {
         }
     };
 
+    // Attach click listeners to tabs
     document.querySelectorAll('.icon-tab-btn').forEach(btn => {
         btn.onclick = (e) => {
             document.querySelectorAll('.icon-tab-btn').forEach(b => { b.style.color = 'var(--text-secondary)'; b.style.fontWeight = 'normal'; });
@@ -95,19 +118,29 @@ window.openIconSelector = () => {
         };
     });
     
-    renderTab('images'); // Load default
+    // Automatically render the logos tab once data is fetched
+    renderTab('images'); 
 };
 
 window.selectIcon = (type, value) => {
     if(!value) return;
-    document.getElementById('acc-icon-type').value = type;
-    document.getElementById('acc-icon-value').value = value;
     
-    const display = document.getElementById('acc-current-icon-display');
-    if (type === 'image') display.innerHTML = `<img src="${value}" style="width:100%; height:100%; border-radius:50%; object-fit:contain; background: white; padding: 4px;">`;
-    else if (type === 'icon') display.innerHTML = atob(value);
-    else if (type === 'emoji') display.innerHTML = value;
-    else if (type === 'letter') display.innerHTML = `<span style="color:var(--text); font-weight:bold;">${value.toUpperCase()}</span>`;
+    // Dynamically apply to either "acc-" (Accounts) or "admin-" (Admin Panel)
+    const prefix = window.iconTargetPrefix || 'acc';
+    
+    const typeInput = document.getElementById(`${prefix}-icon-type`);
+    const valInput = document.getElementById(`${prefix}-icon-value`);
+    const display = document.getElementById(`${prefix}-current-icon-display`);
+
+    if (typeInput) typeInput.value = type;
+    if (valInput) valInput.value = value;
+    
+    if (display) {
+        if (type === 'image') display.innerHTML = `<img src="${value}" style="width:100%; height:100%; border-radius:50%; object-fit:contain; background: white; padding: 4px;">`;
+        else if (type === 'icon') display.innerHTML = atob(value);
+        else if (type === 'emoji') display.innerHTML = value;
+        else if (type === 'letter') display.innerHTML = `<span style="color:var(--text); font-weight:bold;">${value.toUpperCase()}</span>`;
+    }
     
     document.getElementById('icon-selector-overlay').classList.remove('active');
 };

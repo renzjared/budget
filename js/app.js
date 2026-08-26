@@ -265,6 +265,89 @@ window.switchView = (targetId) => {
     }
 };
 
+// --- GLOBAL HEADER MEMORY & LAYOUT ---
+window.toggleGlobalHeader = () => {
+    const content = document.getElementById('global-header-links');
+    const arrow = document.getElementById('global-header-arrow');
+    const isClosed = content.style.display === 'none';
+
+    if (isClosed) {
+        content.style.display = 'flex';
+        arrow.style.transform = 'rotate(180deg)'; // Arrow points UP
+        localStorage.setItem('daloy_header_state', 'open');
+    } else {
+        content.style.display = 'none';
+        arrow.style.transform = 'rotate(0deg)'; // Arrow points DOWN
+        localStorage.setItem('daloy_header_state', 'closed');
+    }
+    
+    // Wait a millisecond for the DOM to snap to its new size, then push the app down
+    setTimeout(window.adjustAppPadding, 50);
+};
+
+window.initGlobalHeader = () => {
+    const state = localStorage.getItem('daloy_header_state') || 'open';
+    const content = document.getElementById('global-header-links');
+    const arrow = document.getElementById('global-header-arrow');
+    
+    if (state === 'closed') {
+        content.style.display = 'none';
+        arrow.style.transform = 'rotate(0deg)';
+    } else {
+        content.style.display = 'flex';
+        arrow.style.transform = 'rotate(180deg)';
+    }
+    
+    setTimeout(window.adjustAppPadding, 50);
+};
+
+window.adjustAppPadding = () => {
+    const header = document.getElementById('global-app-header');
+    // Only push the app down if the user is logged in and the header is actually visible!
+    if (window.currentUser && header.style.display !== 'none') {
+        document.body.style.paddingTop = header.offsetHeight + 'px';
+    } else {
+        document.body.style.paddingTop = '0px';
+    }
+};
+
+// --- DOCUMENTATION ENGINE ---
+window.loadDoc = async (docId) => {
+    // 1. Switch to the User Guide view
+    window.switchView('user-guide');
+
+    // 2. Update Sidebar Active States
+    document.querySelectorAll('.docs-link').forEach(btn => btn.classList.remove('active'));
+    const activeBtn = document.querySelector(`.docs-link[onclick="window.loadDoc('${docId}')"]`);
+    if (activeBtn) activeBtn.classList.add('active');
+
+    // 3. Prepare Content Area
+    const contentDiv = document.getElementById('docs-content');
+    contentDiv.innerHTML = '<span class="text-muted" style="display: flex; align-items: center; gap: 8px;">⏳ Fetching documentation...</span>';
+
+    try {
+        // 4. Fetch the Markdown file
+        const response = await fetch(`docs/${docId}.md`);
+        if (!response.ok) throw new Error('Article not found.');
+        
+        const markdown = await response.text();
+        
+        // 5. Ensure marked.js is ready, then parse
+        if (typeof marked === 'undefined') {
+            setTimeout(() => window.loadDoc(docId), 200);
+            return;
+        }
+        
+        contentDiv.innerHTML = marked.parse(markdown);
+        
+    } catch (error) {
+        contentDiv.innerHTML = `
+            <h1 style="color: var(--accent-red); border-bottom: none;">404 - Not Found</h1>
+            <p class="text-muted">The documentation article "<strong>${docId}</strong>" could not be loaded. It may not be written yet, or the server blocked the request.</p>
+        `;
+    }
+};
+
 window.quickAddTemplate = (name, amount, category, merchant, typeStr) => {
     const isIncome = (typeStr || '').toUpperCase().includes('INCOM');
     const displayAmount = isIncome ? amount : -amount;
@@ -520,6 +603,22 @@ window.applySettingsToUI = () => {
         behaviorSelect.addEventListener('change', (e) => {
             customSelect.style.display = e.target.value === 'custom' ? 'block' : 'none';
         });
+    }
+
+    // Update Landing Page Buttons based on Auth State
+    document.querySelectorAll('.landing-auth-btn').forEach(btn => {
+        if (btn.id === 'discord-login-btn') {
+            btn.innerText = window.currentUser ? 'Go to Dashboard' : 'Get Started';
+        } else {
+            btn.innerText = window.currentUser ? 'Dashboard' : 'Log In';
+        }
+    });
+
+    // Show the global header ONLY if the user is signed in
+    const globalHeader = document.getElementById('global-app-header');
+    if (globalHeader) {
+        globalHeader.style.display = window.currentUser ? 'block' : 'none';
+        window.initGlobalHeader();
     }
 };
 
@@ -4532,6 +4631,60 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error("Failed to delete trip:", e);
             alert("An error occurred while deleting the trip.");
         }
+    });
+
+
+    // ==========================================
+    // PROGRESSIVE WEB APP (PWA) & LANDING PAGE ANIMATIONS
+    // ==========================================
+
+    // 1. Register the Service Worker for PWA
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+                .then(registration => console.log('PWA ServiceWorker registered with scope:', registration.scope))
+                .catch(err => console.log('PWA ServiceWorker registration failed:', err));
+        });
+    }
+
+    // 2. Scroll Reveal Animation Logic
+    const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('active');
+                // Optional: Stop observing once revealed so it doesn't animate out and back in
+                // revealObserver.unobserve(entry.target); 
+            }
+        });
+    }, { 
+        threshold: 0.1, 
+        rootMargin: "0px 0px -50px 0px" 
+    });
+
+    // Observe all elements with the 'reveal' class
+    document.querySelectorAll('.reveal').forEach(el => {
+        revealObserver.observe(el);
+    });
+
+    // ==========================================
+    // GLOBAL LOADING SCREEN LOGIC
+    // ==========================================
+    window.hideGlobalLoader = () => {
+        document.body.classList.add('loaded');
+    };
+
+    // 1. Hide loader safely when the app finishes building the UI
+    if (window.bootUI) {
+        const originalBootUI = window.bootUI;
+        window.bootUI = () => {
+            originalBootUI();
+            window.hideGlobalLoader();
+        };
+    }
+
+    // 2. Failsafe: Hide loader after 1 second regardless (crucial for logged-out users where bootUI doesn't run)
+    window.addEventListener('load', () => {
+        setTimeout(window.hideGlobalLoader, 1000);
     });
 
 });

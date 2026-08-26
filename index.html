@@ -4,9 +4,54 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Budget Tracker</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#00D26A">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <!-- GLOBAL LOADING SCREEN -->
+    <div id="global-loader" style="position: fixed; inset: 0; z-index: 9999999; background: #0B0B0B; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: opacity 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0.6s;">
+        <h1 style="color: #FFFFFF; font-size: 56px; font-weight: 900; letter-spacing: -2px; margin: 0; animation: pulseFade 1.5s infinite ease-in-out;">
+            Loading your <span style="color: var(--primary);"> finances</span>
+        </h1>
+        <style>
+            @keyframes pulseFade {
+                0%, 100% { opacity: 1; transform: scale(1); }
+                50% { opacity: 0.5; transform: scale(0.95); }
+            }
+            body.loaded #global-loader {
+                opacity: 0;
+                visibility: hidden;
+                pointer-events: none;
+            }
+        </style>
+    </div>
+
+    <!-- GLOBAL COLLAPSIBLE HEADER (LOGGED IN USERS ONLY) -->
+    <div id="global-app-header" style="display: none; position: fixed; top: 0; left: 0; width: 100%; z-index: 1050; transition: all 0.3s ease;">
+        
+        <!-- The 40/60 Content -->
+        <div id="global-header-links" style="display: flex; align-items: center; justify-content: space-between; padding: 16px 5%; background: var(--surface); border-bottom: 1px solid var(--border); box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+            <div style="flex: 0 0 40%; display: flex; align-items: center; cursor: pointer;" onclick="window.switchView('landing')">
+                <img src="logo.png" alt="Logo" style="height: 28px; margin-right: 12px;">
+                <span style="font-size: 20px; font-weight: 800; letter-spacing: -0.5px; color: var(--text);">Renz-Bot | Finance</span>
+            </div>
+            <div style="flex: 1; display: flex; justify-content: flex-end; align-items: center; gap: 32px; font-size: 14px; font-weight: 600; flex-wrap: wrap; padding-right: 24px;">
+                <a href="#" style="color: var(--text-secondary); text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-secondary)'" onclick="window.switchView('landing')">App Home</a>
+                <a href="#" style="color: var(--text-secondary); text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-secondary)'" onclick="window.switchView('yield-optimizer')">Savings</a>
+                <a href="#" style="color: var(--text-secondary); text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-secondary)'" onclick="window.loadDoc('getting-started')">User Guide</a>
+                <a href="#" style="color: var(--text-secondary); text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-secondary)'" onclick="window.loadDoc('privacy')">Legal</a>
+            </div>
+        </div>
+        
+        <!-- Subtle Pull-Tab Toggle on the Right Edge -->
+        <div onclick="window.toggleGlobalHeader()" style="position: absolute; right: 5%; bottom: -24px; width: 48px; height: 24px; background: var(--surface); border: 1px solid var(--border); border-top: none; border-radius: 0 0 12px 12px; cursor: pointer; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 1051;" title="Toggle Quick Links">
+            <span id="global-header-arrow" style="font-size: 12px; transition: transform 0.2s; color: var(--text-secondary);">▼</span>
+        </div>
+    </div>
+
     <div class="app-container">
         
         <div id="mobile-header" class="mobile-header" style="display: none;">
@@ -65,61 +110,174 @@
 
         <main class="content">
 
-            <section id="landing" class="view active">
-                <div style="display: flex; flex-direction: column; min-height: 100vh;">
-                    <div class="landing-container" style="text-align: center; max-width: 800px; margin: 10vh auto; flex: 1;">
-                        <div style="display:flex; justify-content:center; margin-bottom: 24px;">
-                            <img src="logo.png" alt="Renz-bot Finance Logo" class="landing-logo" style="max-width: 200px; height: auto;">
-                        </div>
-                        <h1 style="font-size: 56px; font-weight: 700; letter-spacing: -2px; margin-bottom: 16px;">i like money</h1>
-                        <p class="text-muted" style="font-size: 18px; margin-bottom: 48px; line-height: 1.6;">a financial management tool. track budgets, analyze cash flow, and manage multiple accounts with seamless cloud sync. (now with multi currency support, yatta!)</p>
-                        
-                        <button id="discord-login-btn" class="primary-btn" style="font-size: 18px; padding: 16px 40px; background-color: #5865F2; color: white;">
-                            Login with Discord (sorry, WIP pa other means of auth)
+<!-- LANDING PAGE (STRICT DARK MODE, MAYA-INSPIRED) -->
+            <section id="landing" class="view active" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; overflow-y: auto; z-index: 999; padding: 0; background: #111111; color: #FFFFFF;">
+                
+                <!-- FIXED 40/60 HEADER -->
+                <header style="position: fixed; top: 0; left: 0; width: 100%; z-index: 1000; display: flex; align-items: center; justify-content: space-between; padding: 20px 5%; background: rgba(11, 11, 11, 0.85); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255,255,255,0.05); box-sizing: border-box;">
+                    <div style="flex: 0 0 40%; display: flex; align-items: center; cursor: pointer;" onclick="document.getElementById('landing').scrollTo({top: 0, behavior: 'smooth'})">
+                        <img src="logo.png" alt="Logo" style="height: 28px; margin-right: 12px;">
+                        <span style="font-size: 20px; font-weight: 800; letter-spacing: -0.5px; color: #FFFFFF;">Renz-Bot | Finance</span>
+                    </div>
+                    <div class="landing-nav-links" style="flex: 1; display: flex; justify-content: flex-end; align-items: center; gap: 32px; font-size: 14px; font-weight: 600;">
+                        <a href="#" onclick="document.getElementById('landing').scrollTo({top: 0, behavior: 'smooth'})">Home</a>
+                        <a href="#" onclick="window.switchView('yield-optimizer')">Savings</a>
+                        <a href="#" onclick="window.loadDoc('getting-started')">User Guide</a>
+                        <a href="#landing-footer">Legal</a>
+                        <button class="landing-auth-btn" style="padding: 10px 24px; border-radius: 24px; font-size: 14px; font-weight: 700; background: #FFFFFF; color: #000000; border: none; cursor: pointer; transition: transform 0.2s;" onclick="window.currentUser ? window.switchView('dashboard') : document.getElementById('discord-login-btn').click()">
+                            Log In
                         </button>
+                    </div>
+                </header>
+
+
+                <!-- HERO SECTION -->
+                <div class="landing-hero" style="min-height: 85vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px; position: relative;">
+                    <div style="z-index: 1; max-width: 900px;">
+                        <p class="reveal text-muted" style="font-size: 14px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 16px;">What's New</p>
+                        <h1 class="reveal" style="font-size: clamp(48px, 8vw, 84px); font-weight: 900; letter-spacing: -2px; line-height: 1.1; margin-bottom: 24px; color: #FFFFFF;">
+                            Your Money. Your Flow. <span style="color: var(--primary);">ツ</span>
+                        </h1>
+                        <p class="reveal" style="font-size: clamp(16px, 3vw, 20px); margin-bottom: 48px; line-height: 1.6; max-width: 600px; margin-left: auto; margin-right: auto; color: #A0A0A0;">
+                            A financial management tool built for the modern era. Track budgets, log deep expenses, settle ledgers, and analyze cash flow seamlessly.
+                        </p>
                         
-                        <!-- NEW: Public Access Button -->
-                        <div style="margin-top: 16px;">
-                            <button class="secondary-btn" style="padding: 12px 32px; border-color: var(--primary); color: var(--primary);" onclick="window.switchView('yield-optimizer')">
-                                Try the High-Yield Optimizer (No account needed) →
+                        <div class="reveal" style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+                            <button id="discord-login-btn" class="landing-auth-btn" style="padding: 16px 40px; font-size: 16px; font-weight: 700; background: var(--primary); color: #000; border: none; border-radius: 32px; cursor: pointer; transition: transform 0.2s;">
+                                Get Started
+                            </button>
+                            <button style="padding: 16px 40px; font-size: 16px; font-weight: 700; border: 2px solid var(--primary); color: var(--primary); background: transparent; border-radius: 32px; cursor: pointer; transition: transform 0.2s;" onclick="window.switchView('yield-optimizer')">
+                                Try Savings Optimizer
                             </button>
                         </div>
+                    </div>
+                </div>
 
-                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 80px; text-align: left;">
-                            <div class="card"><h3 style="margin-bottom:8px">Visual Insights</h3><p class="text-muted">Interactive bar charts and trend analyses for your cash flow.</p></div>
-                            <div class="card"><h3 style="margin-bottom:8px">Smart Budgets</h3><p class="text-muted">Income-based automatic category budgeting and savings.</p></div>
-                            <div class="card"><h3 style="margin-bottom:8px">Cloud Sync</h3><p class="text-muted">Powered by Supabase. Your data is secure and available everywhere.</p></div>
+                <!-- BENTO HIGHLIGHT CARDS (Maya Style) -->
+                <div style="padding: 60px 5%; max-width: 1400px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 24px;">
+                    <!-- Card 1: Ledgers -->
+                    <div class="reveal card" style="background: #2C3550; border-radius: 32px; padding: 48px; min-height: 450px; border: none; position: relative; overflow: hidden;">
+                        <h3 style="font-size: 32px; font-weight: 800; color: #FFFFFF; margin-bottom: 16px; line-height: 1.2;">Master your IOUs with Ledgers.</h3>
+                        <p style="font-size: 16px; color: rgba(255,255,255,0.8); line-height: 1.5; margin-bottom: 32px;">Never forget who owes who. Log lent money, track partial payments, and generate beautiful PDF Statements of Account in one tap.</p>
+                        <button style="background: #A3B1E6; color: #111; padding: 12px 24px; border-radius: 24px; border: none; font-weight: 700; cursor: pointer;">Explore Ledgers</button>
+                        
+                        <!-- Floating graphic representation -->
+                        <div style="position: absolute; bottom: -40px; right: -20px; width: 250px; height: 180px; background: rgba(0,0,0,0.2); border-radius: 24px; transform: rotate(-10deg); border: 2px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; padding: 20px;">
+                            <div style="width: 60%; height: 12px; background: rgba(255,255,255,0.2); border-radius: 6px; margin-bottom: 16px;"></div>
+                            <div style="width: 40%; height: 24px; background: var(--primary); border-radius: 6px; margin-bottom: auto;"></div>
+                            <div style="align-self: flex-end; width: 40px; height: 40px; background: rgba(255,255,255,0.1); border-radius: 50%;"></div>
                         </div>
                     </div>
 
-                    <footer class="landing-footer">
-                        <div class="footer-grid">
-                            <div class="footer-brand">
-                                <div style="display:flex; align-items:center; gap: 8px; font-weight: 700; font-size: 16px;">
-                                    <img src="logo.png" alt="Logo" style="max-width: 140px; height: auto;">
-                                </div>
-                                <p class="text-muted" style="font-size: 13px; margin-top: 8px;">Developed by Renz Jared Rolle.<br>Part of the Renz-bot Project.</p>
-                            </div>
-                            <div class="footer-links">
-                                <h4>Projects</h4>
-                                <a href="https://renzjared.github.io/recipes/" target="_blank">Recipes</a>
-                                <a href="https://renzjared.github.io/grades/" target="_blank">Grades</a>
-                                <a href="https://bit.ly/renz-bot" target="_blank">Discord Bot</a>
-                            </div>
-                            <div class="footer-links">
-                                <h4>Games</h4>
-                                <a href="https://renzjared.github.io/chainlink/" target="_blank">Chainlink</a>
-                                <a href="https://renzjared.github.io/morph/" target="_blank">Morph</a>
-                            </div>
-                            <div class="footer-links">
-                                <h4>Support</h4>
-                                <a href="#" class="nav-proxy" data-target="contact-us">Contact Us</a>
-                                <a href="#" onclick="window.loadLegal('tos.md', 'Terms of Service')">Terms of Service</a>
-                                <a href="#" onclick="window.loadLegal('privacy.md', 'Privacy Policy')">Privacy Policy</a>
+                    <!-- Card 2: Budgets -->
+                    <div class="reveal card" style="background: var(--primary); border-radius: 32px; padding: 48px; min-height: 450px; border: none; position: relative; overflow: hidden;">
+                        <h3 style="font-size: 32px; font-weight: 800; color: #000000; margin-bottom: 16px; line-height: 1.2;">It's easy to allocate money with Renz-bot.</h3>
+                        <p style="font-size: 16px; color: rgba(0,0,0,0.8); line-height: 1.5; margin-bottom: 32px;">Set your category percentages once. Every time you log an income, we automatically calculate your budget cycles.</p>
+                        <button style="background: #FFFFFF; color: #000; padding: 12px 24px; border-radius: 24px; border: none; font-weight: 700; cursor: pointer;">Set your Budgets</button>
+                        
+                        <!-- Floating graphic representation -->
+                        <div style="position: absolute; bottom: -20px; right: 20px; width: 200px; height: 200px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; justify-content: center; align-items: center;">
+                            <div style="width: 140px; height: 140px; background: rgba(255,255,255,0.4); border-radius: 50%;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DEDICATED FEATURE ROW 1: ACCOUNTS & LOGGING -->
+                <div style="padding: 120px 5%; border-top: 1px solid rgba(255,255,255,0.05);">
+                    <div style="max-width: 1200px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 60px; align-items: center;">
+                        <div class="reveal" style="flex: 1; min-width: 300px;">
+                            <h2 style="font-size: clamp(32px, 4vw, 48px); font-weight: 800; letter-spacing: -1px; margin-bottom: 24px; color: #FFFFFF;">One portfolio. Multiple accounts.</h2>
+                            <p style="font-size: 18px; margin-bottom: 32px; line-height: 1.6; color: #A0A0A0;">Link your expenses precisely to where they happened. Manage Banks, E-Wallets, Cash, and Investments in one unified dashboard.</p>
+                            <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 16px; font-size: 16px; color: #FFFFFF;">
+                                <li style="display: flex; align-items: center; gap: 12px; font-weight: 600;"><span style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: var(--primary); color: #000; border-radius: 50%; font-size: 12px;">✓</span> Track isolated balances</li>
+                                <li style="display: flex; align-items: center; gap: 12px; font-weight: 600;"><span style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: var(--primary); color: #000; border-radius: 50%; font-size: 12px;">✓</span> Log internal account transfers</li>
+                            </ul>
+                        </div>
+                        <div class="reveal" style="flex: 1; min-width: 300px; display: flex; justify-content: center;">
+                            <div style="width: 100%; max-width: 450px; height: 350px; background: #1A1A1A; border-radius: 32px; box-shadow: 0 30px 60px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: center; align-items: center; color: #555; font-weight: 700;">
+                                [ Accounts UI Mockup ]
                             </div>
                         </div>
-                    </footer>
+                    </div>
                 </div>
+
+                <!-- DEDICATED FEATURE ROW 2: ANALYTICS (Reversed Layout) -->
+                <div style="padding: 120px 5%; background: #161616; border-top: 1px solid rgba(255,255,255,0.05);">
+                    <div style="max-width: 1200px; margin: 0 auto; display: flex; flex-wrap: wrap-reverse; gap: 60px; align-items: center;">
+                        <div class="reveal" style="flex: 1; min-width: 300px; display: flex; justify-content: center;">
+                            <div style="width: 100%; max-width: 450px; height: 350px; background: #1A1A1A; border-radius: 32px; box-shadow: 0 30px 60px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: center; align-items: center; color: #555; font-weight: 700;">
+                                [ Analytics Charts Mockup ]
+                            </div>
+                        </div>
+                        <div class="reveal" style="flex: 1; min-width: 300px;">
+                            <h2 style="font-size: clamp(32px, 4vw, 48px); font-weight: 800; letter-spacing: -1px; margin-bottom: 24px; color: #FFFFFF;">Command Center Analytics.</h2>
+                            <p style="font-size: 18px; margin-bottom: 32px; line-height: 1.6; color: #A0A0A0;">Stunning, interactive charts that break down your cash flow. Track your running balance, monitor your net worth, and spot spending trends instantly.</p>
+                            <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 16px; font-size: 16px; color: #FFFFFF;">
+                                <li style="display: flex; align-items: center; gap: 12px; font-weight: 600;"><span style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: var(--primary); color: #000; border-radius: 50%; font-size: 12px;">✓</span> Sankey Flow Diagrams</li>
+                                <li style="display: flex; align-items: center; gap: 12px; font-weight: 600;"><span style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: var(--primary); color: #000; border-radius: 50%; font-size: 12px;">✓</span> Customizable Date Ranges</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DEDICATED FEATURE ROW 3: TRAVEL MODE -->
+                <div style="padding: 120px 5%; border-top: 1px solid rgba(255,255,255,0.05);">
+                    <div style="max-width: 1200px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 60px; align-items: center;">
+                        <div class="reveal" style="flex: 1; min-width: 300px;">
+                            <h2 style="font-size: clamp(32px, 4vw, 48px); font-weight: 800; letter-spacing: -1px; margin-bottom: 24px; color: #FFFFFF;">Travel Mode ✈️</h2>
+                            <p style="font-size: 18px; margin-bottom: 32px; line-height: 1.6; color: #A0A0A0;">Vacations shouldn't break your standard budget algorithms. Isolate your trip expenses, fund them via specific savings goals, and get a beautiful "Wrapped" summary of your spending when you return.</p>
+                            <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 16px; font-size: 16px; color: #FFFFFF;">
+                                <li style="display: flex; align-items: center; gap: 12px; font-weight: 600;"><span style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: var(--primary); color: #000; border-radius: 50%; font-size: 12px;">✓</span> Separate Trip Ledgers</li>
+                                <li style="display: flex; align-items: center; gap: 12px; font-weight: 600;"><span style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: var(--primary); color: #000; border-radius: 50%; font-size: 12px;">✓</span> Shareable Insights Image</li>
+                            </ul>
+                        </div>
+                        <div class="reveal" style="flex: 1; min-width: 300px; display: flex; justify-content: center;">
+                            <div style="width: 100%; max-width: 350px; height: 500px; background: #1A1A1A; border-radius: 40px; box-shadow: 0 30px 60px rgba(0,0,0,0.5); border: 8px solid #2C2C2C; display: flex; justify-content: center; align-items: center; color: #555; font-weight: 700;">
+                                [ Mobile App Preview ]
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MASSIVE CALL TO ACTION -->
+                <div style="padding: 120px 5%; background: var(--primary); text-align: center; color: #000000;">
+                    <div class="reveal" style="max-width: 800px; margin: 0 auto;">
+                        <h2 style="font-size: clamp(40px, 6vw, 64px); font-weight: 900; letter-spacing: -2px; margin-bottom: 24px; line-height: 1.1;">Ready to take control?</h2>
+                        <p style="font-size: 20px; font-weight: 500; margin-bottom: 48px; opacity: 0.8;">Join today and experience zero-friction personal finance.</p>
+                        <button class="landing-auth-btn" style="padding: 20px 48px; font-size: 18px; font-weight: 800; background: #000000; color: #FFFFFF; border: none; border-radius: 40px; cursor: pointer; transition: transform 0.2s; box-shadow: 0 10px 30px rgba(0,0,0,0.2);" onclick="window.currentUser ? window.switchView('dashboard') : document.getElementById('discord-login-btn').click()">
+                            Get Started Now
+                        </button>
+                    </div>
+                </div>
+
+                <!-- FOOTER -->
+                <footer class="landing-footer" id="landing-footer" style="padding-top: 80px; padding-bottom: 80px; background: #0B0B0B;">
+                    <div class="footer-grid" style="max-width: 1200px; margin: 0 auto; padding: 0 24px;">
+                        <div class="footer-brand">
+                            <div style="display:flex; align-items:center; gap: 8px; font-weight: 700; font-size: 16px; color: #FFFFFF;">
+                                <img src="logo.png" alt="Logo" style="max-width: 140px; height: auto;">
+                            </div>
+                            <p style="font-size: 13px; margin-top: 16px; line-height: 1.5; color: #A0A0A0;">Developed by Renz Jared Rolle.<br>Part of the Renz-bot Project.</p>
+                        </div>
+                        <div class="footer-links">
+                            <h4 style="margin-bottom: 16px; color: #FFFFFF;">Projects</h4>
+                            <a href="https://renzjared.github.io/recipes/" target="_blank" style="color: #A0A0A0; text-decoration: none;">Recipes</a>
+                            <a href="https://renzjared.github.io/grades/" target="_blank" style="color: #A0A0A0; text-decoration: none; display: block; margin-top: 8px;">Grades</a>
+                            <a href="https://bit.ly/renz-bot" target="_blank" style="color: #A0A0A0; text-decoration: none; display: block; margin-top: 8px;">Discord Bot</a>
+                        </div>
+                        <div class="footer-links">
+                            <h4 style="margin-bottom: 16px; color: #FFFFFF;">Games</h4>
+                            <a href="https://renzjared.github.io/chainlink/" target="_blank" style="color: #A0A0A0; text-decoration: none;">Chainlink</a>
+                            <a href="https://renzjared.github.io/morph/" target="_blank" style="color: #A0A0A0; text-decoration: none; display: block; margin-top: 8px;">Morph</a>
+                        </div>
+                        <div class="footer-links">
+                            <h4 style="margin-bottom: 16px; color: #FFFFFF;">Support</h4>
+                            <a href="#" class="nav-proxy" data-target="contact-us" style="color: #A0A0A0; text-decoration: none;">Contact Us</a>
+                            <a href="#" onclick="window.loadLegal('tos.md', 'Terms of Service')" style="color: #A0A0A0; text-decoration: none; display: block; margin-top: 8px;">Terms of Service</a>
+                            <a href="#" onclick="window.loadLegal('privacy.md', 'Privacy Policy')" style="color: #A0A0A0; text-decoration: none; display: block; margin-top: 8px;">Privacy Policy</a>
+                        </div>
+                    </div>
+                </footer>
             </section>
 
             <section id="username-setup" class="view">
@@ -135,6 +293,8 @@
             </section>
 
             <section id="dashboard" class="view">
+
+
                 <header class="top-header">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div style="display: flex; align-items: center; gap: 16px;">
@@ -776,6 +936,44 @@
                     </div>
 
                     <p class="text-muted" style="font-size: 11px; text-align: center;">*Computations account for standard 20% Philippine withholding tax. Multi-year projections assume annual compounding of the blended APY.</p>
+                </div>
+            </section>
+
+            <!-- API-STYLE USER GUIDE VIEW -->
+            <section id="user-guide" class="view" style="padding: 0; min-height: 100vh; display: flex; flex-direction: column;">
+                <header class="top-header" style="flex-shrink: 0; border-bottom: 1px solid var(--border); padding: 16px 24px; background: var(--surface);">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <h2 style="margin: 0;">User Guide</h2>
+                            <p class="text-muted" style="font-size: 13px; margin: 0;">Documentation & Help Center</p>
+                        </div>
+                        <button class="secondary-btn nav-proxy" data-target="landing" style="padding: 8px 16px;">← Back to Home</button>
+                    </div>
+                </header>
+                
+                <div class="docs-container" style="display: flex; flex: 1; overflow: hidden;">
+                    <!-- Docs Navigation Sidebar -->
+                    <aside class="docs-sidebar" style="width: 260px; background: var(--surface-hover); border-right: 1px solid var(--border); overflow-y: auto; padding: 24px; flex-shrink: 0;">
+                        <h4 style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); margin-bottom: 12px;">Introduction</h4>
+                        <ul style="list-style: none; padding: 0; margin: 0 0 24px 0; display: flex; flex-direction: column; gap: 4px;">
+                            <li><button class="text-btn docs-link active" onclick="window.loadDoc('getting-started')">Getting Started</button></li>
+                        </ul>
+
+                        <h4 style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); margin-bottom: 12px;">Features</h4>
+                        <ul style="list-style: none; padding: 0; margin: 0 0 24px 0; display: flex; flex-direction: column; gap: 4px;">
+                            <li><button class="text-btn docs-link" onclick="window.loadDoc('yield-optimizer')">Yield Optimizer</button></li>
+                            <li><button class="text-btn docs-link" onclick="alert('Accounts documentation coming soon!')">Accounts & Multi-Currency</button></li>
+                            <li><button class="text-btn docs-link" onclick="alert('Ledgers documentation coming soon!')">Ledgers & IOUs</button></li>
+                            <li><button class="text-btn docs-link" onclick="alert('Travel documentation coming soon!')">Travel Mode</button></li>
+                        </ul>
+                    </aside>
+
+                    <!-- Docs Content Area -->
+                    <div style="flex: 1; overflow-y: auto; background: var(--bg); padding: 40px 24px;">
+                        <div id="docs-content" class="markdown-body" style="max-width: 750px; margin: 0 auto;">
+                            <span class="text-muted">Loading article...</span>
+                        </div>
+                    </div>
                 </div>
             </section>
 

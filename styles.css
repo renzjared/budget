@@ -667,3 +667,93 @@ body.travel-theme {
     tr { page-break-inside: avoid; page-break-after: auto; }
     thead { display: table-header-group; }
 }
+
+
+/* --- LANDING PAGE ANIMATIONS & POLISH --- */
+.reveal {
+    opacity: 0;
+    transform: translateY(40px);
+    transition: opacity 0.8s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.reveal.active {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+@keyframes floatBounce {
+    0%, 20%, 50%, 80%, 100% { transform: translateY(0) translateX(-50%); }
+    40% { transform: translateY(-10px) translateX(-50%); }
+    60% { transform: translateY(-5px) translateX(-50%); }
+}
+
+#discord-login-btn:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 15px 35px rgba(88, 101, 242, 0.4) !important;
+}
+
+/* Ensure padding exists on mobile so nothing touches screen edges */
+@media (max-width: 768px) {
+    .landing-hero h1 { font-size: 40px !important; }
+    .landing-hero p { font-size: 16px !important; padding: 0 16px; }
+}
+
+/* --- LANDING PAGE NAVBAR & HOVERS --- */
+.landing-nav-links a {
+    color: #FFFFFF;
+    text-decoration: none;
+    opacity: 0.7;
+    transition: opacity 0.2s, color 0.2s;
+}
+
+.landing-nav-links a:hover {
+    opacity: 1;
+    color: var(--primary);
+}
+
+.landing-auth-btn:hover {
+    transform: scale(1.05);
+}
+
+@media (max-width: 768px) {
+    /* Hide the text links on mobile, keep the main CTA */
+    .landing-nav-links a {
+        display: none;
+    }
+}
+
+/* --- USER GUIDE / API DOCS STYLING --- */
+.docs-link {
+    width: 100%;
+    text-align: left;
+    padding: 8px 12px;
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-size: 14px;
+    transition: all 0.2s;
+    background: transparent;
+}
+
+.docs-link:hover {
+    background: rgba(255,255,255,0.05);
+    color: var(--text);
+}
+
+.docs-link.active {
+    background: var(--primary);
+    color: #000;
+    font-weight: 700;
+}
+
+/* Mobile Responsiveness for Docs Split-Pane */
+@media (max-width: 768px) {
+    .docs-container {
+        flex-direction: column;
+    }
+    .docs-sidebar {
+        width: 100% !important;
+        border-right: none !important;
+        border-bottom: 1px solid var(--border);
+        max-height: 250px;
+    }
+}

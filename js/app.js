@@ -240,6 +240,93 @@ window.setDefaultCurrencyDropdown = (id) => {
 };
 
 // --- CORE FUNCTIONS ---
+
+window.renderDashboardAccountsCarousel = () => {
+    const carousel = document.getElementById('dashboard-accounts-carousel');
+    if (!carousel) return;
+
+    const getAccountLastUsed = (accId) => {
+        const txs = window.appData.filter(t => t.account_id === accId || t.to_account_id === accId);
+        if (!txs.length) return 0;
+        return Math.max(...txs.map(t => new Date(t.timestamp).getTime()));
+    };
+
+    // Sort: Favorites first (by recently used), then Unfavorited (by recently used)
+    const sortedAccounts = [...window.accountsData].sort((a, b) => {
+        if (a.favorite !== b.favorite) return a.favorite ? -1 : 1;
+        return getAccountLastUsed(b.id) - getAccountLastUsed(a.id);
+    });
+
+    if (sortedAccounts.length === 0) {
+        carousel.innerHTML = '<div class="card" style="width: 100%; text-align: center;"><p class="text-muted" style="font-size: 13px; margin: 0;">No accounts linked yet.</p></div>';
+        return;
+    }
+
+    const userCurrency = (window.userSettings?.currency || '₱').replace('₱', 'PHP');
+    const cache = window.getPriceCache ? window.getPriceCache() : {};
+    const userCurrencySymbol = window.userSettings?.currency || '₱';
+
+    carousel.innerHTML = sortedAccounts.map(acc => {
+        let iconHtml = `<span style="font-weight:bold;">${(acc.name || '?').charAt(0).toUpperCase()}</span>`;
+        if (acc.icon_type === 'image') iconHtml = `<img src="${acc.icon_value}" style="width:100%; height:100%; border-radius:50%; object-fit:contain; background: white; padding: 4px;">`;
+        else if (acc.icon_type === 'icon') iconHtml = atob(acc.icon_value);
+        else if (acc.icon_type === 'emoji') iconHtml = acc.icon_value;
+        else if (acc.icon_type === 'letter' && acc.icon_value) iconHtml = `<span style="font-weight:bold;">${acc.icon_value.toUpperCase()}</span>`;
+
+        let convertedAmount = acc.balance;
+        const accCurrency = acc.currency || userCurrency;
+        let originalDisplay = '';
+        
+        if (accCurrency !== userCurrency) {
+            const rate = cache[accCurrency]?.rate || 1;
+            convertedAmount = acc.balance * rate;
+            originalDisplay = `${acc.balance < 0 ? '-' : ''}${window.formatMoneyWithSymbol(Math.abs(acc.balance), accCurrency)}`;
+        }
+
+        let cardBg = acc.color;
+        if (convertedAmount < 0 || acc.type === 'payable') {
+            cardBg = 'linear-gradient(135deg, #FF416C 0%, #FF4B2B 100%)';
+        }
+
+        return `
+            <div class="account-card maya-card carousel-card" style="background: ${cardBg}; cursor: pointer; padding: 20px; min-height: 140px; display: flex; flex-direction: column; justify-content: space-between; border-radius: 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.15);" onclick="window.switchView('accounts'); setTimeout(() => window.openAccountLedger('${acc.id}'), 100)">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+                    <div class="icon-wrapper" style="width: 40px; height: 40px; font-size: 16px; ${(!acc.icon_type || acc.icon_type === 'letter') ? '' : 'background:transparent; box-shadow:none; overflow:visible;'}">${iconHtml}</div>
+                    ${acc.favorite ? '<span style="color:#FFD700; font-size:16px; text-shadow: 0 1px 3px rgba(0,0,0,0.5);">★</span>' : ''}
+                </div>
+                <div>
+                    <h3 class="card-name" style="font-size: 15px; margin-bottom: 4px; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.5);">${acc.name}</h3>
+                    <h2 class="card-bal" style="font-size: 22px; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.5); margin: 0;">${convertedAmount < 0 ? '-' : ''}${window.formatMoneyWithSymbol(Math.abs(convertedAmount), userCurrencySymbol)}</h2>
+                    ${originalDisplay ? `<p style="font-size: 11px; margin-top: 4px; color: rgba(255,255,255,0.8);">${originalDisplay}</p>` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Allow horizontal scrolling via standard vertical mouse wheel
+    // (We remove the old listener first to prevent speed stacking if the dashboard is re-rendered)
+    carousel.removeEventListener('wheel', window.carouselScrollHandler);
+    
+    window.carouselScrollHandler = (e) => {
+        // Only hijack pure vertical scrolling (ignores trackpad horizontal swipes)
+        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+            const isAtStart = carousel.scrollLeft === 0;
+            const isAtEnd = Math.ceil(carousel.scrollLeft + carousel.clientWidth) >= carousel.scrollWidth;
+            
+            // If hitting the edges and pushing outwards, let the browser handle it!
+            // This prevents trapping the user and triggers the native OS rubber-banding effect.
+            if ((isAtStart && e.deltaY < 0) || (isAtEnd && e.deltaY > 0)) {
+                return; 
+            }
+            
+            e.preventDefault();
+            carousel.scrollLeft += e.deltaY;
+        }
+    };
+    
+    carousel.addEventListener('wheel', window.carouselScrollHandler, { passive: false });
+};
+
 window.switchView = (targetId) => {
     if (!targetId) return;
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -1254,6 +1341,13 @@ window.updateDashboard = () => {
     if (window.renderUpcomingSubscriptions) window.renderUpcomingSubscriptions();
     if (window.renderDashboardInsights) window.renderDashboardInsights();
     if (window.renderQuickAddWidget) window.renderQuickAddWidget();
+
+    // Trigger Insights & Carousel Refresh
+    if (window.updateDashboardInsights) {
+        const rangeEl = document.getElementById('dashboard-insights-range');
+        window.updateDashboardInsights(rangeEl ? rangeEl.value : '30');
+    }
+    if (window.renderDashboardAccountsCarousel) window.renderDashboardAccountsCarousel();
 };
 
 window.activeCategoryFilters = new Set();
@@ -1664,14 +1758,17 @@ window.renderStatistics = (range = 'all') => {
         cutoffStart = new Date(new Date().getTime() - (parseInt(range) * 24 * 60 * 60 * 1000));
     }
 
-    let totalIncome = 0; let totalExpense = 0; let expensesList = [];
+let totalIncome = 0; let totalExpense = 0; let expensesList = [];
     let filteredData = []; let dataBeforeStart = [];
+    
+    // NEW FOR ANALYTICS:
+    let txCount = 0;
+    const catTotals = {};
 
     const includeTravel = document.getElementById('stats-include-travel')?.checked || false;
 
     window.appData.forEach(entry => {
         if (entry.timestamp) {
-            // FIX: Explicitly exclude ledgers and internal transfers from all cash flow analytics
             if (entry.type === 'TRANSFER' || entry.type === 'LEDGER_ITEM') return;
 
             const eDate = new Date(entry.timestamp);
@@ -1680,20 +1777,36 @@ window.renderStatistics = (range = 'all') => {
                 if (!includeTravel && entry.trip_id) return; 
 
                 filteredData.push(entry);
+                txCount++; // Increment count
+                
                 const isIncome = (entry.type || '').toUpperCase().includes('INCOM');
                 if (isIncome) { 
                     totalIncome += entry.amount; 
                 } else { 
-                    // No need to check for transfers here anymore, they are filtered out above!
                     totalExpense -= entry.amount; 
                     expensesList.push(entry); 
+                    
+                    // Track category for analytics
+                    const cat = entry.category || 'Uncategorized';
+                    catTotals[cat] = (catTotals[cat] || 0) + Math.abs(entry.amount);
                 }
             }
         }
     });
+    
+    let topCat = '-'; let topCatAmt = 0;
+    for (const [cat, amt] of Object.entries(catTotals)) {
+        if (amt > topCatAmt) { topCatAmt = amt; topCat = cat; }
+    }
+
     const safeSet = (id, text) => { const el = document.getElementById(id); if(el) el.innerText = text; };
     safeSet('stat-income', window.formatMoney(totalIncome, true));
     safeSet('stat-expense', window.formatMoney(totalExpense, true));
+    
+    // NEW FOR ANALYTICS: Update the DOM
+    safeSet('stat-tx-count', txCount);
+    safeSet('stat-top-cat', topCat);
+    safeSet('stat-top-cat-amt', window.formatMoney(topCatAmt, true));
     
     const net = totalIncome - totalExpense;
     const netEl = document.getElementById('stat-net');

@@ -373,6 +373,119 @@
                     </div>
                 </div>
 
+                    <style>
+                        .dashboard-insights-grid {
+                            display: grid;
+                            grid-template-columns: repeat(2, 1fr);
+                            gap: 16px;
+                            margin-bottom: 20px;
+                        }
+                        /* On wider screens, span exactly 4 across perfectly */
+                        @media(min-width: 800px) {
+                            .dashboard-insights-grid {
+                                grid-template-columns: repeat(4, 1fr);
+                            }
+                        }
+                        .insight-card {
+                            background: var(--surface-hover);
+                            padding: 20px;
+                            border-radius: 16px;
+                            display: flex;
+                            flex-direction: column;
+                            justify-content: space-between;
+                            transition: transform 0.2s, background 0.2s;
+                        }
+                        .insight-card.clickable:hover {
+                            background: var(--border);
+                            cursor: pointer;
+                        }
+                    </style>
+
+                    <div class="card" style="margin-bottom: 24px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                            <h3 style="margin: 0;">Spending Insights</h3>
+                            <select id="dashboard-insights-range" class="form-input" style="width: auto; padding: 6px 12px; font-size: 13px; font-weight: 600; border-radius: 8px; min-width: 90px; cursor: pointer;" onchange="window.updateDashboardInsights(this.value)">
+                                <option value="1">1D</option>
+                                <option value="7">7D</option>
+                                <option value="30" selected>30D</option>
+                                <option value="365">1Y</option>
+                                <option value="all">All Time</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                        
+<div class="dashboard-insights-grid">
+                            
+                            <!-- Net Change (Not clickable) -->
+                            <div class="insight-card">
+                                <p class="text-muted" style="font-size:11px; text-transform:uppercase; font-weight:700; margin-bottom:12px; letter-spacing:0.5px;">Net Change</p>
+                                <div style="display: flex; flex-direction: row; gap: 8px; align-items: center; flex-wrap: wrap;">
+                                    <h3 id="dash-insight-net" style="margin:0; font-size: 22px; font-weight: 800;">₱0.00</h3>
+                                    <span id="dash-insight-net-pct"></span>
+                                </div>
+                            </div>
+                            
+                            <!-- Rem. Budget (Not clickable) -->
+                            <div class="insight-card">
+                                <p class="text-muted" style="font-size:11px; text-transform:uppercase; font-weight:700; margin-bottom:12px; letter-spacing:0.5px;">Rem. Budget</p>
+                                <div style="display: flex; flex-direction: row; gap: 8px; align-items: center; flex-wrap: wrap;">
+                                    <h3 id="dash-insight-rem" style="margin:0; font-size: 22px; font-weight: 800;">₱0.00</h3>
+                                </div>
+                            </div>
+                            
+                            <!-- Transactions (Clickable) -->
+                            <div class="insight-card clickable" onclick="window.openInsightTxs('Transactions')">
+                                <p class="text-muted" style="font-size:11px; text-transform:uppercase; font-weight:700; margin-bottom:12px; letter-spacing:0.5px;">Transactions</p>
+                                <div style="display: flex; flex-direction: row; gap: 8px; align-items: center; flex-wrap: wrap;">
+                                    <h3 id="dash-insight-tx" style="margin:0; font-size: 22px; font-weight: 800;">0</h3>
+                                    <span id="dash-insight-tx-pct"></span>
+                                </div>
+                            </div>
+                            
+                            <!-- Total Spent (Clickable) -->
+                            <div class="insight-card clickable" onclick="window.openInsightTxs('Total Spent')">
+                                <p class="text-muted" style="font-size:11px; text-transform:uppercase; font-weight:700; margin-bottom:12px; letter-spacing:0.5px;">Total Spent</p>
+                                <div style="display: flex; flex-direction: row; gap: 8px; align-items: center; flex-wrap: wrap;">
+                                    <h3 id="dash-insight-spent" style="margin:0; font-size: 22px; font-weight: 800; color: var(--accent-red);">₱0.00</h3>
+                                    <span id="dash-insight-spent-pct"></span>
+                                </div>
+                            </div>
+                            
+                            <!-- Top Category spans full width across the bottom -->
+                            <div class="insight-card clickable" onclick="window.openInsightTxs('Top Category')" style="grid-column: 1 / -1; flex-direction: row; align-items: center; min-height: 90px;">
+                                <div>
+                                    <p class="text-muted" style="font-size:11px; text-transform:uppercase; font-weight:700; margin-bottom:4px; letter-spacing:0.5px;">Top Category</p>
+                                    <div style="display: flex; align-items: center; gap: 12px;">
+                                        <h3 id="dash-insight-top-cat" style="margin:0; font-size: 20px; font-weight: 800; text-transform: uppercase;">-</h3>
+                                        <span id="dash-insight-top-cat-prog" style="font-size: 13px; font-weight: 700;"></span>
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <p class="text-muted" style="font-size:11px; text-transform:uppercase; font-weight:700; margin-bottom:4px; letter-spacing:0.5px;">Amount</p>
+                                    <h3 id="dash-insight-top-spend" style="margin:0; font-size: 20px; font-weight: 800; color: var(--text);">₱0.00</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="secondary-btn" style="width: 100%; font-size: 13px;" onclick="window.switchView('statistics')">More Insights →</button>
+                    </div>
+
+                <!-- NEW: DASHBOARD ACCOUNTS CAROUSEL -->
+                <div style="margin-bottom: 32px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h3 style="margin: 0;">My Accounts</h3>
+                        <button class="text-btn" onclick="window.switchView('accounts')" style="font-size: 13px; font-weight: 600; color: var(--primary);">View All</button>
+                    </div>
+                    <div id="dashboard-accounts-carousel" style="display: flex; gap: 16px; overflow-x: auto; padding-bottom: 12px; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;">
+                        <!-- JS Injected Cards -->
+                    </div>
+                    <style>
+                        #dashboard-accounts-carousel::-webkit-scrollbar { height: 4px; }
+                        #dashboard-accounts-carousel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+                        .carousel-card { flex: 0 0 calc(85vw - 16px); max-width: 320px; scroll-snap-align: start; flex-shrink: 0; }
+                        @media(min-width: 768px) { .carousel-card { flex: 0 0 calc(33.333% - 11px); } }
+                    </style>
+                </div>
+
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; margin-bottom: 24px;">
                     
                     <div class="card">
@@ -513,7 +626,7 @@
                     </div>
                 </header>
                 
-                <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
+                <!-- <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
                     <div class="card"><p class="text-muted">Total Income</p><h2 id="stat-income" style="color: var(--primary); margin-top: 8px;">₱0.00</h2></div>
                     <div class="card"><p class="text-muted">Total Expenses</p><h2 id="stat-expense" style="color: var(--text); margin-top: 8px;">₱0.00</h2></div>
                     <div class="card">
@@ -523,6 +636,20 @@
                             <button class="icon-btn privacy-toggle-btn" onclick="window.togglePrivacyMode()" style="color: var(--text-secondary); cursor: pointer; padding: 4px; background: none; border: none;"></button>
                         </div>
                     </div>
+                </div> -->
+
+                <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px;">
+                    <div class="card"><p class="text-muted">Total Income</p><h2 id="stat-income" style="color: var(--primary); margin-top: 8px;">₱0.00</h2></div>
+                    <div class="card"><p class="text-muted">Total Expenses</p><h2 id="stat-expense" style="color: var(--accent-red); margin-top: 8px;">₱0.00</h2></div>
+                    <div class="card">
+                        <p class="text-muted">Net Change</p>
+                        <div style="display: flex; align-items: center; gap: 16px; margin-top: 8px;">
+                            <h2 id="stat-net" style="margin: 0;">₱0.00</h2>
+                            <button class="icon-btn privacy-toggle-btn" onclick="window.togglePrivacyMode()" style="color: var(--text-secondary); cursor: pointer; padding: 4px; background: none; border: none;"></button>
+                        </div>
+                    </div>
+                    <div class="card"><p class="text-muted">Transactions</p><h2 id="stat-tx-count" style="margin-top: 8px;">0</h2></div>
+                    <div class="card"><p class="text-muted">Top Category</p><h3 id="stat-top-cat" style="margin-top: 8px; font-size: 20px;">-</h3><p id="stat-top-cat-amt" class="text-muted" style="font-size: 12px; margin-top: 4px;">₱0.00</p></div>
                 </div>
 
                 <div class="card" style="margin-bottom: 24px;">
@@ -1428,8 +1555,9 @@
     
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <script src="js/state.js" defer></script>
-    <script src="js/charts.js" defer></script>
     <script src="js/app.js" defer></script>
+    <script src="js/charts.js" defer></script>
+    <script src="js/insights.js" defer></script>
     <script src="js/ledgers.js" defer></script>
     <script src="js/yield.js" defer></script>
     <script src="js/admin.js" defer></script>

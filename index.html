@@ -29,37 +29,25 @@
         </style>
     </div>
 
-    <!-- GLOBAL COLLAPSIBLE HEADER (LOGGED IN USERS ONLY) -->
-    <div id="global-app-header" style="display: none; position: fixed; top: 0; left: 0; width: 100%; z-index: 1050; transition: all 0.3s ease;">
-        
-        <!-- The 40/60 Content -->
-        <div id="global-header-links" style="display: flex; align-items: center; justify-content: space-between; padding: 16px 5%; background: var(--surface); border-bottom: 1px solid var(--border); box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
-            <div style="flex: 0 0 40%; display: flex; align-items: center; cursor: pointer;" onclick="window.switchView('landing')">
-                <img src="logo.png" alt="Logo" style="height: 28px; margin-right: 12px;">
-                <span style="font-size: 20px; font-weight: 800; letter-spacing: -0.5px; color: var(--text);">Renz-Bot | Finance</span>
-            </div>
-            <div style="flex: 1; display: flex; justify-content: flex-end; align-items: center; gap: 32px; font-size: 14px; font-weight: 600; flex-wrap: wrap; padding-right: 24px;">
-                <a href="#" style="color: var(--text-secondary); text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-secondary)'" onclick="window.switchView('landing')">App Home</a>
-                <a href="#" style="color: var(--text-secondary); text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-secondary)'" onclick="window.switchView('yield-optimizer')">Savings</a>
-                <a href="#" style="color: var(--text-secondary); text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-secondary)'" onclick="window.loadDoc('getting-started')">User Guide</a>
-                <a href="#" style="color: var(--text-secondary); text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-secondary)'" onclick="window.loadDoc('privacy')">Legal</a>
-            </div>
-        </div>
-        
-        <!-- Subtle Pull-Tab Toggle on the Right Edge -->
-        <div onclick="window.toggleGlobalHeader()" style="position: absolute; right: 5%; bottom: -24px; width: 48px; height: 24px; background: var(--surface); border: 1px solid var(--border); border-top: none; border-radius: 0 0 12px 12px; cursor: pointer; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 1051;" title="Toggle Quick Links">
-            <span id="global-header-arrow" style="font-size: 12px; transition: transform 0.2s; color: var(--text-secondary);">▼</span>
-        </div>
-    </div>
+                <!-- FIXED 40/60 HEADER -->
+                <header style="position: fixed; top: 0; left: 0; width: 100%; z-index: 1000; display: flex; align-items: center; justify-content: space-between; padding: 20px 5%; background: rgba(11, 11, 11, 0.85); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255,255,255,0.05); box-sizing: border-box;">
+                    <div style="flex: 0 0 40%; display: flex; align-items: center; cursor: pointer;" onclick="document.getElementById('landing').scrollTo({top: 0, behavior: 'smooth'})">
+                        <img src="logo.png" alt="Logo" style="height: 28px; margin-right: 12px;">
+                        <span style="font-size: 20px; font-weight: 800; letter-spacing: -0.5px; color: #FFFFFF;">Renz-Bot | Finance</span>
+                    </div>
+                    <div class="landing-nav-links" style="flex: 1; display: flex; justify-content: flex-end; align-items: center; gap: 32px; font-size: 14px; font-weight: 600;">
+                        <a href="#" onclick="document.getElementById('landing').scrollTo({top: 0, behavior: 'smooth'})">Home</a>
+                        <a href="#" onclick="window.switchView('yield-optimizer')">Savings</a>
+                        <a href="#" onclick="window.loadDoc('getting-started')">User Guide</a>
+                        <a href="#landing-footer">Legal</a>
+                        <button class="landing-auth-btn" style="padding: 10px 24px; border-radius: 24px; font-size: 14px; font-weight: 700; background: #FFFFFF; color: #000000; border: none; cursor: pointer; transition: transform 0.2s;" onclick="window.currentUser ? window.switchView('dashboard') : document.getElementById('discord-login-btn').click()">
+                            Log In
+                        </button>
+                    </div>
+                </header>
+
 
     <div class="app-container">
-        
-        <div id="mobile-header" class="mobile-header" style="display: none;">
-            <button id="mobile-menu-btn" class="icon-btn">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-            </button>
-            <span style="font-weight: 700; font-size: 18px; color: var(--text);">Renz-bot Finance</span>
-        </div>
 
         <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
         <aside class="sidebar" id="main-sidebar" style="display: none;">
@@ -112,24 +100,7 @@
 
 <!-- LANDING PAGE (STRICT DARK MODE, MAYA-INSPIRED) -->
             <section id="landing" class="view active" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; overflow-y: auto; z-index: 999; padding: 0; background: #111111; color: #FFFFFF;">
-                
-                <!-- FIXED 40/60 HEADER -->
-                <header style="position: fixed; top: 0; left: 0; width: 100%; z-index: 1000; display: flex; align-items: center; justify-content: space-between; padding: 20px 5%; background: rgba(11, 11, 11, 0.85); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255,255,255,0.05); box-sizing: border-box;">
-                    <div style="flex: 0 0 40%; display: flex; align-items: center; cursor: pointer;" onclick="document.getElementById('landing').scrollTo({top: 0, behavior: 'smooth'})">
-                        <img src="logo.png" alt="Logo" style="height: 28px; margin-right: 12px;">
-                        <span style="font-size: 20px; font-weight: 800; letter-spacing: -0.5px; color: #FFFFFF;">Renz-Bot | Finance</span>
-                    </div>
-                    <div class="landing-nav-links" style="flex: 1; display: flex; justify-content: flex-end; align-items: center; gap: 32px; font-size: 14px; font-weight: 600;">
-                        <a href="#" onclick="document.getElementById('landing').scrollTo({top: 0, behavior: 'smooth'})">Home</a>
-                        <a href="#" onclick="window.switchView('yield-optimizer')">Savings</a>
-                        <a href="#" onclick="window.loadDoc('getting-started')">User Guide</a>
-                        <a href="#landing-footer">Legal</a>
-                        <button class="landing-auth-btn" style="padding: 10px 24px; border-radius: 24px; font-size: 14px; font-weight: 700; background: #FFFFFF; color: #000000; border: none; cursor: pointer; transition: transform 0.2s;" onclick="window.currentUser ? window.switchView('dashboard') : document.getElementById('discord-login-btn').click()">
-                            Log In
-                        </button>
-                    </div>
-                </header>
-
+            
 
                 <!-- HERO SECTION -->
                 <div class="landing-hero" style="min-height: 85vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px; position: relative;">

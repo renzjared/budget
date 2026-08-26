@@ -265,51 +265,31 @@ window.switchView = (targetId) => {
     }
 };
 
-// --- GLOBAL HEADER MEMORY & LAYOUT ---
-window.toggleGlobalHeader = () => {
-    const content = document.getElementById('global-header-links');
-    const arrow = document.getElementById('global-header-arrow');
-    const isClosed = content.style.display === 'none';
-
-    if (isClosed) {
-        content.style.display = 'flex';
-        arrow.style.transform = 'rotate(180deg)'; // Arrow points UP
-        localStorage.setItem('daloy_header_state', 'open');
-    } else {
-        content.style.display = 'none';
-        arrow.style.transform = 'rotate(0deg)'; // Arrow points DOWN
-        localStorage.setItem('daloy_header_state', 'closed');
-    }
-    
-    // Wait a millisecond for the DOM to snap to its new size, then push the app down
-    setTimeout(window.adjustAppPadding, 50);
-};
-
-window.initGlobalHeader = () => {
-    const state = localStorage.getItem('daloy_header_state') || 'open';
-    const content = document.getElementById('global-header-links');
-    const arrow = document.getElementById('global-header-arrow');
-    
-    if (state === 'closed') {
-        content.style.display = 'none';
-        arrow.style.transform = 'rotate(0deg)';
-    } else {
-        content.style.display = 'flex';
-        arrow.style.transform = 'rotate(180deg)';
-    }
-    
-    setTimeout(window.adjustAppPadding, 50);
-};
-
+// --- UNIFIED HEADER LAYOUT ---
 window.adjustAppPadding = () => {
-    const header = document.getElementById('global-app-header');
-    // Only push the app down if the user is logged in and the header is actually visible!
-    if (window.currentUser && header.style.display !== 'none') {
-        document.body.style.paddingTop = header.offsetHeight + 'px';
-    } else {
-        document.body.style.paddingTop = '0px';
+    const header = document.getElementById('unified-global-header');
+    const appContainer = document.querySelector('.app-container');
+    const sidebar = document.getElementById('main-sidebar');
+    
+    if (header && appContainer) {
+        const headerHeight = header.offsetHeight;
+        // Push the main app container down
+        appContainer.style.paddingTop = headerHeight + 'px';
+        
+        // Ensure the sidebar accounts for the header height
+        if (sidebar && window.innerWidth > 768) {
+            sidebar.style.top = headerHeight + 'px';
+            sidebar.style.height = `calc(100vh - ${headerHeight}px)`;
+        } else if (sidebar) {
+            sidebar.style.top = '0';
+            sidebar.style.height = '100vh';
+        }
     }
 };
+
+// Listeners to ensure spacing remains perfect on resize
+window.addEventListener('resize', window.adjustAppPadding);
+document.addEventListener('DOMContentLoaded', () => { setTimeout(window.adjustAppPadding, 100); });
 
 // --- DOCUMENTATION ENGINE ---
 window.loadDoc = async (docId) => {
@@ -614,12 +594,7 @@ window.applySettingsToUI = () => {
         }
     });
 
-    // Show the global header ONLY if the user is signed in
-    const globalHeader = document.getElementById('global-app-header');
-    if (globalHeader) {
-        globalHeader.style.display = window.currentUser ? 'block' : 'none';
-        window.initGlobalHeader();
-    }
+
 };
 
 window.recalculateSavings = () => {

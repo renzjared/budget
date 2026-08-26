@@ -29,22 +29,50 @@
         </style>
     </div>
 
-                <!-- FIXED 40/60 HEADER -->
-                <header style="position: fixed; top: 0; left: 0; width: 100%; z-index: 1000; display: flex; align-items: center; justify-content: space-between; padding: 20px 5%; background: rgba(11, 11, 11, 0.85); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255,255,255,0.05); box-sizing: border-box;">
-                    <div style="flex: 0 0 40%; display: flex; align-items: center; cursor: pointer;" onclick="document.getElementById('landing').scrollTo({top: 0, behavior: 'smooth'})">
-                        <img src="logo.png" alt="Logo" style="height: 28px; margin-right: 12px;">
-                        <span style="font-size: 20px; font-weight: 800; letter-spacing: -0.5px; color: #FFFFFF;">Renz-Bot | Finance</span>
-                    </div>
-                    <div class="landing-nav-links" style="flex: 1; display: flex; justify-content: flex-end; align-items: center; gap: 32px; font-size: 14px; font-weight: 600;">
-                        <a href="#" onclick="document.getElementById('landing').scrollTo({top: 0, behavior: 'smooth'})">Home</a>
-                        <a href="#" onclick="window.switchView('yield-optimizer')">Savings</a>
-                        <a href="#" onclick="window.loadDoc('getting-started')">User Guide</a>
-                        <a href="#landing-footer">Legal</a>
-                        <button class="landing-auth-btn" style="padding: 10px 24px; border-radius: 24px; font-size: 14px; font-weight: 700; background: #FFFFFF; color: #000000; border: none; cursor: pointer; transition: transform 0.2s;" onclick="window.currentUser ? window.switchView('dashboard') : document.getElementById('discord-login-btn').click()">
-                            Log In
-                        </button>
-                    </div>
-                </header>
+<!-- UNIFIED GLOBAL HEADER WITH PULL-TAB -->
+    <div id="unified-global-header" style="position: fixed; top: 0; left: 0; width: 100%; z-index: 1050; transition: transform 0.3s ease;">
+        
+        <header style="display: flex; align-items: center; justify-content: space-between; padding: 20px 5%; background: rgba(11, 11, 11, 0.85); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255,255,255,0.05); box-sizing: border-box; width: 100%;">
+            <style>
+                @media (max-width: 768px) {
+                    #unified-global-header header { flex-direction: column !important; align-items: flex-start !important; padding: 16px 20px !important; }
+                    .header-brand-section { width: 100% !important; margin-bottom: 16px !important; }
+                    .landing-nav-links { width: 100% !important; justify-content: flex-start !important; gap: 16px !important; padding-right: 0 !important; }
+                    #mobile-menu-btn { display: flex !important; }
+                }
+                .landing-nav-links a { color: #FFFFFF; text-decoration: none; opacity: 0.7; transition: opacity 0.2s, color 0.2s; }
+                .landing-nav-links a:hover { opacity: 1; color: var(--primary); }
+            </style>
+
+            <div class="header-brand-section" style="flex: 0 0 40%; display: flex; align-items: center;">
+                <button id="mobile-menu-btn" class="icon-btn" style="display: none; margin-right: 16px; background: transparent; border: none; color: #FFFFFF; cursor: pointer; padding: 4px;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                </button>
+                
+                <!-- Fixed Logo Link -->
+                <div style="display: flex; align-items: center; cursor: pointer;" onclick="event.preventDefault(); window.switchView('landing'); document.getElementById('landing').scrollTo({top: 0, behavior: 'smooth'})">
+                    <img src="logo.png" alt="Logo" style="height: 28px; margin-right: 12px;">
+                    <span style="font-size: 20px; font-weight: 800; letter-spacing: -0.5px; color: #FFFFFF;">Renz-Bot | Finance</span>
+                </div>
+            </div>
+
+            <div class="landing-nav-links" style="flex: 1; display: flex; justify-content: flex-end; align-items: center; gap: 32px; font-size: 14px; font-weight: 600;">
+                <!-- Fixed Navigation Links -->
+                <a href="#" onclick="event.preventDefault(); window.switchView('landing'); document.getElementById('landing').scrollTo({top: 0, behavior: 'smooth'})">Home</a>
+                <a href="#" onclick="event.preventDefault(); window.switchView('yield-optimizer')">Savings</a>
+                <a href="#" onclick="event.preventDefault(); window.loadDoc('getting-started')">User Guide</a>
+                <a href="#" onclick="event.preventDefault(); window.switchView('landing'); setTimeout(() => document.getElementById('landing-footer').scrollIntoView({behavior: 'smooth'}), 50);">Legal</a>
+                <button class="landing-auth-btn" style="padding: 10px 24px; border-radius: 24px; font-size: 14px; font-weight: 700; background: #FFFFFF; color: #000000; border: none; cursor: pointer; transition: transform 0.2s;" onclick="window.currentUser ? window.switchView('dashboard') : document.getElementById('discord-login-btn').click()">
+                    Log In
+                </button>
+            </div>
+        </header>
+
+        <!-- Pull Tab Toggle -->
+        <div onclick="window.toggleGlobalHeader()" style="position: absolute; right: 5%; bottom: -24px; width: 48px; height: 24px; background: rgba(11, 11, 11, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); border-top: none; border-radius: 0 0 12px 12px; cursor: pointer; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); z-index: 1051;" title="Toggle Header">
+            <span id="global-header-arrow" style="font-size: 12px; transition: transform 0.3s; color: rgba(255,255,255,0.7); display: inline-block;">▲</span>
+        </div>
+    </div>
 
 
     <div class="app-container">

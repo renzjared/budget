@@ -266,6 +266,46 @@ window.switchView = (targetId) => {
 };
 
 // --- UNIFIED HEADER LAYOUT ---
+// --- UNIFIED HEADER LAYOUT & TOGGLE ---
+window.toggleGlobalHeader = () => {
+    const header = document.getElementById('unified-global-header');
+    const arrow = document.getElementById('global-header-arrow');
+    
+    // Check if it's currently hidden by looking at its transform property
+    const isClosed = header.style.transform === 'translateY(-100%)';
+
+    if (isClosed) {
+        header.style.transform = 'translateY(0)';
+        arrow.style.transform = 'rotate(0deg)'; // Point up (▲)
+        localStorage.setItem('daloy_header_state', 'open');
+    } else {
+        header.style.transform = 'translateY(-100%)';
+        arrow.style.transform = 'rotate(180deg)'; // Point down (▼)
+        localStorage.setItem('daloy_header_state', 'closed');
+    }
+    
+    // Wait for the CSS transform to finish, then bump the content down
+    setTimeout(window.adjustAppPadding, 300);
+};
+
+window.initGlobalHeader = () => {
+    const state = localStorage.getItem('daloy_header_state') || 'open';
+    const header = document.getElementById('unified-global-header');
+    const arrow = document.getElementById('global-header-arrow');
+    
+    if (!header || !arrow) return;
+
+    if (state === 'closed') {
+        header.style.transform = 'translateY(-100%)';
+        arrow.style.transform = 'rotate(180deg)';
+    } else {
+        header.style.transform = 'translateY(0)';
+        arrow.style.transform = 'rotate(0deg)';
+    }
+    
+    setTimeout(window.adjustAppPadding, 50);
+};
+
 window.adjustAppPadding = () => {
     const header = document.getElementById('unified-global-header');
     const appContainer = document.querySelector('.app-container');

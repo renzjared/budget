@@ -1,17 +1,40 @@
 window.AdminEngine = {
     ALLOWED_ADMIN_UID: 'e0b7eea1-cdd7-410c-ad57-86e99040551c',
-    
-    init: () => {
-        window.AdminEngine.verifyAdminAccess();
-    },
+    currentBank: null,
+
+    init: () => { window.AdminEngine.verifyAdminAccess(); },
 
     verifyAdminAccess: () => {
         if (!window.currentUser) return;
-        
-        // Check the immutable Supabase User ID
         if (window.currentUser.id === window.AdminEngine.ALLOWED_ADMIN_UID) {
             document.getElementById('admin-nav-btn').style.display = 'flex';
             window.AdminEngine.loadCatalog();
+        }
+    },
+
+    toggleBankCollapse: (bankId) => {
+        // Close all other product lists
+        document.querySelectorAll('[id^="products-list-"]').forEach(el => {
+            if (el.id !== `products-list-${bankId}`) el.style.display = 'none';
+        });
+        // Reset all arrows
+        document.querySelectorAll('[id^="arrow-"]').forEach(el => {
+            if (el.id !== `arrow-${bankId}`) el.style.transform = 'rotate(0deg)';
+        });
+
+        if (!bankId) return; // If null, we just wanted to collapse everything
+
+        // Toggle the clicked one
+        const prodList = document.getElementById(`products-list-${bankId}`);
+        const arrow = document.getElementById(`arrow-${bankId}`);
+        if (prodList) {
+            if (prodList.style.display === 'none') {
+                prodList.style.display = 'flex';
+                if (arrow) arrow.style.transform = 'rotate(180deg)';
+            } else {
+                prodList.style.display = 'none';
+                if (arrow) arrow.style.transform = 'rotate(0deg)';
+            }
         }
     },
 
@@ -19,142 +42,200 @@ window.AdminEngine = {
         const { data, error } = await window.supabase.from('banks_catalog').select('*').order('name');
         if (error) return console.error('Failed to load catalog', error);
         
-        // Update local Yield engine catalog
         if (window.YieldEngine) window.YieldEngine.catalog = data;
         
-        // Render Admin List
         const list = document.getElementById('admin-bank-list');
-        list.innerHTML = data.map(bank => `
-            <li class="tx-item" style="padding: 12px 8px; cursor: pointer; border-bottom: 1px solid var(--border);" onclick='window.AdminEngine.editBank(${JSON.stringify(bank).replace(/'/g, "&apos;")})'>
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                    <span style="font-weight: 600;">${bank.name}</span>
-                    <span class="text-muted" style="font-size: 12px;">${bank.tiers.length} Tiers</span>
+        list.innerHTML = data.map(bank => {
+            
+            // Format the specific products cleanly on their own lines
+            const productItems = (bank.products || []).length > 0 
+                ? (bank.products || []).map(p => `
+                    <div style="font-size: 12px; color: var(--text-secondary); padding: 6px 0 6px 12px; border-left: 2px solid ${bank.color}; margin-left: 4px;">
+                        <span style="color: var(--text); font-weight: 500;">${p.name}</span> <span style="opacity: 0.6;">(${p.type === 'time_deposit' ? 'Time Deposit' : 'Savings'})</span>
+                    </div>
+                `).join('')
+                : '<div style="font-size: 11px; color: var(--text-secondary); margin-left: 4px; padding: 4px 0;">No products configured.</div>';
+
+            return `
+            <li class="card" style="padding: 12px; border: 1px solid var(--border); transition: border-color 0.2s;">
+                <!-- Clickable Header: Contains Name and Capsule stacked vertically -->
+                <div style="cursor: pointer; display: flex; flex-direction: column; gap: 8px;" onclick='window.AdminEngine.toggleBankCollapse("${bank.id}"); window.AdminEngine.editBank(${JSON.stringify(bank).replace(/'/g, "&apos;")})'>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 800; color: ${bank.color}; font-size: 16px;">${bank.name}</span>
+                        <span id="arrow-${bank.id}" style="font-size: 10px; transition: transform 0.2s; color: var(--text-secondary);">▼</span>
+                    </div>
+                    <span style="font-size: 10px; background: var(--surface-hover); padding: 4px 8px; border-radius: 4px; width: fit-content; color: var(--text-secondary); font-weight: 700;">${bank.products?.length || 0} Products</span>
+                </div>
+                
+                <!-- Hidden Accordion: Contains the separated list of products -->
+                <div id="products-list-${bank.id}" style="display: none; flex-direction: column; gap: 4px; margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
+                    ${productItems}
                 </div>
             </li>
-        `).join('');
+            `;
+        }).join('');
     },
 
     clearForm: () => {
+        window.AdminEngine.toggleBankCollapse(null); // Force close any open dropdowns
+        
         document.getElementById('admin-editor-card').style.opacity = '1';
         document.getElementById('admin-editor-card').style.pointerEvents = 'auto';
         
         document.getElementById('admin-id').value = '';
-        document.getElementById('admin-bank-id').value = '';
         document.getElementById('admin-name').value = '';
-        document.getElementById('admin-product').value = '';
         document.getElementById('admin-color').value = '#3A5DFF';
-        document.getElementById('admin-tax').value = '0.20';
+        document.getElementById('admin-referral').value = '';
         document.getElementById('admin-icon-type').value = 'letter';
         document.getElementById('admin-icon-value').value = '';
         document.getElementById('admin-current-icon-display').innerHTML = '?';
-        
-        document.getElementById('admin-tiers-container').innerHTML = '';
         document.getElementById('admin-delete-btn').style.display = 'none';
         
-        document.getElementById('admin-is-td').checked = false;
-        document.getElementById('admin-lockup').value = '0';
-
-        window.AdminEngine.addTierRow(); // Add 1 empty row by default
+        window.AdminEngine.currentBank = { products: [] };
+        window.AdminEngine.renderProducts();
     },
 
     editBank: (bank) => {
         window.AdminEngine.clearForm();
+        window.AdminEngine.currentBank = bank;
         
         document.getElementById('admin-id').value = bank.id;
-        document.getElementById('admin-bank-id').value = bank.bank_id;
         document.getElementById('admin-name').value = bank.name;
-        document.getElementById('admin-product').value = bank.product;
         document.getElementById('admin-color').value = bank.color;
-        document.getElementById('admin-tax').value = bank.tax;
+        document.getElementById('admin-referral').value = bank.referral_code || '';
         document.getElementById('admin-delete-btn').style.display = 'block';
 
-        document.getElementById('admin-is-td').checked = bank.is_time_deposit || false;
-        document.getElementById('admin-lockup').value = bank.lockup_days || 0;
-
-        // Load Icon
         window.iconTargetPrefix = 'admin';
         window.selectIcon(bank.icon_type || 'letter', bank.icon_value || bank.name.charAt(0));
 
-        // Load Tiers
-        const container = document.getElementById('admin-tiers-container');
-        container.innerHTML = '';
-        bank.tiers.forEach(t => window.AdminEngine.addTierRow(t));
+        if (!window.AdminEngine.currentBank.products) window.AdminEngine.currentBank.products = [];
+        window.AdminEngine.renderProducts();
     },
 
-    addTierRow: (tier = { min: 0, max: 100000, rate: 0.05, note: '' }) => {
-        const row = document.createElement('div');
-        row.className = 'tier-row';
-        row.style.cssText = 'display: flex; gap: 8px; align-items: flex-end; background: var(--surface-hover); padding: 12px; border-radius: 8px; border: 1px solid var(--border);';
-        
-        // Max value handling for visual layout (empty means Infinity)
-        const displayMax = tier.max >= 999999999 ? '' : tier.max;
-        const displayRate = (tier.rate * 100).toFixed(2);
+    addProduct: () => {
+        window.AdminEngine.currentBank.products.push({
+            id: 'prod_' + Date.now(),
+            name: 'New Product',
+            type: 'savings',
+            crediting: 'monthly',
+            lockup_days: 0,
+            tax: 0.20,
+            tiers: [{ min: 0, max: null, rate: 0.05, note: 'Base' }]
+        });
+        window.AdminEngine.renderProducts();
+    },
 
-        row.innerHTML = `
-            <div style="flex: 1;"><label class="text-muted" style="font-size: 11px;">Min (₱)</label><input type="number" class="form-input t-min" value="${tier.min}"></div>
-            <div style="flex: 1;"><label class="text-muted" style="font-size: 11px;">Max Cap (Leave blank for Uncapped)</label><input type="number" class="form-input t-max" value="${displayMax}" placeholder="Uncapped"></div>
-            <div style="flex: 1;"><label class="text-muted" style="font-size: 11px;">Gross Rate (%)</label><input type="number" class="form-input t-rate" value="${displayRate}" step="0.01"></div>
-            <div style="flex: 2;"><label class="text-muted" style="font-size: 11px;">Note</label><input type="text" class="form-input t-note" value="${tier.note}" placeholder="e.g. Base Rate"></div>
-            <button class="icon-btn" style="color: var(--accent-red); margin-bottom: 8px;" onclick="this.parentElement.remove()">✕</button>
-        `;
-        document.getElementById('admin-tiers-container').appendChild(row);
+    removeProduct: (pIdx) => {
+        if (!confirm("Remove this product?")) return;
+        window.AdminEngine.currentBank.products.splice(pIdx, 1);
+        window.AdminEngine.renderProducts();
+    },
+
+    addTier: (pIdx) => {
+        window.AdminEngine.currentBank.products[pIdx].tiers.push({ min: 0, max: null, rate: 0.05, note: '' });
+        window.AdminEngine.renderProducts();
+    },
+
+    removeTier: (pIdx, tIdx) => {
+        window.AdminEngine.currentBank.products[pIdx].tiers.splice(tIdx, 1);
+        window.AdminEngine.renderProducts();
+    },
+
+    syncDOMToState: () => {
+        // Grab product data from DOM before re-rendering
+        document.querySelectorAll('.admin-product-card').forEach((pCard, pIdx) => {
+            const prod = window.AdminEngine.currentBank.products[pIdx];
+            prod.name = pCard.querySelector('.p-name').value;
+            prod.type = pCard.querySelector('.p-type').value;
+            prod.crediting = pCard.querySelector('.p-crediting').value;
+            prod.lockup_days = parseInt(pCard.querySelector('.p-lockup').value) || 0;
+            prod.tax = parseFloat(pCard.querySelector('.p-tax').value) || 0;
+
+            pCard.querySelectorAll('.tier-row').forEach((tRow, tIdx) => {
+                const tier = prod.tiers[tIdx];
+                tier.min = parseFloat(tRow.querySelector('.t-min').value) || 0;
+                const mVal = tRow.querySelector('.t-max').value;
+                tier.max = mVal ? parseFloat(mVal) : null; // null = Infinity
+                tier.rate = (parseFloat(tRow.querySelector('.t-rate').value) || 0) / 100;
+                tier.note = tRow.querySelector('.t-note').value;
+            });
+        });
+    },
+
+    renderProducts: () => {
+        const container = document.getElementById('admin-products-container');
+        container.innerHTML = window.AdminEngine.currentBank.products.map((p, pIdx) => {
+            
+            const tiersHtml = (p.tiers || []).map((t, tIdx) => `
+                <div class="tier-row" style="display: flex; gap: 8px; align-items: flex-end; padding: 8px 0; border-bottom: 1px dashed var(--border);">
+                    <div style="flex: 1;"><label class="text-muted" style="font-size: 10px;">Min (₱)</label><input type="number" class="form-input t-min" value="${t.min}" onchange="window.AdminEngine.syncDOMToState()"></div>
+                    <div style="flex: 1;"><label class="text-muted" style="font-size: 10px;">Max Cap (Blank=∞)</label><input type="number" class="form-input t-max" value="${t.max !== null ? t.max : ''}" placeholder="Uncapped" onchange="window.AdminEngine.syncDOMToState()"></div>
+                    <div style="flex: 1;"><label class="text-muted" style="font-size: 10px;">Rate (%)</label><input type="number" class="form-input t-rate" value="${(t.rate * 100).toFixed(2)}" step="0.01" onchange="window.AdminEngine.syncDOMToState()"></div>
+                    <div style="flex: 2;"><label class="text-muted" style="font-size: 10px;">Note</label><input type="text" class="form-input t-note" value="${t.note || ''}" onchange="window.AdminEngine.syncDOMToState()"></div>
+                    <button class="icon-btn" style="color: var(--accent-red); margin-bottom: 4px;" onclick="window.AdminEngine.syncDOMToState(); window.AdminEngine.removeTier(${pIdx}, ${tIdx})">✕</button>
+                </div>
+            `).join('');
+
+            return `
+                <div class="admin-product-card" style="background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h4 style="margin: 0;">Product #${pIdx + 1}</h4>
+                        <button class="text-btn" style="color: var(--accent-red); font-size: 12px;" onclick="window.AdminEngine.syncDOMToState(); window.AdminEngine.removeProduct(${pIdx})">Remove Product</button>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                        <div><label class="text-muted" style="font-size: 11px;">Product Name</label><input type="text" class="form-input p-name" value="${p.name}" onchange="window.AdminEngine.syncDOMToState()"></div>
+                        <div><label class="text-muted" style="font-size: 11px;">Type</label><select class="form-input p-type" onchange="window.AdminEngine.syncDOMToState()"><option value="savings" ${p.type === 'savings' ? 'selected' : ''}>Savings</option><option value="time_deposit" ${p.type === 'time_deposit' ? 'selected' : ''}>Time Deposit</option></select></div>
+                        <div><label class="text-muted" style="font-size: 11px;">Tax Rate</label><input type="number" class="form-input p-tax" value="${p.tax}" step="0.01" onchange="window.AdminEngine.syncDOMToState()"></div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; padding: 12px; background: var(--surface-hover); border-radius: 8px;">
+                        <div><label class="text-muted" style="font-size: 11px;">Interest Crediting</label><select class="form-input p-crediting" onchange="window.AdminEngine.syncDOMToState()"><option value="daily" ${p.crediting === 'daily' ? 'selected' : ''}>Daily</option><option value="monthly" ${p.crediting === 'monthly' ? 'selected' : ''}>Monthly</option><option value="yearly" ${p.crediting === 'yearly' ? 'selected' : ''}>Yearly</option><option value="maturity" ${p.crediting === 'maturity' ? 'selected' : ''}>At Maturity</option></select></div>
+                        <div><label class="text-muted" style="font-size: 11px;">Lockup Days (0 if Savings)</label><input type="number" class="form-input p-lockup" value="${p.lockup_days}" onchange="window.AdminEngine.syncDOMToState()"></div>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <h5 style="margin: 0; color: var(--text-secondary);">Yield Tiers</h5>
+                        <button class="secondary-btn" style="padding: 4px 8px; font-size: 11px;" onclick="window.AdminEngine.syncDOMToState(); window.AdminEngine.addTier(${pIdx})">+ Add Tier</button>
+                    </div>
+                    <div style="background: var(--surface); padding: 8px; border-radius: 8px;">
+                        ${tiersHtml}
+                    </div>
+                </div>
+            `;
+        }).join('');
     },
 
     saveBank: async () => {
+        window.AdminEngine.syncDOMToState(); // Final grab
         const id = document.getElementById('admin-id').value;
-        const bankId = document.getElementById('admin-bank-id').value.trim();
         const name = document.getElementById('admin-name').value.trim();
-        
-        if (!bankId || !name) return alert('Bank Code ID and Name are required.');
-
-        // Compile Tiers
-        const tiers = [];
-        document.querySelectorAll('.tier-row').forEach(row => {
-            const min = parseFloat(row.querySelector('.t-min').value) || 0;
-            const maxVal = row.querySelector('.t-max').value;
-            const max = maxVal ? parseFloat(maxVal) : 999999999; // Represents Infinity
-            const rate = (parseFloat(row.querySelector('.t-rate').value) || 0) / 100;
-            const note = row.querySelector('.t-note').value.trim();
-            tiers.push({ min, max, rate, note });
-        });
+        if (!name) return alert('Bank Name is required.');
 
         const payload = {
-            bank_id: bankId,
             name: name,
-            product: document.getElementById('admin-product').value.trim(),
             color: document.getElementById('admin-color').value,
-            tax: parseFloat(document.getElementById('admin-tax').value) || 0.20,
+            referral_code: document.getElementById('admin-referral').value.trim(),
             icon_type: document.getElementById('admin-icon-type').value,
             icon_value: document.getElementById('admin-icon-value').value,
-            is_time_deposit: document.getElementById('admin-is-td').checked,
-            lockup_days: parseInt(document.getElementById('admin-lockup').value) || 0,
-            tiers: tiers
+            products: window.AdminEngine.currentBank.products
         };
+
         if (window.showLoadingToast) window.showLoadingToast('Saving bank to catalog...');
 
-        let req;
-        if (id) {
-            req = window.supabase.from('banks_catalog').update(payload).eq('id', id);
-        } else {
-            req = window.supabase.from('banks_catalog').insert([payload]);
-        }
+        const { error } = id ? await window.supabase.from('banks_catalog').update(payload).eq('id', id) : await window.supabase.from('banks_catalog').insert([payload]);
 
-        const { error } = await req;
         if (error) return alert('Failed to save bank: ' + error.message);
-
         if (window.showToast) window.showToast('Bank successfully saved!');
+        
         window.AdminEngine.loadCatalog();
         window.AdminEngine.clearForm();
     },
 
     deleteBank: async () => {
-        if (!confirm('Are you sure you want to delete this bank from the global catalog?')) return;
-        
+        if (!confirm('Permanently delete this bank and all its products?')) return;
         const id = document.getElementById('admin-id').value;
-        const { error } = await window.supabase.from('banks_catalog').delete().eq('id', id);
-        
-        if (error) return alert('Failed to delete: ' + error.message);
-        
+        await window.supabase.from('banks_catalog').delete().eq('id', id);
         if (window.showToast) window.showToast('Bank deleted');
         window.AdminEngine.loadCatalog();
         window.AdminEngine.clearForm();
@@ -162,6 +243,5 @@ window.AdminEngine = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Run verification slightly delayed to ensure currentUser is loaded
     setTimeout(() => { window.AdminEngine.init(); }, 1500);
 });

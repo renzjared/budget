@@ -1,185 +1,119 @@
 window.YieldEngine = {
-    // Current catalog of PH Digital Banks (Configurable constraints)
-    catalog: [
-        {
-            id: 'maya_savings',
-            name: 'Maya',
-            product: 'Personal Savings',
-            color: '#000000',
-            tax: 0.20,
-            active: true,
-            tiers: [
-                { min: 0, max: 100000, rate: 0.10, note: 'Assuming 10% boosted promo' },
-                { min: 100000, max: 5000000, rate: 0.035, note: 'Base rate' }
-            ]
-        },
-        {
-            id: 'seabank',
-            name: 'SeaBank',
-            product: 'Savings Account',
-            color: '#FF6B00',
-            tax: 0.20,
-            active: true,
-            tiers: [
-                { min: 0, max: 300000, rate: 0.045, note: '4.5% up to 300k' },
-                { min: 300000, max: Infinity, rate: 0.03, note: 'Excess base rate' }
-            ]
-        },
-        {
-            id: 'ownbank',
-            name: 'OwnBank',
-            product: 'Own It Savings',
-            color: '#FFC800',
-            tax: 0.20,
-            active: true,
-            tiers: [
-                { min: 0, max: Infinity, rate: 0.06, note: 'Uncapped 6% p.a.' }
-            ]
-        },
-        {
-            id: 'netbank',
-            name: 'Netbank',
-            product: 'Savings',
-            color: '#00B4DB',
-            tax: 0.20,
-            active: true,
-            tiers: [
-                { min: 0, max: Infinity, rate: 0.05, note: 'Uncapped 5% p.a.' }
-            ]
-        },
-        {
-            id: 'gotyme',
-            name: 'GoTyme',
-            product: 'GoSave',
-            color: '#002BFF',
-            tax: 0.20,
-            active: true,
-            tiers: [
-                { min: 0, max: Infinity, rate: 0.04, note: 'Uncapped 4% p.a.' }
-            ]
-        },
-        {
-            id: 'cimb_upsave',
-            name: 'CIMB',
-            product: 'UpSave',
-            color: '#E50000',
-            tax: 0.20,
-            active: true,
-            tiers: [
-                { min: 0, max: Infinity, rate: 0.025, note: 'Base rate (Excludes ad-hoc promos)' }
-            ]
-        }
-    ],
+    catalog: [],
+    userRates: JSON.parse(localStorage.getItem('yield_user_rates') || '{}'),
+    userExcludedBanks: JSON.parse(localStorage.getItem('yield_excluded_banks') || '[]'),
 
-init: async () => {
+    init: async () => {
         const backBtn = document.getElementById('yield-back-btn');
-        if (backBtn) {
-            backBtn.style.display = window.currentUser ? 'none' : 'block';
-        }
+        if (backBtn) backBtn.style.display = window.currentUser ? 'none' : 'block';
         
-        // Fetch Live Database Catalog for Public Access
-        const { data } = await window.supabase.from('banks_catalog').select('*').order('name');
-        if (data && data.length > 0) {
-            window.YieldEngine.catalog = data;
-        }
+        try {
+            const { data } = await window.supabase.from('banks_catalog').select('*').order('name');
+            if (data) window.YieldEngine.catalog = data;
+        } catch (e) { console.error("Failed to fetch catalog:", e); }
         
         window.YieldEngine.injectModals();
     },
-    
+
     injectModals: () => {
         if (document.getElementById('yield-settings-overlay')) return;
-        
         const modalHTML = `
             <div id="yield-settings-overlay" class="modal-overlay" style="z-index: 100000;">
-                <div class="account-modal-content card" style="max-width: 500px; width: 95%;">
-                    <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-                        <h3 style="margin: 0;">Bank Filters</h3>
+                <div class="account-modal-content card" style="max-width: 600px; width: 95%; max-height: 90vh; display: flex; flex-direction: column;">
+                    <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-shrink: 0;">
+                        <h3 style="margin: 0;">Optimizer Settings</h3>
                         <button class="close-modal-btn" onclick="document.getElementById('yield-settings-overlay').classList.remove('active')">✕</button>
                     </header>
-                    <p class="text-muted" style="font-size: 13px; margin-bottom: 16px;">Check the banks/wallets you currently have accounts with. Unchecked banks will be ignored in the calculation.</p>
+                    <input type="text" id="yield-bank-search" class="form-input" placeholder="Search banks or products..." style="margin-bottom: 16px; flex-shrink: 0;">
+                    <p class="text-muted" style="font-size: 13px; margin-bottom: 16px; flex-shrink: 0;">Toggle banks you don't use, or override the APY% if you unlocked special missions.</p>
                     
-                    <div id="yield-bank-toggles" style="display: flex; flex-direction: column; gap: 12px; max-height: 400px; overflow-y: auto; margin-bottom: 24px;">
+                    <div id="yield-bank-toggles" style="display: flex; flex-direction: column; gap: 16px; flex: 1; overflow-y: auto; margin-bottom: 24px; padding-right: 8px;">
                         <!-- Injected via JS -->
                     </div>
                     
-                    <button class="primary-btn" style="width: 100%;" onclick="window.YieldEngine.saveSettings()">Save & Recalculate</button>
+                    <button class="primary-btn" style="width: 100%; flex-shrink: 0;" onclick="window.YieldEngine.saveSettings()">Save & Recalculate</button>
                 </div>
             </div>
         `;
         document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+        document.getElementById('yield-bank-search').addEventListener('input', window.YieldEngine.renderSettingsList);
     },
 
-openSettings: () => {
-        const container = document.getElementById('yield-bank-toggles');
-        container.innerHTML = window.YieldEngine.catalog.map(bank => {
-            
-            // Build the editable rate inputs for each tier
-            const tiersHtml = bank.tiers.map((tier, idx) => {
-                // Check if user has an override, otherwise show global rate
-                const currentRate = window.YieldEngine.userRates[bank.id] && window.YieldEngine.userRates[bank.id][idx] !== undefined 
-                    ? window.YieldEngine.userRates[bank.id][idx] 
-                    : tier.rate;
-                
-                const capText = tier.max >= 999999999 ? 'Uncapped' : `Up to ₱${tier.max.toLocaleString()}`;
-                
-                return `
-                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin-top: 6px; padding-left: 30px;">
-                        <span class="text-muted">${capText}</span>
-                        <div style="display: flex; align-items: center; gap: 4px;">
-                            <input type="number" class="form-input yield-rate-override" data-bank="${bank.id}" data-tier="${idx}" value="${(currentRate * 100).toFixed(1)}" step="0.1" style="width: 60px; padding: 4px; font-size: 12px; text-align: right;">
-                            <span class="text-muted">%</span>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-
-            return `
-                <div style="padding: 12px; background: var(--surface-hover); border-radius: 8px; border: 1px solid var(--border);">
-                    <label style="display: flex; align-items: center; cursor: pointer;">
-                        <input type="checkbox" class="yield-bank-checkbox" data-id="${bank.id}" ${bank.active ? 'checked' : ''} style="width: 18px; height: 18px; margin-right: 12px;">
-                        <div style="flex: 1;">
-                            <span style="font-weight: 600; display: block;">${bank.name}</span>
-                            <span class="text-muted" style="font-size: 11px;">${bank.product}</span>
-                        </div>
-                    </label>
-                    ${tiersHtml}
-                </div>
-            `;
-        }).join('');
-        
+    openSettings: () => {
+        document.getElementById('yield-bank-search').value = '';
+        window.YieldEngine.renderSettingsList();
         document.getElementById('yield-settings-overlay').classList.add('active');
     },
 
-    saveSettings: () => {
-        // 1. Save Bank Active/Inactive Checkboxes
-        document.querySelectorAll('.yield-bank-checkbox').forEach(cb => {
-            const id = cb.getAttribute('data-id');
-            const bank = window.YieldEngine.catalog.find(b => b.id === id);
-            if (bank) bank.active = cb.checked;
-        });
-
-        // 2. Save Custom User Rates
-        document.querySelectorAll('.yield-rate-override').forEach(input => {
-            const bankId = input.getAttribute('data-bank');
-            const tierIdx = parseInt(input.getAttribute('data-tier'));
-            const customRateDecimal = parseFloat(input.value) / 100;
+    renderSettingsList: () => {
+        const query = document.getElementById('yield-bank-search').value.toLowerCase();
+        const container = document.getElementById('yield-bank-toggles');
+        
+        let filteredCatalog = window.YieldEngine.catalog.filter(b => b.name.toLowerCase().includes(query) || (b.products || []).some(p => p.name.toLowerCase().includes(query)));
+        filteredCatalog.sort((a, b) => a.name.localeCompare(b.name)); // Alphabetical Sort
+        
+        container.innerHTML = filteredCatalog.map(bank => {
+            const isExcluded = window.YieldEngine.userExcludedBanks.includes(bank.id);
             
-            if (!window.YieldEngine.userRates[bankId]) {
-                window.YieldEngine.userRates[bankId] = {};
-            }
-            window.YieldEngine.userRates[bankId][tierIdx] = customRateDecimal;
-        });
+            const productsHtml = (bank.products || []).map(prod => {
+                const tiersHtml = (prod.tiers || []).map((tier, idx) => {
+                    const customRate = window.YieldEngine.userRates[bank.id] && window.YieldEngine.userRates[bank.id][prod.id] && window.YieldEngine.userRates[bank.id][prod.id][idx] !== undefined 
+                        ? window.YieldEngine.userRates[bank.id][prod.id][idx] : tier.rate;
+                    const capText = tier.max ? `Up to ₱${tier.max.toLocaleString()}` : 'Uncapped';
+                    return `
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; padding: 4px 0; border-top: 1px dashed var(--border);">
+                            <span class="text-muted" style="flex:1;">${capText} <i style="opacity:0.6">${tier.note ? '('+tier.note+')' : ''}</i></span>
+                            <div style="display: flex; align-items: center; gap: 4px;">
+                                <input type="number" class="form-input yield-rate-override" data-bank="${bank.id}" data-prod="${prod.id}" data-tier="${idx}" value="${(customRate * 100).toFixed(2)}" step="0.01" style="width: 60px; padding: 4px; font-size: 11px; text-align: right;">
+                                <span class="text-muted">%</span>
+                            </div>
+                        </div>`;
+                }).join('');
 
-        // Commit to localStorage so they survive page refreshes
-        localStorage.setItem('yield_user_rates', JSON.stringify(window.YieldEngine.userRates));
+                return `
+                    <div style="margin-top: 12px; padding: 12px; background: var(--surface); border-radius: 8px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <span style="font-weight: 600; font-size: 13px; color: ${bank.color};">${prod.name} <span style="font-weight: normal; opacity: 0.6;">(${prod.type})</span></span>
+                        </div>
+                        ${tiersHtml}
+                    </div>`;
+            }).join('');
+
+            return `
+                <div style="padding: 16px; background: var(--surface-hover); border-radius: 12px; border: 1px solid var(--border);">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" class="yield-bank-checkbox" data-id="${bank.id}" ${!isExcluded ? 'checked' : ''} style="width: 20px; height: 20px; margin-right: 12px;">
+                        <span style="font-weight: 800; font-size: 16px;">${bank.name}</span>
+                    </label>
+                    ${productsHtml}
+                </div>
+            `;
+        }).join('');
+    },
+
+    saveSettings: () => {
+        const excluded = [];
+        document.querySelectorAll('.yield-bank-checkbox').forEach(cb => { if (!cb.checked) excluded.push(cb.getAttribute('data-id')); });
+        window.YieldEngine.userExcludedBanks = excluded;
+        localStorage.setItem('yield_excluded_banks', JSON.stringify(excluded));
+
+        const newRates = {};
+        document.querySelectorAll('.yield-rate-override').forEach(input => {
+            const bId = input.getAttribute('data-bank'); const pId = input.getAttribute('data-prod'); const tIdx = parseInt(input.getAttribute('data-tier'));
+            const customRate = parseFloat(input.value) / 100;
+            if (!newRates[bId]) newRates[bId] = {};
+            if (!newRates[bId][pId]) newRates[bId][pId] = {};
+            newRates[bId][pId][tIdx] = customRate;
+        });
+        window.YieldEngine.userRates = newRates;
+        localStorage.setItem('yield_user_rates', JSON.stringify(newRates));
 
         document.getElementById('yield-settings-overlay').classList.remove('active');
         window.YieldEngine.calculate();
     },
 
-    userRates: JSON.parse(localStorage.getItem('yield_user_rates') || '{}'),
-
-calculate: () => {
+    calculate: () => {
         const inputEl = document.getElementById('yield-input-amount');
         let amountToAllocate = parseFloat(inputEl.value) || 0;
         const initialAmount = amountToAllocate;
@@ -187,156 +121,96 @@ calculate: () => {
         
         if (amountToAllocate <= 0) return alert("Please enter a valid amount to invest.");
 
-        // 1. Break catalog into allocatable tranches (buckets)
         let buckets = [];
-        window.YieldEngine.catalog.filter(b => b.active).forEach(bank => {
-            // Skip if it's a Time Deposit and the user disabled them
-            if (!allowTD && bank.is_time_deposit) return;
+        window.YieldEngine.catalog.forEach(bank => {
+            if (window.YieldEngine.userExcludedBanks.includes(bank.id)) return;
+            (bank.products || []).forEach(prod => {
+                if (!allowTD && prod.type === 'time_deposit') return;
+                
+                (prod.tiers || []).forEach((tier, tIdx) => {
+                    const customRate = window.YieldEngine.userRates[bank.id]?.[prod.id]?.[tIdx] !== undefined ? window.YieldEngine.userRates[bank.id][prod.id][tIdx] : tier.rate;
+                    const maxCap = tier.max || Infinity;
 
-            bank.tiers.forEach((tier, tierIdx) => {
-                const customRate = window.YieldEngine.userRates[bank.id] && window.YieldEngine.userRates[bank.id][tierIdx] !== undefined 
-                    ? window.YieldEngine.userRates[bank.id][tierIdx] 
-                    : tier.rate;
-
-                buckets.push({
-                    bankId: bank.id,
-                    bankName: bank.name,
-                    product: bank.product,
-                    color: bank.color,
-                    tax: bank.tax,
-                    isTD: bank.is_time_deposit,
-                    lockupDays: bank.lockup_days,
-                    grossRate: customRate,
-                    netRate: customRate * (1 - bank.tax),
-                    capacity: tier.max - tier.min,
-                    note: tier.note
+                    buckets.push({
+                        bankId: bank.id, bankName: bank.name, color: bank.color, referral: bank.referral_code,
+                        productId: prod.id, productName: prod.name, isTD: prod.type === 'time_deposit',
+                        lockupDays: prod.lockup_days, crediting: prod.crediting,
+                        grossRate: customRate, netRate: customRate * (1 - prod.tax),
+                        capacity: maxCap - tier.min
+                    });
                 });
             });
         });
 
-        // 2. Sort buckets by Net Rate (Highest Yield First)
         buckets.sort((a, b) => b.netRate - a.netRate);
 
-        // 3. Greedy Allocation
-        let allocations = [];
-        let totalNetEarnings = 0;
-
+        let allocations = []; let totalNetEarnings = 0;
         for (let bucket of buckets) {
             if (amountToAllocate <= 0) break;
-
-            const allocationAmount = Math.min(amountToAllocate, bucket.capacity);
-            const netEarnings = allocationAmount * bucket.netRate;
-
-            allocations.push({
-                ...bucket,
-                allocated: allocationAmount,
-                earnings: netEarnings
-            });
-
-            amountToAllocate -= allocationAmount;
-            totalNetEarnings += netEarnings;
+            const allocAmt = Math.min(amountToAllocate, bucket.capacity);
+            allocations.push({ ...bucket, allocated: allocAmt, earnings: allocAmt * bucket.netRate });
+            amountToAllocate -= allocAmt; totalNetEarnings += (allocAmt * bucket.netRate);
         }
 
-        // Combine multiple tiers of the same bank for cleaner display
-        const consolidated = {};
+        const cons = {};
         allocations.forEach(a => {
-            if (!consolidated[a.bankId]) {
-                consolidated[a.bankId] = {
-                    bankName: a.bankName,
-                    product: a.product,
-                    color: a.color,
-                    isTD: a.isTD,
-                    lockupDays: a.lockupDays,
-                    totalAllocated: 0,
-                    totalEarnings: 0,
-                    breakdown: []
-                };
-            }
-            consolidated[a.bankId].totalAllocated += a.allocated;
-            consolidated[a.bankId].totalEarnings += a.earnings;
-            consolidated[a.bankId].breakdown.push(`₱${a.allocated.toLocaleString()} @ ${(a.grossRate * 100).toFixed(1)}%`);
+            const key = `${a.bankId}_${a.productId}`;
+            if (!cons[key]) cons[key] = {
+                bankName: a.bankName, productName: a.productName, color: a.color, referral: a.referral,
+                isTD: a.isTD, lockupDays: a.lockupDays, crediting: a.crediting, totalAllocated: 0, totalEarnings: 0, breakdown: []
+            };
+            cons[key].totalAllocated += a.allocated; cons[key].totalEarnings += a.earnings;
+            cons[key].breakdown.push(`₱${a.allocated.toLocaleString()} @ ${(a.grossRate * 100).toFixed(2)}%`);
         });
 
-        const finalResults = Object.values(consolidated).sort((a,b) => b.totalEarnings - a.totalEarnings);
-
-        // 4. Render Results
+        const finalResults = Object.values(cons).sort((a,b) => b.totalEarnings - a.totalEarnings);
         const blendedRate = initialAmount > 0 ? (totalNetEarnings / initialAmount) : 0;
         
-        document.getElementById('yield-total-earnings').innerText = window.formatMoney ? window.formatMoney(totalNetEarnings, true) : `₱${totalNetEarnings.toLocaleString(undefined, {minimumFractionDigits:2})}`;
+        document.getElementById('yield-total-earnings').innerText = window.formatMoney ? window.formatMoney(totalNetEarnings, true) : `₱${totalNetEarnings.toLocaleString()}`;
         document.getElementById('yield-blended-rate').innerText = `${(blendedRate * 100).toFixed(2)}%`;
 
         const listContainer = document.getElementById('yield-allocation-list');
         if (finalResults.length === 0) {
-            listContainer.innerHTML = `<p class="text-muted" style="text-align: center; padding: 24px;">No banks match your criteria. Try enabling Time Deposits or adjusting your filters.</p>`;
+            listContainer.innerHTML = `<p class="text-muted" style="text-align:center; padding:24px;">No banks match your criteria.</p>`;
         } else {
             listContainer.innerHTML = finalResults.map(res => {
-                const pctOfTotal = (res.totalAllocated / initialAmount) * 100;
-                // Generate the TD Badge if applicable
-                const tdBadge = res.isTD ? `<span style="background: rgba(0,0,0,0.1); padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-left: 8px; vertical-align: middle;">🔒 ${res.lockupDays} Days</span>` : '';
+                const pct = (res.totalAllocated / initialAmount) * 100;
+                const tdBadge = res.isTD ? `<span style="background: rgba(0,0,0,0.1); padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-left: 8px;">🔒 ${res.lockupDays} Days</span>` : '';
+                const refHtml = res.referral ? `<div style="font-size: 11px; margin-top: 8px; color: var(--primary);">🎁 Referral: <b>${res.referral}</b></div>` : '';
 
                 return `
                     <div class="card" style="padding: 20px; border-left: 4px solid ${res.color};">
                         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
                             <div>
                                 <h3 style="margin: 0 0 4px 0; display: flex; align-items: center;">${res.bankName} ${tdBadge}</h3>
-                                <span class="text-muted" style="font-size: 12px;">${res.product}</span>
+                                <span class="text-muted" style="font-size: 12px;">${res.productName} • ${res.crediting} payout</span>
+                                ${refHtml}
                             </div>
                             <div style="text-align: right;">
                                 <h3 style="margin: 0; color: var(--primary);">${window.formatMoney ? window.formatMoney(res.totalAllocated, true) : '₱'+res.totalAllocated.toLocaleString()}</h3>
-                                <span class="text-muted" style="font-size: 11px;">${pctOfTotal.toFixed(1)}% of funds</span>
+                                <span class="text-muted" style="font-size: 11px;">${pct.toFixed(1)}% of funds</span>
                             </div>
                         </div>
-                        
                         <div style="background: var(--surface-hover); padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
-                            <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
-                                ${res.breakdown.join('<br>')}
-                            </div>
+                            <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">${res.breakdown.join('<br>')}</div>
                             <div style="text-align: right;">
                                 <span style="display: block; font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Est. Annual Net</span>
-                                <span style="font-weight: 700; color: var(--text);">${window.formatMoney ? window.formatMoney(res.totalEarnings, true) : '₱'+res.totalEarnings.toLocaleString()}</span>
+                                <span style="font-weight: 700;">${window.formatMoney ? window.formatMoney(res.totalEarnings, true) : '₱'+res.totalEarnings.toLocaleString()}</span>
                             </div>
                         </div>
-                    </div>
-                `;
+                    </div>`;
             }).join('');
         }
 
-        // 5. Generate Projections Timeline
         const tBody = document.getElementById('yield-projection-tbody');
-        const timelines = [
-            { label: '1 Month', years: 1/12 },
-            { label: '3 Months', years: 3/12 },
-            { label: '6 Months', years: 6/12 },
-            { label: '1 Year', years: 1 },
-            { label: '2 Years', years: 2 },
-            { label: '5 Years', years: 5 }
-        ];
-
+        const timelines = [ { label: '1 Month', yrs: 1/12 }, { label: '6 Months', yrs: 6/12 }, { label: '1 Year', yrs: 1 }, { label: '2 Years', yrs: 2 }, { label: '5 Years', yrs: 5 } ];
+        
         tBody.innerHTML = timelines.map(t => {
-            let profit = 0;
-            if (t.years < 1) {
-                // Simple fraction for sub-year projections
-                profit = totalNetEarnings * t.years;
-            } else {
-                // Annual Compounding for multi-year
-                profit = initialAmount * (Math.pow(1 + blendedRate, t.years) - 1);
-            }
-            
-            const projectedBalance = initialAmount + profit;
-            
-            return `
-                <tr>
-                    <td style="padding: 16px; border-bottom: 1px solid var(--border); font-weight: 600;">${t.label}</td>
-                    <td style="padding: 16px; border-bottom: 1px solid var(--border); text-align: right; font-family: monospace; font-size: 15px;">${window.formatMoney ? window.formatMoney(projectedBalance, true) : '₱'+projectedBalance.toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                    <td style="padding: 16px; border-bottom: 1px solid var(--border); text-align: right; font-family: monospace; font-size: 15px; color: var(--primary);">+${window.formatMoney ? window.formatMoney(profit, true) : '₱'+profit.toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                </tr>
-            `;
+            const profit = t.yrs < 1 ? totalNetEarnings * t.yrs : initialAmount * (Math.pow(1 + blendedRate, t.yrs) - 1);
+            return `<tr><td style="padding: 16px; border-bottom: 1px solid var(--border);">${t.label}</td><td style="padding: 16px; border-bottom: 1px solid var(--border); text-align: right; font-family: monospace;">${window.formatMoney ? window.formatMoney(initialAmount + profit, true) : '₱'+(initialAmount + profit).toLocaleString()}</td><td style="padding: 16px; border-bottom: 1px solid var(--border); text-align: right; color: var(--primary); font-family: monospace;">+${window.formatMoney ? window.formatMoney(profit, true) : '₱'+profit.toLocaleString()}</td></tr>`;
         }).join('');
-
         document.getElementById('yield-results-container').style.display = 'block';
-    },
+    }
 };
 
-document.addEventListener('DOMContentLoaded', () => {
-    window.YieldEngine.init();
-});
+document.addEventListener('DOMContentLoaded', () => { window.YieldEngine.init(); });

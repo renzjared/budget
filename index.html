@@ -600,68 +600,67 @@
                 </div>
             </section>
 
-            <section id="admin-panel" class="view" style="padding-bottom: 80px;">
+<section id="admin-panel" class="view" style="padding-bottom: 80px;">
                 <header class="top-header">
                     <h2>Catalog Admin</h2>
-                    <p class="text-muted" style="font-size: 13px;">Manage Banks, Yields, and Caps globally.</p>
+                    <p class="text-muted" style="font-size: 13px;">Manage Banks, Products, Yields, and Caps globally.</p>
                 </header>
 
-                <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 24px;">
-                    <!-- List of Existing Banks -->
-                    <div class="card">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 16px;">
-                            <h3>Bank Catalog</h3>
-                            <button class="text-btn" onclick="window.AdminEngine.clearForm()">+ New</button>
+                <div style="display: grid; grid-template-columns: 300px 1fr; gap: 24px;">
+                    <!-- Left Sidebar: List of Banks and Products -->
+                    <div class="card" style="align-self: start; max-height: 80vh; overflow-y: auto;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 16px; align-items: center;">
+                            <h3 style="margin: 0;">Bank Catalog</h3>
+                            <button class="text-btn" onclick="window.AdminEngine.clearForm()">+ New Bank</button>
                         </div>
-                        <ul id="admin-bank-list" class="minimal-list interactive-list"></ul>
+                        <ul id="admin-bank-list" class="minimal-list interactive-list" style="display: flex; flex-direction: column; gap: 8px;"></ul>
                     </div>
 
-                    <!-- Editor Form -->
-                    <div class="card" id="admin-editor-card" style="opacity: 0.5; pointer-events: none;">
+                    <!-- Right Panel: Editor Form -->
+                    <div class="card" id="admin-editor-card" style="opacity: 0.5; pointer-events: none; background: transparent; border: none; box-shadow: none; padding: 0;">
                         <input type="hidden" id="admin-id">
                         
-                        <div style="display: flex; gap: 16px; margin-bottom: 24px; align-items: center;">
-                            <div id="admin-current-icon-display" style="width: 56px; height: 56px; border-radius: 50%; background: var(--surface-hover); display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer; border: 2px dashed var(--primary); flex-shrink: 0;" onclick="window.openIconSelector('admin')">?</div>
-                            <div style="flex: 1;">
-                                <button class="secondary-btn" style="width: 100%;" onclick="window.openIconSelector('admin')">Set Bank Logo / Icon</button>
+                        <!-- BANK IDENTITY -->
+                        <div class="card" style="margin-bottom: 24px;">
+                            <h3 style="margin-bottom: 16px; color: var(--primary);">1. Bank Identity</h3>
+                            <div style="display: flex; gap: 16px; margin-bottom: 24px; align-items: center;">
+                                <div id="admin-current-icon-display" style="width: 56px; height: 56px; border-radius: 50%; background: var(--surface-hover); display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer; border: 2px dashed var(--primary); flex-shrink: 0;" onclick="window.openIconSelector('admin')">?</div>
+                                <div style="flex: 1;">
+                                    <button class="secondary-btn" style="width: 100%;" onclick="window.openIconSelector('admin')">Set Bank Logo / Icon</button>
+                                </div>
+                                <input type="hidden" id="admin-icon-type" value="letter">
+                                <input type="hidden" id="admin-icon-value" value="">
                             </div>
-                            <input type="hidden" id="admin-icon-type" value="letter">
-                            <input type="hidden" id="admin-icon-value" value="">
-                        </div>
 
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
-                            <div class="form-group" style="margin: 0;"><label class="text-muted">Bank Code ID</label><input type="text" id="admin-bank-id" class="form-input" placeholder="e.g., maya_savings"></div>
-                            <div class="form-group" style="margin: 0;"><label class="text-muted">Display Name</label><input type="text" id="admin-name" class="form-input" placeholder="e.g., Maya"></div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px;">
-                            <div class="form-group" style="margin: 0;"><label class="text-muted">Product Name</label><input type="text" id="admin-product" class="form-input" placeholder="e.g., Personal Savings"></div>
-                            <div class="form-group" style="margin: 0;"><label class="text-muted">Theme Color</label><input type="color" id="admin-color" class="form-input" style="height: 48px; padding: 4px; border-radius: 8px;"></div>
-                            <div class="form-group" style="margin: 0;"><label class="text-muted">Tax Rate</label><input type="number" id="admin-tax" class="form-input" value="0.20" step="0.01"></div>
-                        </div>
-
-                        <!-- NEW: Time Deposit Admin Fields -->
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; padding: 12px; background: var(--surface-hover); border-radius: 8px;">
-                            <div class="form-group" style="margin: 0; display: flex; align-items: center;">
-                                <input type="checkbox" id="admin-is-td" style="width: 18px; height: 18px; margin-right: 8px; cursor: pointer;">
-                                <label for="admin-is-td" class="text-muted" style="margin: 0; cursor: pointer;">Is Time Deposit?</label>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                                <div class="form-group" style="margin: 0;"><label class="text-muted">Bank Name</label><input type="text" id="admin-name" class="form-input" placeholder="e.g., Maya"></div>
+                                <div class="form-group" style="margin: 0;">
+                                    <label class="text-muted">Theme Color</label>
+                                    <div style="display: flex; gap: 8px;">
+                                        <input type="color" id="admin-color" class="form-input" style="height: 48px; padding: 4px; border-radius: 8px; flex: 1; cursor: pointer;">
+                                        <button type="button" class="icon-btn" onclick="window.useEyeDropper('admin-color')" style="background: var(--surface-hover); border: 1px solid var(--border); border-radius: 8px; padding: 0 16px; color: var(--text);" title="Pick color from screen">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 22 1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z"/></svg>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="form-group" style="margin: 0;">
-                                <label class="text-muted" style="font-size: 11px;">Lockup Period (Days)</label>
-                                <input type="number" id="admin-lockup" class="form-input" placeholder="e.g., 30" value="0">
+                            <div class="form-group" style="margin: 0;"><label class="text-muted">Referral Code / Link (Optional)</label><input type="text" id="admin-referral" class="form-input" placeholder="e.g., Use code MAYA123"></div>
+                        </div>
+
+                        <!-- PRODUCTS & SERVICES -->
+                        <div class="card" style="margin-bottom: 24px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                                <h3 style="margin: 0; color: var(--primary);">2. Products & Services</h3>
+                                <button class="secondary-btn" style="padding: 6px 12px; font-size: 12px;" onclick="window.AdminEngine.addProduct()">+ Add Product</button>
+                            </div>
+                            <div id="admin-products-container" style="display: flex; flex-direction: column; gap: 24px;">
+                                <!-- Dynamic Products render here -->
                             </div>
                         </div>
 
-                        <div style="border-top: 1px solid var(--border); padding-top: 16px; margin-bottom: 24px;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 16px;">
-                                <h4>Yield Tiers & Caps</h4>
-                                <button class="secondary-btn" style="padding: 4px 12px; font-size: 12px;" onclick="window.AdminEngine.addTierRow()">+ Add Tier</button>
-                            </div>
-                            <div id="admin-tiers-container" style="display: flex; flex-direction: column; gap: 12px;"></div>
-                        </div>
-
+                        <!-- ACTIONS -->
                         <div style="display: flex; gap: 12px;">
-                            <button id="admin-delete-btn" class="secondary-btn" style="flex: 1; border-color: var(--accent-red); color: var(--accent-red); display: none;" onclick="window.AdminEngine.deleteBank()">Delete</button>
+                            <button id="admin-delete-btn" class="secondary-btn" style="flex: 1; border-color: var(--accent-red); color: var(--accent-red); display: none;" onclick="window.AdminEngine.deleteBank()">Delete Bank entirely</button>
                             <button class="primary-btn" style="flex: 2;" onclick="window.AdminEngine.saveBank()">Save to Cloud Catalog</button>
                         </div>
                     </div>
@@ -1053,7 +1052,15 @@
             
             <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-bottom: 16px;">
                 <div class="form-group" style="margin-bottom: 0;"><label class="text-muted">Balance</label><input type="number" id="acc-balance" class="form-input" placeholder="0.00"></div>
-                <div class="form-group" style="margin-bottom: 0;"><label class="text-muted">Card Color</label><input type="color" id="acc-color" class="form-input" value="#00D26A" style="height: 48px; padding: 4px; border-radius: 12px;"></div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="text-muted">Card Color</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="color" id="acc-color" class="form-input" value="#00D26A" style="height: 48px; padding: 4px; border-radius: 12px; flex: 1; cursor: pointer;">
+                        <button type="button" class="icon-btn" onclick="window.useEyeDropper('acc-color')" style="background: var(--surface-hover); border: 1px solid var(--border); border-radius: 12px; padding: 0 16px; color: var(--text);" title="Pick color from screen">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 22 1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z"/></svg>
+                        </button>
+                    </div>
+                </div>
             </div>
             
             <button id="acc-expand-btn" class="text-btn" style="margin-bottom: 16px; padding: 0; font-size: 14px;">+ More Options</button>
@@ -1074,6 +1081,10 @@
                 <h3 style="margin: 0;">Select Icon</h3>
                 <button class="close-modal-btn" onclick="document.getElementById('icon-selector-overlay').classList.remove('active')">✕</button>
             </header>
+            
+            <!-- NEW: Search Bar -->
+            <input type="text" id="icon-search" class="form-input" placeholder="Search banks or icons..." style="margin-bottom: 16px; padding: 10px 14px;">
+
             
             <div style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px; overflow-x: auto;">
                 <button class="text-btn icon-tab-btn active" data-tab="images" style="font-weight: bold; color: var(--primary);">Logos</button>

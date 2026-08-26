@@ -33,40 +33,61 @@ window.togglePrivacyMode = async () => {
     window.bootUI();
 };
 
+// --- EYEDROPPER TOOL ---
+window.useEyeDropper = async (targetInputId) => {
+    // Check if the browser supports the EyeDropper API
+    if (!window.EyeDropper) {
+        alert("Your browser does not support the eyedropper tool. Please click the color block directly to use your device's default color picker.");
+        return;
+    }
+    
+    try {
+        const eyeDropper = new EyeDropper();
+        const result = await eyeDropper.open(); // Triggers the screen picker
+        
+        const input = document.getElementById(targetInputId);
+        if (input) {
+            input.value = result.sRGBHex;
+            // Dispatch a change event so the DOM knows it updated
+            input.dispatchEvent(new Event('change'));
+        }
+    } catch (e) {
+        // User pressed 'Escape' or cancelled the picker
+        console.log('EyeDropper cancelled');
+    }
+};
+
 window.iconTargetPrefix = 'acc'; // Defaults to account
 
 window.openIconSelector = async (targetPrefix = 'acc') => {
     window.iconTargetPrefix = targetPrefix;
     const content = document.getElementById('icon-tab-content');
-    document.getElementById('icon-selector-overlay').classList.add('active');
+    const searchInput = document.getElementById('icon-search');
+    if (searchInput) searchInput.value = ''; // Reset search
     
-    // Show a quick loading state while fetching the live database logos
+    document.getElementById('icon-selector-overlay').classList.add('active');
     content.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--text-secondary);">Loading catalog...</div>';
 
-    // 1. Fetch live bank logos from Supabase (Admin Catalog)
     let bankLogos = [];
     try {
         const { data } = await window.supabase.from('banks_catalog').select('name, icon_type, icon_value').order('name');
         if (data && data.length > 0) {
-            // Only grab banks where the admin explicitly set an image URL
-            bankLogos = data
-                .filter(b => b.icon_type === 'image' && b.icon_value)
-                .map(b => ({ name: b.name, url: b.icon_value }));
+            bankLogos = data.filter(b => b.icon_type === 'image' && b.icon_value).map(b => ({ name: b.name, url: b.icon_value }));
         }
-    } catch (e) {
-        console.error("Failed to load catalog logos:", e);
-    }
+    } catch (e) { console.error("Failed to load catalog logos:", e); }
 
-    // 2. Fallback to default libraries if the catalog is empty
     if (bankLogos.length === 0) {
         bankLogos = [
+            { name: 'BDO', url: 'https://upload.wikimedia.org/wikipedia/commons/8/8c/BDO_Unibank_logo.svg' },
+            { name: 'BPI', url: 'https://upload.wikimedia.org/wikipedia/en/c/c2/Bank_of_the_Philippine_Islands_logo.svg' },
             { name: 'GCash', url: 'https://upload.wikimedia.org/wikipedia/commons/5/52/GCash_logo.svg' },
             { name: 'Maya', url: 'https://upload.wikimedia.org/wikipedia/commons/9/9a/Maya_logo.svg' },
-            { name: 'BPI', url: 'https://upload.wikimedia.org/wikipedia/en/c/c2/Bank_of_the_Philippine_Islands_logo.svg' },
-            { name: 'BDO', url: 'https://upload.wikimedia.org/wikipedia/commons/8/8c/BDO_Unibank_logo.svg' },
             { name: 'UnionBank', url: 'https://upload.wikimedia.org/wikipedia/en/9/91/UnionBank_of_the_Philippines_logo.svg' }
         ];
     }
+    
+    // Sort banks alphabetically
+    bankLogos.sort((a, b) => a.name.localeCompare(b.name));
     
     const svgIcons = [
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>', // Card
@@ -75,11 +96,15 @@ window.openIconSelector = async (targetPrefix = 'acc') => {
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>', // Dollar
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>' // Activity
     ];
-    
     const emojisList = ['🐷','💰','🏦','💳','📈','💎','🛒','🍔','✈️','🚗','🎁','🏠','⚡','🔥','🚀','💼'];
 
-    const renderTab = (tab) => {
-        if (tab === 'images') {
+    let activeTab = 'images';
+
+    const renderTab = () => {
+        const query = (document.getElementById('icon-search')?.value || '').toLowerCase();
+
+        if (activeTab === 'images') {
+            const filtered = bankLogos.filter(b => b.name.toLowerCase().includes(query));
             content.innerHTML = `
                 <div style="margin-bottom: 24px;">
                     <label class="text-muted" style="font-size:12px; margin-bottom:4px; display:block;">Or paste any Image URL:</label>
@@ -89,37 +114,39 @@ window.openIconSelector = async (targetPrefix = 'acc') => {
                     </div>
                 </div>
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
-                    ${bankLogos.map(b => `<div onclick="window.selectIcon('image', '${b.url}')" style="cursor:pointer; background:var(--surface-hover); padding:16px; border-radius:12px; text-align:center; transition:transform 0.2s;"><img src="${b.url}" style="width:100%; height:40px; object-fit:contain;"><p style="font-size:11px; margin-top:8px;" class="text-muted">${b.name}</p></div>`).join('')}
+                    ${filtered.map(b => `<div onclick="window.selectIcon('image', '${b.url}')" style="cursor:pointer; background:var(--surface-hover); padding:16px; border-radius:12px; text-align:center; transition:transform 0.2s;"><img src="${b.url}" style="width:100%; height:40px; object-fit:contain;"><p style="font-size:11px; margin-top:8px;" class="text-muted">${b.name}</p></div>`).join('')}
                 </div>`;
-        } else if (tab === 'icons') {
+        } else if (activeTab === 'icons') {
             content.innerHTML = `<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
                 ${svgIcons.map(svg => `<div onclick="window.selectIcon('icon', '${btoa(svg)}')"" style="cursor:pointer; background:var(--surface-hover); padding:20px; border-radius:12px; text-align:center; color:var(--text); transition:transform 0.2s;">${svg}</div>`).join('')}
             </div>`;
-        } else if (tab === 'emojis') {
+        } else if (activeTab === 'emojis') {
+            const filteredE = emojisList.filter(e => e.includes(query));
             content.innerHTML = `<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
-                ${emojisList.map(e => `<div onclick="window.selectIcon('emoji', '${e}')" style="cursor:pointer; background:var(--surface-hover); padding:20px; border-radius:12px; text-align:center; font-size:32px; transition:transform 0.2s;">${e}</div>`).join('')}
+                ${filteredE.map(e => `<div onclick="window.selectIcon('emoji', '${e}')" style="cursor:pointer; background:var(--surface-hover); padding:20px; border-radius:12px; text-align:center; font-size:32px; transition:transform 0.2s;">${e}</div>`).join('')}
             </div>`;
-        } else if (tab === 'letters') {
+        } else if (activeTab === 'letters') {
             content.innerHTML = `
                 <div style="text-align:center; padding: 24px;">
                     <label class="text-muted" style="margin-bottom:8px; display:block;">Type a single letter</label>
-                    <input type="text" id="custom-icon-letter" class="form-input" maxlength="1" style="width: 80px; height: 80px; font-size: 32px; text-align: center; text-transform: uppercase; margin: 0 auto 16px auto;">
+                    <input type="text" id="custom-icon-letter" class="form-input" maxlength="1" style="width: 80px; height: 80px; font-size: 32px; text-align: center; text-transform: uppercase; margin: 0 auto 16px auto;" value="${query.charAt(0) || ''}">
                     <button class="primary-btn" onclick="window.selectIcon('letter', document.getElementById('custom-icon-letter').value)">Use Letter</button>
                 </div>`;
         }
     };
 
-    // Attach click listeners to tabs
+    if (searchInput) searchInput.oninput = renderTab;
+
     document.querySelectorAll('.icon-tab-btn').forEach(btn => {
         btn.onclick = (e) => {
             document.querySelectorAll('.icon-tab-btn').forEach(b => { b.style.color = 'var(--text-secondary)'; b.style.fontWeight = 'normal'; });
             e.target.style.color = 'var(--primary)'; e.target.style.fontWeight = 'bold';
-            renderTab(e.target.getAttribute('data-tab'));
+            activeTab = e.target.getAttribute('data-tab');
+            renderTab();
         };
     });
     
-    // Automatically render the logos tab once data is fetched
-    renderTab('images'); 
+    renderTab(); 
 };
 
 window.selectIcon = (type, value) => {

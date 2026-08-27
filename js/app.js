@@ -1266,10 +1266,18 @@ window.renderDashboardInsights = () => {
         const spentPctOfIncome = cycleIncome > 0 ? (spent / cycleIncome) * 100 : 0;
         const spentPctText = Number.isInteger(spentPctOfIncome) ? spentPctOfIncome : spentPctOfIncome.toFixed(1);
 
+        // Prettier Tooltip formatting
+        const spentStr = window.formatMoney(Math.abs(spent));
+        const allocStr = window.formatMoney(allocated);
+
         return `
             <div style="margin-bottom: 16px; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'" onclick="window.openBudgetCategoryDetails('${cat.name.replace(/'/g, "\\'")}', ${cutoff.getTime()})">
                 <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px;">
-                    <span style="font-weight: 600;">${cat.name} <span style="color:var(--text-secondary); font-weight:400">(${spentPctText}%/${cat.percent}%)</span></span>
+                    <span style="font-weight: 600;">${cat.name} 
+                        <span class="pretty-tooltip" title="${spentStr} / ${allocStr}" data-tooltip="${spentStr} / ${allocStr}" style="color:var(--text-secondary); font-weight:400; margin-left: 4px;">
+                            (${spentPctText}%/${cat.percent}%)
+                        </span>
+                    </span>
                     <span style="font-weight: 700; color: ${color};">${remainingText}</span>
                 </div>
                 <div style="width: 100%; height: 6px; background-color: var(--border); border-radius: 4px; overflow: hidden;">
@@ -1999,16 +2007,24 @@ window.renderBudgetTracking = () => {
         const spentPctOfIncome = cycleIncome > 0 ? (spent / cycleIncome) * 100 : 0;
         const spentPctText = Number.isInteger(spentPctOfIncome) ? spentPctOfIncome : spentPctOfIncome.toFixed(1);
 
+        // Prettier Tooltip formatting
+        const spentStr = window.formatMoney(Math.abs(spent));
+        const allocStr = window.formatMoney(allocated);
+
         return `
             <div style="margin-bottom: 20px; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'" onclick="window.openBudgetCategoryDetails('${cat.name.replace(/'/g, "\\'")}', ${cutoff.getTime()})">
                 <div style="display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 8px;">
-                    <span style="font-weight: 700;">${cat.name} <span style="font-weight:400; color:var(--text-secondary)">(${spentPctText}%/${cat.percent}%)</span></span>
-                    <span style="font-weight: 700; color: ${color};">${window.formatMoney(spent)} <span style="font-weight:400; color:var(--text-secondary)">/ ${window.formatMoney(allocated)}</span></span>
+                    <span style="font-weight: 700;">${cat.name} 
+                        <span class="pretty-tooltip" title="${spentStr} / ${allocStr}" data-tooltip="${spentStr} / ${allocStr}" style="font-weight:400; color:var(--text-secondary); margin-left: 4px;">
+                            (${spentPctText}%/${cat.percent}%)
+                        </span>
+                    </span>
+                    <span style="font-weight: 700; color: ${color};">${window.formatMoney(Math.abs(spent))} <span style="font-weight:400; color:var(--text-secondary)">/ ${window.formatMoney(allocated)}</span></span>
                 </div>
                 <div style="width: 100%; height: 8px; background-color: var(--border); border-radius: 4px; overflow: hidden;">
                     <div style="height: 100%; width: ${Math.min(pct, 100)}%; background-color: ${color}; transition: width 0.3s ease;"></div>
                 </div>
-                ${over ? `<p style="font-size: 12px; color: var(--accent-red); margin-top: 6px;">Overbudget by ${window.formatMoney(spent - allocated)}</p>` : ''}
+                ${over ? `<p style="font-size: 12px; color: var(--accent-red); margin-top: 6px;">Overbudget by ${window.formatMoney(Math.abs(spent) - allocated)}</p>` : ''}
             </div>`;
     }).join('');
 };

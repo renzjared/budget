@@ -745,6 +745,39 @@ body.travel-theme {
     font-weight: 700;
 }
 
+/* Prettier Custom Tooltip */
+    .pretty-tooltip {
+        position: relative;
+        cursor: help;
+        border-bottom: 1px dotted var(--text-secondary);
+        display: inline-block;
+    }
+    .pretty-tooltip::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        bottom: calc(100% + 8px);
+        left: 50%;
+        transform: translateX(-50%) translateY(5px);
+        background: var(--text);
+        color: var(--bg);
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 800;
+        white-space: nowrap;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.2s, transform 0.2s;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        z-index: 10000;
+        pointer-events: none;
+    }
+    .pretty-tooltip:hover::after {
+        opacity: 1;
+        visibility: visible;
+        transform: translateX(-50%) translateY(0);
+    }
+
 /* Mobile Responsiveness for Docs Split-Pane */
 @media (max-width: 768px) {
     .docs-container {
@@ -757,3 +790,4 @@ body.travel-theme {
         max-height: 250px;
     }
 }
+

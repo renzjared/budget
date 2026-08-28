@@ -79,7 +79,6 @@ nav { display: flex; flex-direction: column; gap: 0.5rem; }
 /* Content */
 /* .content { flex: 1; padding: 2.5rem 3rem; overflow-y: auto; } */
 
-
 .content { 
     flex: 1; 
     padding: 2.5rem 3rem; 

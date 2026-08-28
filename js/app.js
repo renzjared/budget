@@ -395,22 +395,34 @@ window.initGlobalHeader = () => {
 
 window.adjustAppPadding = () => {
     const header = document.getElementById('unified-global-header');
-    const appContainer = document.querySelector('.app-container');
+    const content = document.querySelector('.content');
     const sidebar = document.getElementById('main-sidebar');
+    const appContainer = document.querySelector('.app-container');
     
-    if (header && appContainer) {
-        const headerHeight = header.offsetHeight;
-        // Push the main app container down
-        appContainer.style.paddingTop = headerHeight + 'px';
-        
-        // Ensure the sidebar accounts for the header height
-        if (sidebar && window.innerWidth > 768) {
-            sidebar.style.top = headerHeight + 'px';
-            sidebar.style.height = `calc(100vh - ${headerHeight}px)`;
-        } else if (sidebar) {
-            sidebar.style.top = '0';
-            sidebar.style.height = '100vh';
-        }
+    if (!header) return;
+
+    // Reset the parent container so it doesn't leave a gray void
+    if (appContainer) appContainer.style.paddingTop = '0px';
+
+    // Check if the header is currently slid down
+    const isActive = header.style.transform !== 'translateY(-100%)';
+    const headerInner = header.querySelector('header');
+    const bumpHeight = isActive ? (headerInner ? headerInner.offsetHeight : 70) : 0;
+
+    // Apply smooth padding directly to the scrollable content area
+    if (content) {
+        content.style.transition = 'padding-top 0.3s ease';
+        content.style.paddingTop = `calc(2.5rem + ${bumpHeight}px)`;
+    }
+    
+    // Push the sidebar contents down smoothly too
+    if (sidebar && window.innerWidth > 768) {
+        sidebar.style.transition = 'padding-top 0.3s ease';
+        sidebar.style.paddingTop = `calc(2.5rem + ${bumpHeight}px)`;
+        sidebar.style.top = '0';
+        sidebar.style.height = '100vh';
+    } else if (sidebar) {
+        sidebar.style.paddingTop = '2.5rem';
     }
 };
 
@@ -712,16 +724,14 @@ window.applySettingsToUI = () => {
         });
     }
 
-    // Update Landing Page Buttons based on Auth State
     document.querySelectorAll('.landing-auth-btn').forEach(btn => {
         if (btn.id === 'discord-login-btn') {
             btn.innerText = window.currentUser ? 'Go to Dashboard' : 'Get Started';
         } else {
-            btn.innerText = window.currentUser ? 'Dashboard' : 'Log In';
+            // Hide the header button entirely if the user is already logged in
+            btn.style.display = window.currentUser ? 'none' : 'block';
         }
     });
-
-
 };
 
 window.recalculateSavings = () => {

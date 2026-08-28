@@ -621,18 +621,17 @@
                 <header class="top-header">
                     <h2>Analytics</h2>
                     
-                    <div class="chip-group" id="stats-filters" style="margin-top: 16px;">
-                        <button class="chip" data-range="1">1D</button>
-                        <button class="chip" data-range="7">7D</button>
-                        <button class="chip active" data-range="30">30D</button>
-                        <button class="chip" data-range="365">1Y</button>
-                        <button class="chip" data-range="all">All Time</button>
-                        <button class="chip" data-range="custom">Custom</button>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 24px; margin-top: 16px; flex-wrap: wrap;">
                         <div class="chip-group" id="stats-filters">
-                            </div>
-                        <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--text-secondary); cursor: pointer;">
+                            <button class="chip" data-range="1">1D</button>
+                            <button class="chip" data-range="7">7D</button>
+                            <button class="chip active" data-range="30">30D</button>
+                            <button class="chip" data-range="365">1Y</button>
+                            <button class="chip" data-range="all">All Time</button>
+                            <button class="chip" data-range="custom">Custom</button>
+                        </div>
+                        
+                        <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--text-secondary); cursor: pointer; border-left: 1px solid var(--border); padding-left: 12px;">
                             <input type="checkbox" id="stats-include-travel" style="width: 16px; height: 16px; cursor: pointer;"> Include Travels
                         </label>
                     </div>
@@ -642,6 +641,7 @@
                         <span style="display:flex; align-items:center;">to</span>
                         <input type="date" id="chart-end-date" class="form-input" style="padding: 8px; width: auto; font-size: 13px;">
                     </div>
+
                 </header>
                 
                 <!-- <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">

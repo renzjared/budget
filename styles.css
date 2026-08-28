@@ -35,13 +35,32 @@ body.dark-theme {
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'DM Sans', sans-serif; }
-
+/* 
 body {
     background-color: var(--bg); color: var(--text);
     display: flex; height: 100vh; overflow: hidden; -webkit-font-smoothing: antialiased;
+} */
+
+body {
+    background-color: var(--bg); color: var(--text);
+    display: flex; flex-direction: column; 
+    height: 100dvh; /* Adapts dynamically to mobile UI bars */
+    overflow: hidden; 
+    -webkit-font-smoothing: antialiased;
 }
 
-.app-container { display: flex; width: 100%; max-width: 1400px; margin: 0 auto; }
+.app-container { 
+    display: flex; 
+    width: 100%; 
+    max-width: 1400px; 
+    margin: 0 auto; 
+    height: 100%; /* Force it to respect the body's 100dvh boundary */
+    overflow: hidden; /* Prevent parent from expanding */
+}
+
+
+/* .app-container { display: flex; width: 100%; max-width: 1400px; margin: 0 auto; } */
+
 .text-muted { color: var(--text-secondary); font-size: 14px; font-weight: 500; }
 h2 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
 h3 { font-size: 18px; font-weight: 700; }
@@ -58,7 +77,17 @@ nav { display: flex; flex-direction: column; gap: 0.5rem; }
 .nav-btn.active svg { color: var(--primary); }
 
 /* Content */
-.content { flex: 1; padding: 2.5rem 3rem; overflow-y: auto; }
+/* .content { flex: 1; padding: 2.5rem 3rem; overflow-y: auto; } */
+
+
+.content { 
+    flex: 1; 
+    padding: 2.5rem 3rem; 
+    overflow-y: auto; 
+    height: 100%; 
+    -webkit-overflow-scrolling: touch; /* Enables buttery-smooth mobile momentum scrolling */
+}
+
 .massive-balance { font-size: 44px; font-weight: 700; letter-spacing: -1.5px; margin-top: 4px; color: var(--text); }
 .top-header { margin-bottom: 2rem; }
 

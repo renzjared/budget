@@ -13,11 +13,12 @@ window.LedgersEngine = {
     isReadOnly: false, 
     itemDirection: 1, 
     paymentDirection: 1, 
-
-    // --- DEEP LINKING URL ROUTER ---
     sharedOwnerName: null,
 
+    // --- DEEP LINKING URL ROUTER ---
     initSharedView: async (token) => {
+        document.getElementById('main-sidebar').style.display = 'none';
+        
         // Fetch ledger by URL token
         const { data: ledger, error } = await window.supabase.from('accounts').select('*').eq('share_token', token).single();
         
@@ -30,18 +31,45 @@ window.LedgersEngine = {
         const { data: owner } = await window.supabase.from('profiles').select('username').eq('id', ledger.user_id).single();
         window.LedgersEngine.sharedOwnerName = owner?.username || 'User';
 
-        // Selected Mode Authentication Check
+        // Selected Mode Authentication & Invite Check
         if (ledger.sharing_mode === 'selected') {
             if (!window.currentUser) {
                 window.location.href = '/'; // Force login if not authenticated
                 return;
             }
-            const currentUsername = window.userProfile?.username;
-            const { data: shareAccess } = await window.supabase.from('ledger_shares').select('*').eq('ledger_id', ledger.id).eq('target_username', currentUsername).single();
             
-            if (!shareAccess && ledger.user_id !== window.currentUser.id) {
+            const currentUsername = window.userProfile?.username?.toLowerCase();
+            const meta = window.currentUser?.user_metadata || {};
+            const dName1 = (meta.full_name || '').toLowerCase();
+            const dName2 = (meta.name || '').toLowerCase();
+            const dName3 = (meta.preferred_username || '').toLowerCase();
+
+            const { data: allShares } = await window.supabase.from('ledger_shares').select('*').eq('ledger_id', ledger.id);
+            
+            let matchedShare = null;
+            if (allShares) {
+                matchedShare = allShares.find(s => {
+                    const target = s.target_username.toLowerCase();
+                    // Match legacy format or exact App User format
+                    if (target === currentUsername || target === `app#${currentUsername}`) return true;
+                    // Match Discord format
+                    if (target.startsWith('discord#')) {
+                        const dTarget = target.split('#')[1];
+                        if (dTarget === dName1 || dTarget === dName2 || dTarget === dName3) return true;
+                    }
+                    return false;
+                });
+            }
+
+            // Block access if they are neither the owner nor on the invite list
+            if (!matchedShare && ledger.user_id !== window.currentUser.id) {
                 document.body.innerHTML = `<div style="padding: 40px; text-align: center; font-family: sans-serif;"><h2>Access Denied</h2><p>You do not have permission to view this ledger.</p><a href="/">Go to Homepage</a></div>`;
                 return;
+            }
+
+            // If the user accessed the link successfully, auto-convert their status to accepted
+            if (matchedShare && matchedShare.status === 'pending') {
+                await window.supabase.from('ledger_shares').update({ status: 'accepted' }).eq('id', matchedShare.id);
             }
         }
 
@@ -49,7 +77,7 @@ window.LedgersEngine = {
         if (!window.currentUser) {
             const publicBanner = document.getElementById('public-ledger-banner');
             if (publicBanner) publicBanner.style.display = 'flex';
-            window.switchView('landing'); // Keep the landing page visible in the background
+            window.switchView('landing'); 
         }
 
         // Fetch Read-Only Transactions
@@ -168,13 +196,17 @@ window.LedgersEngine = {
 
                     <div id="share-selected-group" style="display: none; border-top: 1px solid var(--border); padding-top: 24px;">
                         <label class="text-muted" style="margin-bottom: 8px; display: block;">Invite Users</label>
-                        <p class="text-muted" style="font-size: 12px; margin-bottom: 12px;">Enter an App Username or Discord Username. They will receive a notification.</p>
+                        <p class="text-muted" style="font-size: 12px; margin-bottom: 12px;">Invite users by their Renz-Bot Username or Discord Name. They can join via the public link once invited.</p>
                         <div style="display: flex; gap: 8px; margin-bottom: 16px;">
-                            <input type="text" id="share-username-input" class="form-input" placeholder="Username...">
+                            <select id="share-platform-select" class="form-input" style="width: auto; padding: 8px 12px; font-size: 13px;">
+                                <option value="app">App User</option>
+                                <option value="discord">Discord</option>
+                            </select>
+                            <input type="text" id="share-username-input" class="form-input" placeholder="Username..." style="flex: 1;">
                             <button class="primary-btn" onclick="window.LedgersEngine.addSharedUser()">Invite</button>
                         </div>
                         <ul id="shared-users-list" class="minimal-list"></ul>
-                        <p id="share-warning-msg" style="color: #FFA800; font-size: 12px; margin-top: 12px; display: none;"></p>
+                        <div id="share-warning-msg" style="background: rgba(255, 168, 0, 0.1); color: #FFA800; padding: 12px; border-radius: 8px; font-size: 12px; margin-top: 12px; display: none; line-height: 1.4;"></div>
                     </div>
                 </div>
             </div>
@@ -366,7 +398,7 @@ window.LedgersEngine = {
         window.LedgersEngine.renderList();
     },
 
-openDetails: (id, forceReadOnly = false) => {
+    openDetails: (id, forceReadOnly = false) => {
         window.LedgersEngine.activeLedgerId = id;
         const ledger = window.accountsData.find(a => a.id === id);
         if (!ledger) return;
@@ -510,34 +542,56 @@ openDetails: (id, forceReadOnly = false) => {
             return;
         }
 
-        list.innerHTML = shares.map(share => `
-            <li style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px dashed var(--border);">
-                <div>
-                    <span style="font-weight: 600;">@${share.target_username}</span>
-                    <span style="font-size: 11px; margin-left: 8px; color: ${share.status === 'pending' ? '#FFA800' : 'var(--primary)'};">${share.status}</span>
-                </div>
-                <button class="icon-btn" style="color: var(--accent-red);" onclick="window.LedgersEngine.removeSharedUser('${share.id}')">✕</button>
-            </li>
-        `).join('');
+        list.innerHTML = shares.map(share => {
+            let displayPlatform = 'App';
+            let displayUser = share.target_username;
+            if (displayUser.includes('#')) {
+                const parts = displayUser.split('#');
+                displayPlatform = parts[0] === 'discord' ? 'Discord' : 'App';
+                displayUser = parts[1];
+            }
+
+            return `
+                <li style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px dashed var(--border);">
+                    <div>
+                        <span style="font-weight: 600;">@${displayUser}</span>
+                        <span style="font-size: 10px; margin-left: 6px; background: var(--surface-hover); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border);">${displayPlatform}</span>
+                        <span style="font-size: 11px; margin-left: 6px; color: ${share.status === 'pending' ? '#FFA800' : 'var(--primary)'};">${share.status}</span>
+                    </div>
+                    <button class="icon-btn" style="color: var(--accent-red);" onclick="window.LedgersEngine.removeSharedUser('${share.id}')">✕</button>
+                </li>
+            `;
+        }).join('');
     },
 
     addSharedUser: async () => {
         const id = window.LedgersEngine.activeLedgerId;
         const input = document.getElementById('share-username-input');
+        const platformSelect = document.getElementById('share-platform-select');
         const username = input.value.trim().toLowerCase();
+        const platform = platformSelect ? platformSelect.value : 'app';
+        
         if (!username) return;
 
         if (window.showLoadingToast) window.showLoadingToast('Checking user...');
-
-        // Check if user exists
-        const { data: profile } = await window.supabase.from('profiles').select('id').eq('username', username).single();
         const warningEl = document.getElementById('share-warning-msg');
+
+        let profile = null;
+        
+        // We only verify existing accounts if it's an app user
+        if (platform === 'app') {
+            // Use limit(1) to be completely safe against multiple row exceptions or 0 row crashes
+            const { data: profiles } = await window.supabase.from('profiles').select('id').eq('username', username).limit(1);
+            profile = profiles && profiles.length > 0 ? profiles[0] : null;
+        }
+
+        const storedUsername = `${platform}#${username}`;
 
         const sharePayload = {
             ledger_id: id,
             owner_id: window.currentUser.id,
-            target_username: username,
-            status: profile ? 'accepted' : 'pending'
+            target_username: storedUsername,
+            status: profile ? 'accepted' : 'pending' // If discord, always pending initially
         };
 
         const { error } = await window.supabase.from('ledger_shares').insert([sharePayload]);
@@ -547,7 +601,7 @@ openDetails: (id, forceReadOnly = false) => {
         }
 
         if (profile) {
-            // Notify existing user
+            // Notify existing App User via Inbox
             await window.supabase.from('notifications').insert([{
                 user_id: profile.id,
                 title: 'New Ledger Shared',
@@ -557,8 +611,10 @@ openDetails: (id, forceReadOnly = false) => {
             warningEl.style.display = 'none';
             if(window.showToast) window.showToast('User invited successfully!');
         } else {
+            // Alert that the invite was saved safely as pending
             warningEl.style.display = 'block';
-            warningEl.innerText = `⚠️ User '${username}' not found. The invitation will be pending until they create an account.`;
+            warningEl.innerText = `⚠️ Invitation sent! The user '${username}' will remain pending until they create an account and click the public link to claim access.`;
+            if(window.showToast) window.showToast('Invitation saved as pending.');
         }
 
         input.value = '';
@@ -754,19 +810,17 @@ openDetails: (id, forceReadOnly = false) => {
         if (window.showToast) window.showToast('Payment logged!');
     },
 
-previewReceipt: () => {
+    previewReceipt: () => {
         const id = window.LedgersEngine.activeLedgerId;
         const ledger = window.accountsData.find(a => a.id === id);
         if (!ledger) return;
 
         const sym = ledger.currency ? window.getCurrencySymbol(ledger.currency) : window.getCurrencySymbol(window.userSettings?.currency || '₱');
         
-        // Dynamically grab the real names based on who is viewing
         const creatorName = (window.LedgersEngine.isReadOnly && window.LedgersEngine.sharedOwnerName) 
             ? window.LedgersEngine.sharedOwnerName 
             : (window.userProfile?.username || 'You');
             
-        // Strip out the "User's Ledger: " prefix if it was added during the shared view
         const entityName = ledger.name.includes(': ') ? ledger.name.split(': ')[1] : ledger.name;
         
         const txs = window.appData.filter(t => 
@@ -862,7 +916,6 @@ previewReceipt: () => {
     }
 };
 
-// Initialize Ledgers module automatically
 document.addEventListener('DOMContentLoaded', () => {
     window.LedgersEngine.init();
 });

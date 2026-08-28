@@ -4782,7 +4782,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // PROGRESSIVE WEB APP (PWA) & LANDING PAGE ANIMATIONS
     // ==========================================
 
-    // 1. Register the Service Worker for PWA
+// 1. Register the Service Worker for PWA
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('./sw.js')
@@ -4791,6 +4791,43 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // NEW: PWA Installation Prompt Engine
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+        // Prevent Chrome 67 and earlier from automatically showing the prompt
+        e.preventDefault();
+        // Stash the event so it can be triggered later
+        deferredPrompt = e;
+        
+        // Unhide the install button in the sidebar
+        const installBtn = document.getElementById('install-pwa-btn');
+        if (installBtn) {
+            installBtn.style.display = 'flex';
+            
+            installBtn.onclick = async () => {
+                // Show the browser's native install prompt
+                deferredPrompt.prompt();
+                
+                // Wait for the user to respond
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    console.log('User accepted the install prompt');
+                    installBtn.style.display = 'none'; // Hide button once installed
+                }
+                // Clear the prompt variable, it can only be used once
+                deferredPrompt = null;
+            };
+        }
+    });
+
+    // Successfully installed event
+    window.addEventListener('appinstalled', () => {
+        const installBtn = document.getElementById('install-pwa-btn');
+        if (installBtn) installBtn.style.display = 'none';
+        deferredPrompt = null;
+        console.log('PWA was installed successfully');
+    });
+    
     // 2. Scroll Reveal Animation Logic
     const revealObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {

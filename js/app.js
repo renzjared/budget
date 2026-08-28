@@ -1569,10 +1569,16 @@ window.editTransaction = () => {
     if (!window.currentEditingTransaction) return;
     const entry = window.currentEditingTransaction;
     
-    const isIncome = (entry.type || '').toUpperCase().includes('INCOM');
     const baseCode = window.getCurrencyCodeFromSymbol(window.userSettings?.currency || '₱');
     
-    const displayAmount = (entry.original_amount !== undefined && entry.original_amount !== null) ? Math.abs(entry.original_amount) : Math.abs(entry.amount);
+    // Fix: Show the true signed amount for Ledgers so users can fix corrupted directions.
+    // For standard Income/Expense, show Math.abs() because the type handles the sign.
+    let displayAmount;
+    if (entry.type === 'LEDGER_ITEM') {
+        displayAmount = (entry.original_amount !== undefined && entry.original_amount !== null) ? entry.original_amount : entry.amount;
+    } else {
+        displayAmount = (entry.original_amount !== undefined && entry.original_amount !== null) ? Math.abs(entry.original_amount) : Math.abs(entry.amount);
+    }
     
     document.getElementById('edit-tx-name').value = entry.name || '';
     document.getElementById('edit-tx-amount').value = displayAmount || 0;
@@ -1748,26 +1754,39 @@ window.saveTransactionEdit = async () => {
     const isTripCb = document.getElementById('edit-is-trip')?.checked;
     const newTripId = isTripCb ? document.getElementById('edit-trip-id')?.value : null;
 
-    if (!newName || !newAmount || isNaN(newAmount)) {
+    if (!newName || isNaN(newAmount)) {
         alert('Please fill in Name and Amount');
         return;
     }
     
-    const isIncome = (entry.type || '').toUpperCase().includes('INCOM');
     const selCur = document.getElementById('edit-tx-currency').value;
     const baseCur = window.getCurrencyCodeFromSymbol(window.userSettings?.currency || '₱');
     
-    let finalAmount = newAmount;
+    let finalAmount = Math.abs(newAmount);
     let exchangeRate = 1;
     
     if (selCur !== baseCur) {
-        finalAmount = window.convertCurrency(newAmount, selCur, baseCur);
-        exchangeRate = finalAmount / newAmount;
+        finalAmount = window.convertCurrency(Math.abs(newAmount), selCur, baseCur);
+        exchangeRate = finalAmount / Math.abs(newAmount);
     }
     localStorage.setItem('lastUsedCurrency', selCur);
     
-    const signedFinalAmount = isIncome ? finalAmount : -finalAmount;
-    const signedOrigAmount = isIncome ? newAmount : -newAmount;
+    let signedFinalAmount;
+    let signedOrigAmount;
+
+    // Fix: Dynamically assign the correct mathematical sign based on transaction type
+    if (entry.type === 'LEDGER_ITEM') {
+        const isPositive = newAmount >= 0;
+        signedFinalAmount = isPositive ? finalAmount : -finalAmount;
+        signedOrigAmount = isPositive ? Math.abs(newAmount) : -Math.abs(newAmount);
+    } else if (entry.type === 'TRANSFER') {
+        signedFinalAmount = finalAmount;
+        signedOrigAmount = Math.abs(newAmount);
+    } else {
+        const isIncome = (entry.type || '').toUpperCase().includes('INCOM');
+        signedFinalAmount = isIncome ? finalAmount : -finalAmount;
+        signedOrigAmount = isIncome ? Math.abs(newAmount) : -Math.abs(newAmount);
+    }
     
     const { error } = await window.supabase
         .from('transactions')

@@ -1,32 +1,26 @@
-# High-Yield Optimizer
+# Savings Planner (Yield Optimizer)
 
-The Yield Optimizer is a proprietary tool designed to algorithmically maximize your interest earnings across various Philippine Digital Banks using a greedy allocation strategy.
+The Savings Planner is a powerful mathematical engine designed to help you maximize the interest earned on your idle cash across Philippine Digital Banks. 
 
-## How the Algorithm Works
+Instead of guessing where to put your money, the optimizer calculates the exact mathematical distribution required to earn the highest possible net yield.
 
-When you input a principal amount, the engine performs the following operations:
-1. **Query**: Fetches the live bank catalog and current interest tiers.
-2. **Filter**: Removes banks you have explicitly excluded in your settings.
-3. **Sort**: Ranks every available tier by its **Net APY** (Gross Rate - Withholding Tax).
-4. **Allocate**: Pours your funds into the highest-yielding bucket until its cap is reached, then spills the remainder into the next highest bucket.
+## 1. The Progressive Pour Algorithm
+Digital banks often use "tiered" interest rates (e.g., 6% on the first ₱20,000, and 4% on the rest). The optimizer understands these limits.
+1. Enter your **Investment Amount** at the top of the planner.
+2. The engine will "pour" your money into the highest-yielding tier available across all banks.
+3. Once a high-yield tier hits its maximum cap, the engine automatically spills the remaining funds into the next highest available tier.
+4. The result is a precise, blended APY (Annual Percentage Yield) and a step-by-step breakdown of exactly where to deposit your funds.
 
----
+*Note: All calculations automatically account for the standard 20% Philippine withholding tax to show you your true Net Earnings.*
 
-## Overriding Rates (Gamified Tiers)
+## 2. Bank Browser & Standalone Calculator
+If you want to explore banks individually without running the global optimizer, scroll down to the **Explore Digital Banks** section.
+* Click on any Bank to view its specific savings and time deposit products.
+* Click on a Product to open the **Standalone Calculator**. 
+* Entering an amount here will show you exactly how much that specific product will yield daily, monthly, and yearly, complete with a breakdown of how your money fills its internal interest tiers.
 
-Many digital banks (like Maya) offer gamified interest rates (e.g., 3.5% base, up to 15% boosted). The global catalog sets the baseline, but you can override this locally.
-
-### Steps to Override:
-1. Open the Yield Optimizer.
-2. Click the **⚙️ Settings** icon in the top right.
-3. Find your target bank in the list.
-4. Click the `%` input box next to the tier cap and enter your personal unlocked rate.
-5. Click **Save & Recalculate**.
-
-| Bank | Standard Base | Maximum Boosted | Crediting |
-| :--- | :--- | :--- | :--- |
-| **Maya** | 3.50% | 15.00% | Daily |
-| **SeaBank** | 4.50% | 4.50% | Daily |
-| **OwnBank** | 6.00% | 6.00% | Daily |
-
-*Note: All Philippine bank interest is subject to a standard 20% withholding tax. The Yield Optimizer calculates earnings based on the post-tax net.*
+## 3. Customizing the Optimizer
+Not everyone has an account with every digital bank, and some users unlock special promotional interest rates.
+* **Filter Banks:** Click the ⚙️ (Gear) icon in the top right of the Savings Planner. You can uncheck banks you do not wish to use, and the optimizer will completely ignore them.
+* **Rate Overrides:** In that same Settings menu, you can manually type in a new APY% for any specific tier. If you completed a promotional mission to unlock 10% interest for a month, simply enter `10.00` here and hit Save.
+* **Time Deposits:** By default, the optimizer considers locked Time Deposits. If you only want liquid savings, simply uncheck the "Include locked Time Deposits" box below the input amount.

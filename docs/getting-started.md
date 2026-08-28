@@ -1,33 +1,24 @@
 # Getting Started
 
-Welcome! This guide will help you set up your workspace, link your accounts, and start logging your financial flow. Renz-bot is built on a zero-friction philosophy—meaning you spend less time entering data and more time understanding it.
+Welcome to Renz-Bot Finance, a robust, privacy-first personal finance manager designed to track your cash flow, manage debt ledgers, and optimize your high-yield savings.
 
-## Overview
+This guide will help you set up your financial environment so you can begin tracking immediately.
 
-We operate on three core pillars:
-1. **Accounts**: The physical or digital places where your money lives (e.g., Maya, Cash, BPI).
-2. **Transactions**: The movement of money in, out, or between Accounts.
-3. **Budgets & Goals**: Virtual partitions of your money designed to pace your spending.
+## 1. Initial Setup
+When you first log in, the app operates on a clean slate. Follow these steps to configure your environment:
+1. **Navigate to Settings:** Click the "Settings" gear icon in the sidebar.
+2. **Set Base Currency:** Choose your primary currency (e.g., PHP, USD, EUR). The app utilizes an automated multi-currency engine, meaning foreign transactions will always convert back to this base currency for analytics.
+3. **Set Starting Balance:** If you prefer using a single global "Running Balance" without managing individual accounts, input your current net worth here.
 
----
+## 2. Define Your Budget Cycle
+Renz-Bot relies on an automated proportional budgeting system rather than rigid, hard-coded limits.
+1. In **Settings**, locate the **Category Budgets** section.
+2. Choose your tracking cycle: **Daily**, **Weekly**, or **Monthly**.
+3. Add your standard spending categories (e.g., FOOD, BILLS, LEISURE) and assign a percentage. 
+4. *How it works:* Whenever you log an "Income" transaction, the app automatically divides that income into these categories based on your percentages.
 
-## Your First Steps
-
-### 1. Configure your Base Currency
-Renz-bot currently supports over 15 currencies, but you need a "Base Currency" for your global net worth calculations.
-* Go to **Settings** > **Currency**.
-* Select your primary currency (default is `₱ Philippine Peso`).
-
-### 2. Create an Account
-You cannot log an expense without a source. 
-1. Navigate to the **Accounts** tab.
-2. Click **+ Add Account**.
-3. Select an Icon, assign a starting balance, and define the Account Type.
-
-> **Pro Tip:** Use the **EyeDropper Tool** when selecting your card color to perfectly match your physical bank card!
-
-### 3. Log a Transaction
-Click the quick-add buttons on the Dashboard. When logging, remember:
-* **Income** *adds* to your account and increases your allocatable Budget.
-* **Expenses** *deduct* from your account and consume your Budget limits.
-* **Transfers** move money *between* accounts without affecting your global Net Worth or Budgets.
+## 3. Privacy Mode
+Finance is sensitive. You can click the **Eye icon** next to your massive balance on the dashboard to cycle through privacy states:
+* **Visible:** All amounts are shown.
+* **Totals Hidden:** Individual transactions are visible, but net worth and grand totals are censored (`••••••`).
+* **Strict:** Every monetary value on the screen is censored.

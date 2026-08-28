@@ -206,7 +206,7 @@ input:checked + .slider:before { transform: translateX(22px); }
     font-weight: 700;
 }
 .markdown-body p { margin-bottom: 16px; color: var(--text-secondary); }
-.markdown-body ul { margin-bottom: 16px; padding-left: 24px; color: var(--text-secondary); }
+.markdown-body ul, .markdown-body ol { margin-bottom: 16px; padding-left: 24px; color: var(--text-secondary); }
 .markdown-body li { margin-bottom: 8px; }
 .markdown-body a { color: var(--primary); text-decoration: none; }
 

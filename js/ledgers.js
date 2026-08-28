@@ -2,7 +2,6 @@ window.LedgersEngine = {
     init: () => {
         window.LedgersEngine.injectModals();
         
-        // Hook into the main app's boot sequence to render our ledgers automatically
         const origBoot = window.bootUI;
         window.bootUI = () => {
             if(origBoot) origBoot();
@@ -10,19 +9,81 @@ window.LedgersEngine = {
         };
     },
 
-    // Dynamically injects all necessary modals to prevent HTML bloat
+    activeLedgerId: null,
+    isReadOnly: false, 
+    itemDirection: 1, 
+    paymentDirection: 1, 
+
+    // --- DEEP LINKING URL ROUTER ---
+    sharedOwnerName: null,
+
+    initSharedView: async (token) => {
+        // Fetch ledger by URL token
+        const { data: ledger, error } = await window.supabase.from('accounts').select('*').eq('share_token', token).single();
+        
+        if (error || !ledger || ledger.sharing_mode === 'private') {
+            document.body.innerHTML = `<div style="padding: 40px; text-align: center; font-family: sans-serif;"><h2>Access Denied</h2><p>This ledger is private or does not exist.</p><a href="/">Go to Homepage</a></div>`;
+            return;
+        }
+
+        // Identify Owner
+        const { data: owner } = await window.supabase.from('profiles').select('username').eq('id', ledger.user_id).single();
+        window.LedgersEngine.sharedOwnerName = owner?.username || 'User';
+
+        // Selected Mode Authentication Check
+        if (ledger.sharing_mode === 'selected') {
+            if (!window.currentUser) {
+                window.location.href = '/'; // Force login if not authenticated
+                return;
+            }
+            const currentUsername = window.userProfile?.username;
+            const { data: shareAccess } = await window.supabase.from('ledger_shares').select('*').eq('ledger_id', ledger.id).eq('target_username', currentUsername).single();
+            
+            if (!shareAccess && ledger.user_id !== window.currentUser.id) {
+                document.body.innerHTML = `<div style="padding: 40px; text-align: center; font-family: sans-serif;"><h2>Access Denied</h2><p>You do not have permission to view this ledger.</p><a href="/">Go to Homepage</a></div>`;
+                return;
+            }
+        }
+
+        // Banner and layout for Logged-Out Guests
+        if (!window.currentUser) {
+            const publicBanner = document.getElementById('public-ledger-banner');
+            if (publicBanner) publicBanner.style.display = 'flex';
+            window.switchView('landing'); // Keep the landing page visible in the background
+        }
+
+        // Fetch Read-Only Transactions
+        const { data: txs } = await window.supabase.from('transactions').select('*').or(`account_id.eq.${ledger.id},to_account_id.eq.${ledger.id}`);
+        
+        // Safely inject into state so the modal functions don't break
+        if (!window.accountsData) window.accountsData = [];
+        if (!window.appData) window.appData = [];
+        
+        if (!window.accountsData.find(a => a.id === ledger.id)) {
+            window.accountsData.push(ledger);
+        }
+        
+        if (txs) {
+            const existingTxIds = new Set(window.appData.map(t => t.id));
+            txs.forEach(t => {
+                if (!existingTxIds.has(t.id)) window.appData.push(t);
+            });
+        }
+        
+        const isOwner = window.currentUser && ledger.user_id === window.currentUser.id;
+        window.LedgersEngine.openDetails(ledger.id, !isOwner); // Force Read Only if not owner
+    },
+
     injectModals: () => {
         const modalsHTML = `
             <!-- Dashboard Ledger Select Modal -->
             <div id="dashboard-ledger-select-overlay" class="modal-overlay" style="z-index: 9999;">
-                <!-- FIX: overflow: visible ensures dropdown list doesn't get clipped -->
                 <div class="account-modal-content card" style="overflow: visible;">
                     <header style="display: flex; justify-content: space-between; margin-bottom: 24px;">
                         <h3 style="margin: 0;">Select Ledger</h3>
                         <button class="close-modal-btn" onclick="document.getElementById('dashboard-ledger-select-overlay').classList.remove('active')">✕</button>
                     </header>
                     <div class="form-group" style="margin-bottom: 24px;">
-                        <!-- FIX: Added gap below label -->
                         <label class="text-muted" style="display: block; margin-bottom: 12px;">Which ledger do you want to view/manage?</label>
                         <select id="dashboard-ledger-select" class="form-input"></select>
                     </div>
@@ -58,6 +119,9 @@ window.LedgersEngine = {
                             <p id="ledger-detail-status" class="text-muted" style="font-size: 13px; font-weight: bold; margin: 0;"></p>
                         </div>
                         <div style="display: flex; gap: 12px; align-items: center;">
+                            <button id="ledger-share-btn" class="icon-btn" onclick="window.LedgersEngine.openShareModal()" title="Share Ledger" style="color: var(--text);">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
+                            </button>
                             <button class="icon-btn" onclick="window.LedgersEngine.previewReceipt()" title="Statement of Account" style="color: var(--primary);">
                                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                             </button>
@@ -65,7 +129,7 @@ window.LedgersEngine = {
                         </div>
                     </header>
                     
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                    <div id="ledger-actions-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
                         <button class="secondary-btn" onclick="window.LedgersEngine.openAddItem()">+ Add Item</button>
                         <button class="primary-btn" onclick="window.LedgersEngine.openAddPayment()">+ Log Payment</button>
                     </div>
@@ -77,24 +141,55 @@ window.LedgersEngine = {
                 </div>
             </div>
 
+            <!-- Share Ledger Modal -->
+            <div id="share-ledger-overlay" class="modal-overlay" style="z-index: 10001;">
+                <div class="account-modal-content card">
+                    <header style="display: flex; justify-content: space-between; margin-bottom: 24px;">
+                        <h3 style="margin: 0;">Share Ledger</h3>
+                        <button class="close-modal-btn" onclick="document.getElementById('share-ledger-overlay').classList.remove('active')">✕</button>
+                    </header>
+
+                    <div class="form-group" style="margin-bottom: 24px;">
+                        <label class="text-muted">General Access</label>
+                        <select id="share-mode-select" class="form-input" onchange="window.LedgersEngine.changeSharingMode(this.value)">
+                            <option value="private">🔒 Private (Only you)</option>
+                            <option value="selected">👥 Selected Users</option>
+                            <option value="public">🌐 Anyone with the link</option>
+                        </select>
+                    </div>
+
+                    <div id="share-link-group" class="form-group" style="margin-bottom: 24px; display: none;">
+                        <label class="text-muted">Public Link (View Only)</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="text" id="share-link-input" class="form-input" readonly style="color: var(--text-secondary); background: var(--surface-hover);">
+                            <button class="primary-btn" onclick="window.LedgersEngine.copyShareLink()">Copy</button>
+                        </div>
+                    </div>
+
+                    <div id="share-selected-group" style="display: none; border-top: 1px solid var(--border); padding-top: 24px;">
+                        <label class="text-muted" style="margin-bottom: 8px; display: block;">Invite Users</label>
+                        <p class="text-muted" style="font-size: 12px; margin-bottom: 12px;">Enter an App Username or Discord Username. They will receive a notification.</p>
+                        <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                            <input type="text" id="share-username-input" class="form-input" placeholder="Username...">
+                            <button class="primary-btn" onclick="window.LedgersEngine.addSharedUser()">Invite</button>
+                        </div>
+                        <ul id="shared-users-list" class="minimal-list"></ul>
+                        <p id="share-warning-msg" style="color: #FFA800; font-size: 12px; margin-top: 12px; display: none;"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statement of Account Modal -->
             <div id="ledger-receipt-preview-overlay" class="modal-overlay" style="z-index: 100000;">
-                <!-- FIX 1: Added strict height (height: 85vh;) to prevent the modal from collapsing -->
                 <div class="account-modal-content card" style="max-width: 800px; width: 95%; height: 85vh; max-height: 90vh; display: flex; flex-direction: column; padding: 24px;">
                     <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-shrink: 0;">
                         <h3 style="margin: 0;">Statement Preview</h3>
                         <button class="close-modal-btn" onclick="document.getElementById('ledger-receipt-preview-overlay').classList.remove('active')">✕</button>
                     </header>
-
-                    <!-- FIX: Set padding to 0 so the inner margins control the spacing -->
                     <div style="width: 100%; overflow-y: auto; flex: 1; border-radius: 8px; border: 1px solid var(--border); background: #E5E7EB; padding: 0;">
-                        
-                        <!-- FIX: Changed margin to "32px auto" for top/bottom breathing room -->
                         <div id="ledger-receipt-capture" style="background: white; color: black; width: 100%; max-width: 600px; margin: 32px auto; padding: 40px; font-family: 'DM Sans', sans-serif; box-shadow: 0 4px 12px rgba(0,0,0,0.1); height: max-content; box-sizing: border-box;">
-                            <!-- Statement HTML generated here -->
                         </div>
-                        
                     </div>
-
                     <div style="display: flex; gap: 12px; margin-top: 24px; flex-shrink: 0;">
                         <button class="secondary-btn" style="flex: 1;" onclick="document.getElementById('ledger-receipt-preview-overlay').classList.remove('active')">Cancel</button>
                         <button class="primary-btn" style="flex: 2; display: flex; justify-content: center; align-items: center; gap: 8px;" onclick="window.LedgersEngine.downloadReceipt()">
@@ -124,12 +219,10 @@ window.LedgersEngine = {
                         <label class="text-muted">Cost / Amount</label>
                         <input type="number" id="ledger-item-amount" class="form-input" placeholder="0.00" step="0.01">
                     </div>
-                    
                     <div class="form-group" style="margin-bottom: 16px;">
                         <label class="text-muted" id="ledger-item-account-label">Funds Taken From (Optional)</label>
                         <select id="ledger-item-account" class="form-input"></select>
                     </div>
-
                     <div class="form-group" style="margin-bottom: 16px;">
                         <label class="text-muted">Notes (Optional)</label>
                         <input type="text" id="ledger-item-notes" class="form-input" placeholder="Additional details...">
@@ -174,10 +267,6 @@ window.LedgersEngine = {
         document.body.insertAdjacentHTML('beforeend', modalsHTML);
     },
 
-    activeLedgerId: null,
-    itemDirection: 1, // 1 = I lent them, -1 = They lent me
-    paymentDirection: 1, // 1 = They paid me, -1 = I paid them
-
     renderList: () => {
         const container = document.getElementById('ledgers-list-container');
         if (!container) return;
@@ -189,7 +278,6 @@ window.LedgersEngine = {
             return;
         }
 
-        // Force 2 columns per row dynamically
         container.style.gridTemplateColumns = 'repeat(2, 1fr)';
         container.innerHTML = ledgers.map(acc => {
             const sym = acc.currency ? window.getCurrencySymbol(acc.currency) : window.getCurrencySymbol(window.userSettings?.currency || '₱');
@@ -203,7 +291,6 @@ window.LedgersEngine = {
             else if (acc.icon_type === 'emoji') iconHtml = acc.icon_value;
             else if (acc.icon_type === 'letter' && acc.icon_value) iconHtml = `<span style="font-weight:bold;">${acc.icon_value.toUpperCase()}</span>`;
 
-            // Apply red gradient for debts
             const bgLogic = isClear ? '#2C2C2C' : (isOwed ? '#00D26A' : 'linear-gradient(135deg, #FF416C 0%, #FF4B2B 100%)');
 
             return `
@@ -267,7 +354,9 @@ window.LedgersEngine = {
             color: '#3A5DFF',
             note: 'Debt & Loan Tracking',
             favorite: false,
-            currency: currency
+            currency: currency,
+            sharing_mode: 'private',
+            share_token: window.generateUUID()
         };
 
         window.accountsData.push(accData);
@@ -277,23 +366,52 @@ window.LedgersEngine = {
         window.LedgersEngine.renderList();
     },
 
-    openDetails: (id) => {
+openDetails: (id, forceReadOnly = false) => {
         window.LedgersEngine.activeLedgerId = id;
         const ledger = window.accountsData.find(a => a.id === id);
         if (!ledger) return;
 
-        // FIX: Force the receipt popup to render above the ledger details
+        // Ensure guests or viewers cannot edit
+        const isOwner = window.currentUser && ledger.user_id === window.currentUser.id;
+        window.LedgersEngine.isReadOnly = forceReadOnly || !isOwner;
+        
+        document.getElementById('ledger-actions-grid').style.display = window.LedgersEngine.isReadOnly ? 'none' : 'grid';
+        document.getElementById('ledger-share-btn').style.display = window.LedgersEngine.isReadOnly ? 'none' : 'block';
+
         const receiptOverlay = document.getElementById('receipt-overlay');
         if (receiptOverlay) receiptOverlay.style.zIndex = '10005';
 
         const sym = ledger.currency ? window.getCurrencySymbol(ledger.currency) : window.getCurrencySymbol(window.userSettings?.currency || '₱');
         
-        document.getElementById('ledger-detail-name').innerText = ledger.name;
-        
         const isOwed = ledger.balance > 0;
         const isClear = ledger.balance === 0;
         const statusEl = document.getElementById('ledger-detail-status');
-        statusEl.innerText = isClear ? 'All Settled' : (isOwed ? `Owes you ${window.formatMoneyWithSymbol(Math.abs(ledger.balance), sym)}` : `You owe ${window.formatMoneyWithSymbol(Math.abs(ledger.balance), sym)}`);
+        const amtStr = window.formatMoneyWithSymbol(Math.abs(ledger.balance), sym);
+        
+        let titleName = ledger.name;
+
+        // DYNAMIC GRAMMAR: If guest viewing a shared ledger
+        if (window.LedgersEngine.isReadOnly && window.LedgersEngine.sharedOwnerName) {
+            titleName = `${window.LedgersEngine.sharedOwnerName}'s Ledger: ${ledger.name}`;
+            if (isClear) {
+                statusEl.innerText = 'All Settled';
+            } else if (isOwed) {
+                statusEl.innerText = `${ledger.name} owes ${window.LedgersEngine.sharedOwnerName} ${amtStr}`;
+            } else {
+                statusEl.innerText = `${window.LedgersEngine.sharedOwnerName} owes ${ledger.name} ${amtStr}`;
+            }
+        } else {
+            // DYNAMIC GRAMMAR: If owner viewing their own ledger
+            if (isClear) {
+                statusEl.innerText = 'All Settled';
+            } else if (isOwed) {
+                statusEl.innerText = `${ledger.name} owes you ${amtStr}`;
+            } else {
+                statusEl.innerText = `You owe ${ledger.name} ${amtStr}`;
+            }
+        }
+
+        document.getElementById('ledger-detail-name').innerText = titleName;
         statusEl.style.color = isClear ? 'var(--text-secondary)' : (isOwed ? 'var(--primary)' : 'var(--accent-red)');
 
         const txs = window.appData.filter(t => 
@@ -315,21 +433,20 @@ window.LedgersEngine = {
                     amtColor = t.amount > 0 ? 'var(--primary)' : 'var(--accent-red)';
                     sign = t.amount > 0 ? '+' : '-';
                 } else {
-                    if (t.to_account_id === id) {
-                        title = 'You paid them';
-                        sub = t.notes || 'Payment Sent';
-                        amtColor = 'var(--primary)'; 
-                        sign = '+';
-                    } else {
-                        title = 'They paid you';
-                        sub = t.notes || 'Payment Received';
-                        amtColor = 'var(--accent-red)';
-                        sign = '-';
+                    if (t.to_account_id === id) { 
+                        title = window.LedgersEngine.isReadOnly ? `${window.LedgersEngine.sharedOwnerName} paid them` : 'You paid them'; 
+                        sub = t.notes || 'Payment Sent'; amtColor = 'var(--primary)'; sign = '+'; 
+                    } else { 
+                        title = window.LedgersEngine.isReadOnly ? `They paid ${window.LedgersEngine.sharedOwnerName}` : 'They paid you'; 
+                        sub = t.notes || 'Payment Received'; amtColor = 'var(--accent-red)'; sign = '-'; 
                     }
                 }
 
+                // Protect read-only viewing of receipts
+                const clickAction = window.LedgersEngine.isReadOnly ? '' : `onclick="window.LedgersEngine.openReceipt(${t._id})" style="cursor: pointer;"`;
+
                 return `
-                    <li class="tx-item" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 8px; border-bottom: 1px solid var(--border); cursor: pointer;" onclick="window.LedgersEngine.openReceipt(${t._id})">
+                    <li class="tx-item" ${clickAction}>
                         <div>
                             <span style="display: block; font-weight: 600;">${title}</span>
                             <span style="font-size: 11px; color: var(--text-secondary);">${date} • ${sub}</span>
@@ -343,6 +460,118 @@ window.LedgersEngine = {
         document.getElementById('ledger-details-overlay').classList.add('active');
     },
 
+    // --- SHARE SYSTEM LOGIC ---
+    openShareModal: async () => {
+        const id = window.LedgersEngine.activeLedgerId;
+        const ledger = window.accountsData.find(a => a.id === id);
+        if (!ledger) return;
+
+        // Inject fallback token if older ledger
+        if (!ledger.share_token) ledger.share_token = window.generateUUID();
+
+        document.getElementById('share-mode-select').value = ledger.sharing_mode || 'private';
+        window.LedgersEngine.changeSharingMode(ledger.sharing_mode || 'private', false);
+
+        document.getElementById('share-link-input').value = `${window.location.origin}/?ledger=${ledger.share_token}`;
+        
+        await window.LedgersEngine.renderSharedUsers();
+        document.getElementById('share-warning-msg').style.display = 'none';
+        document.getElementById('share-ledger-overlay').classList.add('active');
+    },
+
+    changeSharingMode: async (mode, autoSave = true) => {
+        document.getElementById('share-link-group').style.display = mode === 'public' ? 'block' : 'none';
+        document.getElementById('share-selected-group').style.display = mode === 'selected' ? 'block' : 'none';
+
+        if (autoSave) {
+            const id = window.LedgersEngine.activeLedgerId;
+            const ledger = window.accountsData.find(a => a.id === id);
+            ledger.sharing_mode = mode;
+            await window.saveAccountsToCloud();
+            if (window.showToast) window.showToast('Sharing mode updated');
+        }
+    },
+
+    copyShareLink: () => {
+        const copyText = document.getElementById("share-link-input");
+        copyText.select();
+        copyText.setSelectionRange(0, 99999); 
+        navigator.clipboard.writeText(copyText.value);
+        if (window.showToast) window.showToast("Link copied to clipboard");
+    },
+
+    renderSharedUsers: async () => {
+        const id = window.LedgersEngine.activeLedgerId;
+        const { data: shares } = await window.supabase.from('ledger_shares').select('*').eq('ledger_id', id);
+        
+        const list = document.getElementById('shared-users-list');
+        if (!shares || shares.length === 0) {
+            list.innerHTML = '<li class="text-muted" style="font-size:12px; padding:8px 0;">No users invited yet.</li>';
+            return;
+        }
+
+        list.innerHTML = shares.map(share => `
+            <li style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px dashed var(--border);">
+                <div>
+                    <span style="font-weight: 600;">@${share.target_username}</span>
+                    <span style="font-size: 11px; margin-left: 8px; color: ${share.status === 'pending' ? '#FFA800' : 'var(--primary)'};">${share.status}</span>
+                </div>
+                <button class="icon-btn" style="color: var(--accent-red);" onclick="window.LedgersEngine.removeSharedUser('${share.id}')">✕</button>
+            </li>
+        `).join('');
+    },
+
+    addSharedUser: async () => {
+        const id = window.LedgersEngine.activeLedgerId;
+        const input = document.getElementById('share-username-input');
+        const username = input.value.trim().toLowerCase();
+        if (!username) return;
+
+        if (window.showLoadingToast) window.showLoadingToast('Checking user...');
+
+        // Check if user exists
+        const { data: profile } = await window.supabase.from('profiles').select('id').eq('username', username).single();
+        const warningEl = document.getElementById('share-warning-msg');
+
+        const sharePayload = {
+            ledger_id: id,
+            owner_id: window.currentUser.id,
+            target_username: username,
+            status: profile ? 'accepted' : 'pending'
+        };
+
+        const { error } = await window.supabase.from('ledger_shares').insert([sharePayload]);
+        if (error) {
+            if(window.showToast) window.showToast('Error sharing ledger', true);
+            return;
+        }
+
+        if (profile) {
+            // Notify existing user
+            await window.supabase.from('notifications').insert([{
+                user_id: profile.id,
+                title: 'New Ledger Shared',
+                message: `@${window.userProfile.username} shared a ledger with you.`,
+                action_url: `/?ledger=${window.accountsData.find(a=>a.id===id).share_token}`
+            }]);
+            warningEl.style.display = 'none';
+            if(window.showToast) window.showToast('User invited successfully!');
+        } else {
+            warningEl.style.display = 'block';
+            warningEl.innerText = `⚠️ User '${username}' not found. The invitation will be pending until they create an account.`;
+        }
+
+        input.value = '';
+        await window.LedgersEngine.renderSharedUsers();
+    },
+
+    removeSharedUser: async (shareId) => {
+        if(!confirm('Remove this user?')) return;
+        await window.supabase.from('ledger_shares').delete().eq('id', shareId);
+        await window.LedgersEngine.renderSharedUsers();
+    },
+
+    // --- STANDARD TRANSACTION METHODS ---
     openReceipt: (localId) => {
         const entry = window.appData.find(x => x._id === localId);
         if (entry) window.openReceiptModal(entry);
@@ -396,7 +625,6 @@ window.LedgersEngine = {
         document.getElementById('ledger-item-overlay').classList.remove('active');
         if(window.showLoadingToast) window.showLoadingToast('Logging ledger item...');
 
-        // Positive if I lent them, Negative if they lent me
         const finalAmount = rawAmount * window.LedgersEngine.itemDirection;
 
         const tx = {
@@ -420,8 +648,6 @@ window.LedgersEngine = {
         if (linkedAccId) {
             const realAcc = window.accountsData.find(a => a.id === linkedAccId);
             if (realAcc) {
-                // If I lent them (+), money left my bank (-)
-                // If they lent me (-), money entered my bank (+)
                 realAcc.balance -= finalAmount; 
             }
         }
@@ -487,11 +713,9 @@ window.LedgersEngine = {
         let fromId, toId;
 
         if (window.LedgersEngine.paymentDirection === 1) {
-            // They paid me: From Ledger To Bank
             fromId = ledgerId;
             toId = realAccId;
         } else {
-            // I paid them: From Bank To Ledger
             fromId = realAccId;
             toId = ledgerId;
         }
@@ -530,13 +754,20 @@ window.LedgersEngine = {
         if (window.showToast) window.showToast('Payment logged!');
     },
 
-    previewReceipt: () => {
+previewReceipt: () => {
         const id = window.LedgersEngine.activeLedgerId;
         const ledger = window.accountsData.find(a => a.id === id);
         if (!ledger) return;
 
         const sym = ledger.currency ? window.getCurrencySymbol(ledger.currency) : window.getCurrencySymbol(window.userSettings?.currency || '₱');
-        const username = window.userProfile?.username || 'You';
+        
+        // Dynamically grab the real names based on who is viewing
+        const creatorName = (window.LedgersEngine.isReadOnly && window.LedgersEngine.sharedOwnerName) 
+            ? window.LedgersEngine.sharedOwnerName 
+            : (window.userProfile?.username || 'You');
+            
+        // Strip out the "User's Ledger: " prefix if it was added during the shared view
+        const entityName = ledger.name.includes(': ') ? ledger.name.split(': ')[1] : ledger.name;
         
         const txs = window.appData.filter(t => 
             (t.type === 'LEDGER_ITEM' && t.account_id === id) || 
@@ -568,7 +799,10 @@ window.LedgersEngine = {
         }).join('');
 
         const isOwed = ledger.balance > 0;
-        const statusText = ledger.balance === 0 ? 'Fully Settled' : (isOwed ? 'Outstanding Balance (They Owe)' : 'Outstanding Balance (You Owe)');
+        const statusText = ledger.balance === 0 
+            ? 'Fully Settled' 
+            : (isOwed ? `Outstanding Balance (${entityName} Owes)` : `Outstanding Balance (${creatorName} Owes)`);
+            
         const statusColor = ledger.balance === 0 ? '#6B7280' : (isOwed ? '#00B85C' : '#FF4A4A');
 
         const captureDiv = document.getElementById('ledger-receipt-capture');
@@ -576,7 +810,7 @@ window.LedgersEngine = {
             <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 3px solid #111; padding-bottom: 20px; margin-bottom: 24px;">
                 <div>
                     <h1 style="margin: 0; font-size: 28px; font-weight: 900; letter-spacing: -1px;">Statement of Account</h1>
-                    <p style="margin: 4px 0 0 0; color: #6B7280; font-size: 14px;">Ledger Entity: <b>${ledger.name}</b></p>
+                    <p style="margin: 4px 0 0 0; color: #6B7280; font-size: 14px;">Ledger Entity: <b>${entityName}</b></p>
                 </div>
                 <div style="text-align: right;">
                     <p style="margin: 0; font-size: 12px; color: #6B7280; text-transform: uppercase;">Generated On</p>
@@ -590,8 +824,8 @@ window.LedgersEngine = {
                     <tr style="background: #F3F4F6;">
                         <th style="padding: 12px; width: 20%;">Date</th>
                         <th style="padding: 12px; width: 40%;">Description</th>
-                        <th style="padding: 12px; width: 20%; text-align: right;">${username} Lent (+)</th>
-                        <th style="padding: 12px; width: 20%; text-align: right;">${ledger.name} Lent (-)</th>
+                        <th style="padding: 12px; width: 20%; text-align: right;">${creatorName} Lent (+)</th>
+                        <th style="padding: 12px; width: 20%; text-align: right;">${entityName} Lent (-)</th>
                     </tr>
                 </thead>
                 <tbody>${itemsRows || '<tr><td colspan="4" style="padding: 12px; text-align: center; color: #6B7280;">No items recorded.</td></tr>'}</tbody>

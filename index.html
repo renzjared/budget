@@ -74,9 +74,15 @@
         </div>
     </div>
 
+    <!-- PUBLIC LEDGER BANNER (GUEST VIEW) -->
+    <div id="public-ledger-banner" style="display: none; position: fixed; bottom: 0; left: 0; width: 100%; background: var(--primary); color: #000; padding: 16px 24px; align-items: center; justify-content: space-between; font-weight: 600; z-index: 100000; box-shadow: 0 -4px 24px rgba(0,0,0,0.25);">
+        <span>👀 You are viewing a shared ledger as a guest.</span>
+        <button style="background: #000; color: #fff; border: none; padding: 10px 20px; border-radius: 24px; font-weight: 700; cursor: pointer; font-size: 13px; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'" onclick="window.location.href='/'">Log in / Create Account</button>
+    </div>
 
     <div class="app-container">
 
+    <div class="app-container">
         <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
         <aside class="sidebar" id="main-sidebar" style="display: none;">
             <div class="logo">
@@ -301,19 +307,41 @@
             <section id="dashboard" class="view">
 
 
-                <header class="top-header">
+<header class="top-header">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div style="display: flex; align-items: center; gap: 16px;">
                             <img id="dashboard-avatar" src="" alt="Avatar" style="display: none; width: 56px; height: 56px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border);">
                             <h2 id="dashboard-greeting" style="font-size: 28px; font-weight: 700; margin: 0; color: var(--text);">Hello</h2>
                         </div>
-                        <select id="dashboard-metric-selector" class="form-input" style="padding: 8px 12px; width: auto; font-size: 13px; max-width: 180px;">
-                            <option value="running">Running Balance</option>
-                            <option value="net_worth">Net Worth (Accounts)</option>
-                            <option value="remaining_daily">Remaining Budget (Daily)</option>
-                            <option value="remaining_weekly">Remaining Budget (Weekly)</option>
-                            <option value="remaining_monthly">Remaining Budget (Monthly)</option>
-                        </select>
+                        
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <!-- NEW: INBOX BELL -->
+                            <div style="position: relative;">
+                                <button class="icon-btn" onclick="window.toggleInbox()" style="color: var(--text); padding: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 50%;">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                                    <span id="inbox-badge" style="display: none; position: absolute; top: -2px; right: -2px; background: var(--accent-red); color: white; font-size: 10px; font-weight: 800; width: 16px; height: 16px; border-radius: 50%; align-items: center; justify-content: center;">0</span>
+                                </button>
+                                
+                                <!-- INBOX DROPDOWN -->
+                                <div id="inbox-dropdown" class="card" style="display: none; position: absolute; top: calc(100% + 8px); right: 0; width: 320px; max-height: 400px; overflow-y: auto; padding: 0; z-index: 10000; box-shadow: 0 10px 40px rgba(0,0,0,0.3);">
+                                    <div style="padding: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: var(--surface); z-index: 2;">
+                                        <h3 style="margin: 0; font-size: 16px;">Notifications</h3>
+                                        <button class="text-btn" style="font-size: 12px;" onclick="window.markAllRead()">Mark all read</button>
+                                    </div>
+                                    <div id="inbox-list" style="display: flex; flex-direction: column;">
+                                        <div style="padding: 24px; text-align: center; color: var(--text-secondary); font-size: 13px;">No notifications.</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <select id="dashboard-metric-selector" class="form-input" style="padding: 8px 12px; width: auto; font-size: 13px; max-width: 180px;">
+                                <option value="running">Running Balance</option>
+                                <option value="net_worth">Net Worth (Accounts)</option>
+                                <option value="remaining_daily">Remaining Budget (Daily)</option>
+                                <option value="remaining_weekly">Remaining Budget (Weekly)</option>
+                                <option value="remaining_monthly">Remaining Budget (Monthly)</option>
+                            </select>
+                        </div>
                     </div>
                     <hr style="border: none; border-top: 1px solid var(--border); margin-top: 24px; margin-bottom: 24px;">
                 </header>
@@ -1173,14 +1201,20 @@
                         <h4 style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); margin-bottom: 12px;">Introduction</h4>
                         <ul style="list-style: none; padding: 0; margin: 0 0 24px 0; display: flex; flex-direction: column; gap: 4px;">
                             <li><button class="text-btn docs-link active" onclick="window.loadDoc('getting-started')">Getting Started</button></li>
+                            <li><button class="text-btn docs-link" onclick="window.loadDoc('components-overview')">Components Overview</button></li>
                         </ul>
 
-                        <h4 style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); margin-bottom: 12px;">Features</h4>
+                        <h4 style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); margin-bottom: 12px;">Core Guides</h4>
                         <ul style="list-style: none; padding: 0; margin: 0 0 24px 0; display: flex; flex-direction: column; gap: 4px;">
-                            <li><button class="text-btn docs-link" onclick="window.loadDoc('yield-optimizer')">Yield Optimizer</button></li>
-                            <li><button class="text-btn docs-link" onclick="alert('Accounts documentation coming soon!')">Accounts & Multi-Currency</button></li>
-                            <li><button class="text-btn docs-link" onclick="alert('Ledgers documentation coming soon!')">Ledgers & IOUs</button></li>
-                            <li><button class="text-btn docs-link" onclick="alert('Travel documentation coming soon!')">Travel Mode</button></li>
+                            <li><button class="text-btn docs-link" onclick="window.loadDoc('managing-accounts')">Managing Accounts</button></li>
+                            <li><button class="text-btn docs-link" onclick="window.loadDoc('logging-transactions')">Logging Transactions</button></li>
+                        </ul>
+
+                        <h4 style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); margin-bottom: 12px;">Advanced Features</h4>
+                        <ul style="list-style: none; padding: 0; margin: 0 0 24px 0; display: flex; flex-direction: column; gap: 4px;">
+                            <li><button class="text-btn docs-link" onclick="window.loadDoc('yield-optimizer')">Savings Planner</button></li>
+                            <li><button class="text-btn docs-link" onclick="window.loadDoc('ledgers-ious')">Ledgers & IOUs</button></li>
+                            <li><button class="text-btn docs-link" onclick="window.loadDoc('travel-mode')">Travel Mode</button></li>
                         </ul>
                     </aside>
 
@@ -1242,7 +1276,6 @@
             
         </div>
     </div>
-    
 
     <div id="delete-trip-overlay" class="modal-overlay">
         <div class="account-modal-content card">

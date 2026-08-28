@@ -203,6 +203,10 @@ window.formatListDate = (dateStr) => {
 };
 
 window.initApp = async () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const sharedToken = urlParams.get('ledger');
+
+    // 1. Setup Auth Listener for future changes
     window.supabase.auth.onAuthStateChange(async (event, session) => {
         if (event === 'SIGNED_IN' && session) {
             window.currentUser = session.user;
@@ -215,15 +219,27 @@ window.initApp = async () => {
         }
     });
 
+    // 2. Fetch current session IMMEDIATELY on boot
     const { data: { session } } = await window.supabase.auth.getSession();
     
     if (session) {
         window.currentUser = session.user;
-        await handleUserRouting();
+        await handleUserRouting(); // Boot dashboard and load data
+        
+        // If they clicked a shared link while logged in, overlay it now
+        if (sharedToken && window.LedgersEngine) {
+            window.LedgersEngine.initSharedView(sharedToken);
+        }
     } else {
         document.getElementById('main-sidebar').style.display = 'none';
         if (document.getElementById('mobile-header')) document.getElementById('mobile-header').style.display = 'none';
-        window.switchView('landing');
+        
+        // If logged out but checking a shared link, bypass boot and load guest view
+        if (sharedToken && window.LedgersEngine) {
+            window.LedgersEngine.initSharedView(sharedToken);
+        } else {
+            window.switchView('landing');
+        }
     }
 };
 
@@ -239,6 +255,7 @@ async function handleUserRouting() {
         await loadCloudData();
         window.switchView('dashboard');
         if (window.bootUI) window.bootUI();
+        if (window.loadInbox) window.loadInbox(); // Load notifications on boot
     }
 }
 
@@ -418,7 +435,7 @@ window.saveAccountsToCloud = async () => {
         }
         
         // Upsert remaining accounts
-        const payload = window.accountsData.map((a, index) => ({ // <-- Add 'index' here
+        const payload = window.accountsData.map((a, index) => ({
             id: a.id || window.generateUUID(),
             user_id: window.currentUser.id,
             name: a.name,
@@ -431,7 +448,11 @@ window.saveAccountsToCloud = async () => {
             custom_type: a.customType || null,
             sort_order: index,
             icon_type: a.icon_type || null,
-            icon_value: a.icon_value || null
+            icon_value: a.icon_value || null,
+            
+            // NEW: Ensure sharing parameters are sent to Supabase
+            sharing_mode: a.sharing_mode || 'private',
+            share_token: a.share_token || null
         }));
         
         const { error } = await window.supabase

@@ -75,7 +75,49 @@ window.openIconSelector = async (targetPrefix = 'acc') => {
             bankLogos = data.filter(b => b.icon_type === 'image' && b.icon_value).map(b => ({ name: b.name, url: b.icon_value }));
         }
     } catch (e) { console.error("Failed to load catalog logos:", e); }
+// NEW: Robust PWA Installation Engine (with iOS Support)
+    let deferredPrompt;
+    const installBtn = document.getElementById('install-pwa-btn');
 
+    // Detect iOS devices (Safari does not support automatic install prompts)
+    const isIos = () => {
+        const userAgent = window.navigator.userAgent.toLowerCase();
+        return /iphone|ipad|ipod/.test(userAgent);
+    };
+    // Detect if already installed/running as standalone app
+    const isInStandaloneMode = () => ('standalone' in window.navigator) && (window.navigator.standalone);
+
+    if (installBtn) {
+        // Fallback for iOS Users
+        if (isIos() && !isInStandaloneMode()) {
+            installBtn.style.display = 'flex';
+            installBtn.onclick = () => {
+                alert("To install on iOS:\n1. Tap the 'Share' icon at the bottom of Safari (square with up arrow).\n2. Scroll down and tap 'Add to Home Screen'.");
+            };
+        }
+
+        // Standard Android/Chrome Prompt
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault(); // Stop Chrome from auto-showing the prompt
+            deferredPrompt = e;
+            installBtn.style.display = 'flex';
+            
+            installBtn.onclick = async () => {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    installBtn.style.display = 'none';
+                }
+                deferredPrompt = null;
+            };
+        });
+
+        window.addEventListener('appinstalled', () => {
+            installBtn.style.display = 'none';
+            deferredPrompt = null;
+            console.log('PWA installed successfully');
+        });
+    }pwa
     if (bankLogos.length === 0) {
         bankLogos = [
             { name: 'BDO', url: 'https://upload.wikimedia.org/wikipedia/commons/8/8c/BDO_Unibank_logo.svg' },
@@ -467,30 +509,54 @@ window.loadDoc = async (docId) => {
     }
 };
 
-window.quickAddTemplate = (name, amount, category, merchant, typeStr) => {
+window.quickAddTemplate = (name, amount, category, merchant, typeStr, accountId) => {
     const isIncome = (typeStr || '').toUpperCase().includes('INCOM');
     const displayAmount = isIncome ? amount : -amount;
     
     if (isIncome) {
         document.getElementById('inc-name').value = name || '';
         document.getElementById('inc-amount').value = displayAmount || '';
-        document.getElementById('inc-category').value = category || 'INCOME';
         document.getElementById('inc-notes').value = '';
+        
+        // 1. Open the modal first so defaults populate
         window.openIncomeModal();
+        
+        // 2. Override with Quick Add Category
+        const incCat = document.getElementById('inc-category');
+        if (category && Array.from(incCat.options).some(opt => opt.value === category)) {
+            incCat.value = category;
+        }
+        
+        // 3. Override with Quick Add Account & trigger custom UI update
+        const incAcc = document.getElementById('inc-account');
+        if (accountId && Array.from(incAcc.options).some(opt => opt.value === accountId)) {
+            incAcc.value = accountId;
+            incAcc.dispatchEvent(new Event('change'));
+        }
+        
     } else {
         document.getElementById('exp-name').value = name || '';
         document.getElementById('exp-amount').value = displayAmount || '';
-        
-        const expCat = document.getElementById('exp-category');
-        if (Array.from(expCat.options).some(opt => opt.value === category)) {
-            expCat.value = category;
-        } else {
-            expCat.value = expCat.options[0]?.value || '';
-        }
-        
         document.getElementById('exp-merchant').value = merchant || '';
         document.getElementById('exp-notes').value = '';
+        
+        // 1. Open the modal first so defaults populate
         window.openExpenseModal();
+        
+        // 2. Override with Quick Add Category
+        const expCat = document.getElementById('exp-category');
+        if (category && Array.from(expCat.options).some(opt => opt.value === category)) {
+            expCat.value = category;
+        } else if (expCat.options.length > 0) {
+            expCat.value = expCat.options[0].value;
+        }
+        
+        // 3. Override with Quick Add Account & trigger custom UI update
+        const expAcc = document.getElementById('exp-account');
+        if (accountId && Array.from(expAcc.options).some(opt => opt.value === accountId)) {
+            expAcc.value = accountId;
+            expAcc.dispatchEvent(new Event('change'));
+        }
     }
 };
 
@@ -510,6 +576,7 @@ window.toggleTxFavorite = async (dbId, localId) => {
     }
 };
 
+
 window.renderQuickAddWidget = () => {
     const favContainer = document.getElementById('quick-add-favorites');
     const recContainer = document.getElementById('quick-add-recent');
@@ -522,8 +589,10 @@ window.renderQuickAddWidget = () => {
         const safeName = (tx.name || '').replace(/'/g, "\\'");
         const safeCat = (tx.category || '').replace(/'/g, "\\'");
         const safeMerchant = (tx.merchant || '').replace(/'/g, "\\'");
+        const safeAccId = tx.account_id || ''; // Extract Account ID
+        
         return `<button class="chip" style="border-color: ${color}; color: ${color}; padding: 6px 12px;" 
-            onclick="window.quickAddTemplate('${safeName}', ${tx.amount}, '${safeCat}', '${safeMerchant}', '${tx.type || ''}')">
+            onclick="window.quickAddTemplate('${safeName}', ${tx.amount}, '${safeCat}', '${safeMerchant}', '${tx.type || ''}', '${safeAccId}')">
             ${tx.name} (${window.formatMoney(Math.abs(tx.amount))})
         </button>`;
     };
@@ -3482,6 +3551,55 @@ window.shareInsights = () => {
     });
 };
 
+// --- INBOX NOTIFICATION ENGINE ---
+window.toggleInbox = () => {
+    const dropdown = document.getElementById('inbox-dropdown');
+    if(!dropdown) return;
+    dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+    if (dropdown.style.display === 'block') window.loadInbox();
+};
+
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('#inbox-dropdown') && !e.target.closest('button[onclick="window.toggleInbox()"]')) {
+        const dropdown = document.getElementById('inbox-dropdown');
+        if (dropdown) dropdown.style.display = 'none';
+    }
+});
+
+window.loadInbox = async () => {
+    if (!window.currentUser) return;
+    const { data } = await window.supabase.from('notifications').select('*').eq('user_id', window.currentUser.id).order('created_at', { ascending: false }).limit(20);
+    
+    const unreadCount = data ? data.filter(n => !n.is_read).length : 0;
+    const badge = document.getElementById('inbox-badge');
+    if (badge) {
+        badge.style.display = unreadCount > 0 ? 'flex' : 'none';
+        badge.innerText = unreadCount;
+    }
+
+    const list = document.getElementById('inbox-list');
+    if (!list) return;
+    if (!data || data.length === 0) {
+        list.innerHTML = '<div style="padding: 24px; text-align: center; color: var(--text-secondary); font-size: 13px;">No notifications.</div>';
+        return;
+    }
+
+    list.innerHTML = data.map(n => `
+        <div style="padding: 16px; border-bottom: 1px solid var(--border); background: ${n.is_read ? 'transparent' : 'var(--surface-hover)'}; cursor: ${n.action_url ? 'pointer' : 'default'};" onclick="${n.action_url ? `window.location.href='${n.action_url}'` : ''}">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span style="font-weight: ${n.is_read ? '600' : '800'}; font-size: 14px; color: ${n.is_read ? 'var(--text)' : 'var(--primary)'};">${n.title}</span>
+                ${!n.is_read ? `<div style="width: 8px; height: 8px; border-radius: 50%; background: var(--primary);"></div>` : ''}
+            </div>
+            <p style="font-size: 13px; color: var(--text-secondary); margin: 0;">${n.message}</p>
+        </div>
+    `).join('');
+};
+
+window.markAllRead = async () => {
+    if (!window.currentUser) return;
+    await window.supabase.from('notifications').update({ is_read: true }).eq('user_id', window.currentUser.id);
+    window.loadInbox();
+};
 
 // ==========================================
 // 2. DOM EVENT LISTENERS
@@ -4792,51 +4910,49 @@ document.addEventListener('DOMContentLoaded', () => {
     // PROGRESSIVE WEB APP (PWA) & LANDING PAGE ANIMATIONS
     // ==========================================
 
-// 1. Register the Service Worker for PWA
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js')
-                .then(registration => console.log('PWA ServiceWorker registered with scope:', registration.scope))
-                .catch(err => console.log('PWA ServiceWorker registration failed:', err));
-        });
-    }
-
-    // NEW: PWA Installation Prompt Engine
+// NEW: Robust PWA Installation Engine (with iOS Support)
     let deferredPrompt;
-    window.addEventListener('beforeinstallprompt', (e) => {
-        // Prevent Chrome 67 and earlier from automatically showing the prompt
-        e.preventDefault();
-        // Stash the event so it can be triggered later
-        deferredPrompt = e;
-        
-        // Unhide the install button in the sidebar
-        const installBtn = document.getElementById('install-pwa-btn');
-        if (installBtn) {
+    const installBtn = document.getElementById('install-pwa-btn');
+
+    // Detect iOS devices (Safari does not support automatic install prompts)
+    const isIos = () => {
+        const userAgent = window.navigator.userAgent.toLowerCase();
+        return /iphone|ipad|ipod/.test(userAgent);
+    };
+    // Detect if already installed/running as standalone app
+    const isInStandaloneMode = () => ('standalone' in window.navigator) && (window.navigator.standalone);
+
+    if (installBtn) {
+        // Fallback for iOS Users
+        if (isIos() && !isInStandaloneMode()) {
+            installBtn.style.display = 'flex';
+            installBtn.onclick = () => {
+                alert("To install on iOS:\n1. Tap the 'Share' icon at the bottom of Safari (square with up arrow).\n2. Scroll down and tap 'Add to Home Screen'.");
+            };
+        }
+
+        // Standard Android/Chrome Prompt
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault(); // Stop Chrome from auto-showing the prompt
+            deferredPrompt = e;
             installBtn.style.display = 'flex';
             
             installBtn.onclick = async () => {
-                // Show the browser's native install prompt
                 deferredPrompt.prompt();
-                
-                // Wait for the user to respond
                 const { outcome } = await deferredPrompt.userChoice;
                 if (outcome === 'accepted') {
-                    console.log('User accepted the install prompt');
-                    installBtn.style.display = 'none'; // Hide button once installed
+                    installBtn.style.display = 'none';
                 }
-                // Clear the prompt variable, it can only be used once
                 deferredPrompt = null;
             };
-        }
-    });
+        });
 
-    // Successfully installed event
-    window.addEventListener('appinstalled', () => {
-        const installBtn = document.getElementById('install-pwa-btn');
-        if (installBtn) installBtn.style.display = 'none';
-        deferredPrompt = null;
-        console.log('PWA was installed successfully');
-    });
+        window.addEventListener('appinstalled', () => {
+            installBtn.style.display = 'none';
+            deferredPrompt = null;
+            console.log('PWA installed successfully');
+        });
+    }
     
     // 2. Scroll Reveal Animation Logic
     const revealObserver = new IntersectionObserver((entries) => {

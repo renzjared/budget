@@ -660,8 +660,19 @@ window.LedgersEngine = {
         window.LedgersEngine.setItemDirection(1);
         
         const selectEl = document.getElementById('ledger-item-account');
-        const realAccounts = window.accountsData.filter(a => a.type !== 'ledger');
-        selectEl.innerHTML = '<option value="">-- None --</option>' + realAccounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+        
+        // Dynamic sorting: Favorites first, then most recently used
+        const getAccountLastUsed = (accId) => {
+            const txs = window.appData.filter(t => t.account_id === accId || t.to_account_id === accId);
+            if (!txs.length) return 0;
+            return Math.max(...txs.map(t => new Date(t.timestamp).getTime()));
+        };
+        const realAccounts = window.accountsData.filter(a => a.type !== 'ledger').sort((a, b) => {
+            if (a.favorite !== b.favorite) return a.favorite ? -1 : 1;
+            return getAccountLastUsed(b.id) - getAccountLastUsed(a.id);
+        });
+
+        selectEl.innerHTML = '<option value="">-- None --</option>' + realAccounts.map(a => `<option value="${a.id}">${a.favorite ? '★ ' : ''}${a.name}</option>`).join('');
         window.applyCustomSelectUI(selectEl, realAccounts);
         
         document.getElementById('ledger-item-overlay').classList.add('active');
@@ -744,8 +755,19 @@ window.LedgersEngine = {
         window.LedgersEngine.setPaymentDirection(1);
         
         const selectEl = document.getElementById('ledger-payment-account');
-        const realAccounts = window.accountsData.filter(a => a.type !== 'ledger');
-        selectEl.innerHTML = realAccounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+        
+        // Dynamic sorting: Favorites first, then most recently used
+        const getAccountLastUsed = (accId) => {
+            const txs = window.appData.filter(t => t.account_id === accId || t.to_account_id === accId);
+            if (!txs.length) return 0;
+            return Math.max(...txs.map(t => new Date(t.timestamp).getTime()));
+        };
+        const realAccounts = window.accountsData.filter(a => a.type !== 'ledger').sort((a, b) => {
+            if (a.favorite !== b.favorite) return a.favorite ? -1 : 1;
+            return getAccountLastUsed(b.id) - getAccountLastUsed(a.id);
+        });
+
+        selectEl.innerHTML = realAccounts.map(a => `<option value="${a.id}">${a.favorite ? '★ ' : ''}${a.name}</option>`).join('');
         window.applyCustomSelectUI(selectEl, realAccounts);
 
         document.getElementById('ledger-payment-overlay').classList.add('active');

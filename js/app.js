@@ -394,7 +394,7 @@ window.switchView = (targetId) => {
     }
 };
 
-// --- UNIFIED HEADER LAYOUT ---
+
 // --- UNIFIED HEADER LAYOUT & TOGGLE ---
 window.toggleGlobalHeader = () => {
     const header = document.getElementById('unified-global-header');
@@ -437,35 +437,57 @@ window.initGlobalHeader = () => {
 
 window.adjustAppPadding = () => {
     const header = document.getElementById('unified-global-header');
-    const content = document.querySelector('.content');
     const sidebar = document.getElementById('main-sidebar');
-    const appContainer = document.querySelector('.app-container');
-    
-    if (!header) return;
 
-    // Reset the parent container so it doesn't leave a gray void
-    if (appContainer) appContainer.style.paddingTop = '0px';
-
-    // Check if the header is currently slid down
-    const isActive = header.style.transform !== 'translateY(-100%)';
-    const headerInner = header.querySelector('header');
+    const isActive = header && header.style.transform !== 'translateY(-100%)';
+    const headerInner = header ? header.querySelector('header') : null;
     const bumpHeight = isActive ? (headerInner ? headerInner.offsetHeight : 70) : 0;
 
-    // Apply smooth padding directly to the scrollable content area
-    if (content) {
-        content.style.transition = 'padding-top 0.3s ease';
-        content.style.paddingTop = `calc(2.5rem + ${bumpHeight}px)`;
-    }
-    
-    // Push the sidebar contents down smoothly too
+    // 1. Manage the scrolling Spacer Block for ALL views
+    document.querySelectorAll('.content').forEach(content => {
+        let spacer = content.querySelector('.header-dynamic-spacer');
+        if (!spacer) {
+            spacer = document.createElement('div');
+            spacer.className = 'header-dynamic-spacer'; // Changed to class so multiple can exist
+            spacer.style.width = '100%';
+            spacer.style.flexShrink = '0';
+            spacer.style.transition = 'height 0.3s ease';
+            // Insert it physically at the very top of the scrollable content
+            content.insertBefore(spacer, content.firstChild);
+        }
+        
+        // Exact height of header (CSS padding-top handles the rest natively)
+        spacer.style.height = `${bumpHeight}px`; 
+        content.style.paddingTop = ''; // Clear inline styles to restore the CSS 2.5rem padding
+    });
+
+    // 2. Adjust sidebar so its top items aren't hidden by the header
     if (sidebar && window.innerWidth > 768) {
         sidebar.style.transition = 'padding-top 0.3s ease';
         sidebar.style.paddingTop = `calc(2.5rem + ${bumpHeight}px)`;
         sidebar.style.top = '0';
         sidebar.style.height = '100vh';
-    } else if (sidebar) {
-        sidebar.style.paddingTop = '2.5rem';
     }
+
+    // 3. Detach the Mobile Menu Button to make it a persistent floating action button
+    const menuBtn = document.getElementById('mobile-menu-btn');
+    if (menuBtn && menuBtn.parentElement !== document.body) {
+        document.body.appendChild(menuBtn); // Pull it out of the collapsible header
+        menuBtn.style.position = 'fixed';
+        menuBtn.style.top = '16px';
+        menuBtn.style.left = '16px';
+        menuBtn.style.zIndex = '10002'; // Keep it above views, below modals
+        menuBtn.style.background = 'var(--surface)';
+        menuBtn.style.border = '1px solid var(--border)';
+        menuBtn.style.borderRadius = '50%';
+        menuBtn.style.boxShadow = 'var(--shadow-soft)';
+        menuBtn.style.display = window.innerWidth <= 768 ? 'flex' : 'none';
+    }
+    
+    // Auto-toggle visibility on resize
+    window.addEventListener('resize', () => {
+        if(menuBtn) menuBtn.style.display = window.innerWidth <= 768 ? 'flex' : 'none';
+    });
 };
 
 // Listeners to ensure spacing remains perfect on resize
@@ -994,9 +1016,37 @@ window.applyCustomSelectUI = (selectEl, sortedAccounts) => {
     box.style.alignItems = 'center';
     box.style.cursor = 'pointer';
 
+    // Update dropdown to be a flex column so the search bar stays sticky
     const dropdown = document.createElement('div');
     dropdown.className = 'card custom-select-dropdown';
-    dropdown.style.cssText = 'position: absolute; top: calc(100% + 4px); left: 0; width: 100%; z-index: 9999; display: none; max-height: 240px; overflow-y: auto; padding: 8px 0; box-shadow: 0 8px 24px rgba(0,0,0,0.2); border: 1px solid var(--border);';
+    dropdown.style.cssText = 'position: absolute; top: calc(100% + 4px); left: 0; width: 100%; z-index: 9999; display: none; flex-direction: column; max-height: 260px; padding: 0; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3); border: 1px solid var(--border);';
+
+    // Search Bar Container
+    const searchContainer = document.createElement('div');
+    searchContainer.style.padding = '12px';
+    searchContainer.style.borderBottom = '1px solid var(--border)';
+    searchContainer.style.background = 'var(--surface)';
+    searchContainer.style.position = 'sticky';
+    searchContainer.style.top = '0';
+    searchContainer.style.zIndex = '2';
+
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.className = 'form-input';
+    searchInput.placeholder = 'Search accounts...';
+    searchInput.style.padding = '8px 12px';
+    searchInput.style.fontSize = '13px';
+    
+    // Prevent clicks inside the search bar from closing the dropdown
+    searchContainer.addEventListener('click', (e) => e.stopPropagation());
+
+    searchContainer.appendChild(searchInput);
+
+    // Scrollable Options Container
+    const optionsContainer = document.createElement('div');
+    optionsContainer.style.overflowY = 'auto';
+    optionsContainer.style.flex = '1';
+    optionsContainer.style.paddingBottom = '8px';
 
     const updateBox = () => {
         const val = selectEl.value;
@@ -1010,7 +1060,6 @@ window.applyCustomSelectUI = (selectEl, sortedAccounts) => {
             const isFav = acc.favorite;
             const balColor = acc.balance < 0 ? 'var(--accent-red)' : 'var(--text-secondary)';
             
-            // FIX: Injected the ▼ arrow alongside the balance so it looks like a real dropdown
             box.innerHTML = `
                 <span style="font-weight: 600; color: ${isFav ? '#FFD700' : 'var(--text)'}">${isFav ? '★ ' : ''}${acc.name}</span>
                 <div style="display: flex; align-items: center; gap: 8px;">
@@ -1022,9 +1071,10 @@ window.applyCustomSelectUI = (selectEl, sortedAccounts) => {
     };
 
     const renderOpts = () => {
-        dropdown.innerHTML = '';
+        optionsContainer.innerHTML = '';
         
         const noneOpt = document.createElement('div');
+        noneOpt.className = 'custom-opt-none';
         noneOpt.innerHTML = `<span style="color: var(--text-secondary)">-- None --</span>`;
         noneOpt.style.cssText = 'padding: 12px 16px; cursor: pointer; border-bottom: 1px solid var(--border);';
         noneOpt.onclick = () => {
@@ -1032,11 +1082,13 @@ window.applyCustomSelectUI = (selectEl, sortedAccounts) => {
             selectEl.dispatchEvent(new Event('change'));
             dropdown.style.display = 'none';
         };
-        dropdown.appendChild(noneOpt);
+        optionsContainer.appendChild(noneOpt);
 
         sortedAccounts.forEach(acc => {
             const sym = acc.currency ? window.getCurrencySymbol(acc.currency) : window.getCurrencySymbol(window.userSettings?.currency || '₱');
             const opt = document.createElement('div');
+            opt.className = 'custom-opt-item';
+            opt.setAttribute('data-name', acc.name.toLowerCase()); // For search filtering
             opt.style.cssText = 'display: flex; justify-content: space-between; padding: 12px 16px; cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.2s;';
             opt.onmouseover = () => opt.style.background = 'var(--surface-hover, rgba(0,0,0,0.05))';
             opt.onmouseout = () => opt.style.background = 'transparent';
@@ -1052,26 +1104,153 @@ window.applyCustomSelectUI = (selectEl, sortedAccounts) => {
                 selectEl.dispatchEvent(new Event('change'));
                 dropdown.style.display = 'none';
             };
-            dropdown.appendChild(opt);
+            optionsContainer.appendChild(opt);
         });
     };
 
+    // Filter Logic
+    searchInput.addEventListener('input', (e) => {
+        const term = e.target.value.toLowerCase().trim();
+        const items = optionsContainer.querySelectorAll('.custom-opt-item');
+        
+        items.forEach(item => {
+            if (item.getAttribute('data-name').includes(term)) {
+                item.style.display = 'flex';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    });
+
     box.onclick = (e) => {
         e.stopPropagation();
-        const wasOpen = dropdown.style.display === 'block';
+        const wasOpen = dropdown.style.display === 'flex';
+        
         document.querySelectorAll('.custom-select-dropdown').forEach(el => el.style.display = 'none');
-        if (!wasOpen) dropdown.style.display = 'block';
+        
+        if (!wasOpen) {
+            dropdown.style.display = 'flex';
+            
+            // Reset the search view
+            searchInput.value = '';
+            searchInput.dispatchEvent(new Event('input')); 
+            
+            // Auto-focus the search bar so the user can immediately type
+            setTimeout(() => searchInput.focus(), 50); 
+        }
     };
 
-    // Very important: listen to the hidden select changes (fired by our Autocomplete system!)
     selectEl.addEventListener('change', updateBox);
     
     updateBox();
     renderOpts();
+    
+    dropdown.appendChild(searchContainer);
+    dropdown.appendChild(optionsContainer);
+    
     wrapper.appendChild(box);
     wrapper.appendChild(dropdown);
     selectEl.parentNode.insertBefore(wrapper, selectEl.nextSibling);
 };
+// window.applyCustomSelectUI = (selectEl, sortedAccounts) => {
+//     // Remove old wrapper if we are refreshing the dropdown list
+//     if (selectEl.nextElementSibling && selectEl.nextElementSibling.classList.contains('custom-select-wrapper')) {
+//         selectEl.nextElementSibling.remove();
+//     }
+
+//     // Hide original boring browser select
+//     selectEl.style.display = 'none';
+
+//     const wrapper = document.createElement('div');
+//     wrapper.className = 'custom-select-wrapper';
+//     wrapper.style.position = 'relative';
+//     wrapper.style.width = '100%';
+
+//     const box = document.createElement('div');
+//     box.className = 'form-input custom-select-box';
+//     box.style.display = 'flex';
+//     box.style.justifyContent = 'space-between';
+//     box.style.alignItems = 'center';
+//     box.style.cursor = 'pointer';
+
+//     const dropdown = document.createElement('div');
+//     dropdown.className = 'card custom-select-dropdown';
+//     dropdown.style.cssText = 'position: absolute; top: calc(100% + 4px); left: 0; width: 100%; z-index: 9999; display: none; max-height: 240px; overflow-y: auto; padding: 8px 0; box-shadow: 0 8px 24px rgba(0,0,0,0.2); border: 1px solid var(--border);';
+
+//     const updateBox = () => {
+//         const val = selectEl.value;
+//         if (!val) {
+//             box.innerHTML = `<span style="color: var(--text-secondary)">-- Select Account --</span><span style="font-size: 10px; color: var(--text-secondary);">▼</span>`;
+//             return;
+//         }
+//         const acc = window.accountsData.find(a => a.id === val);
+//         if (acc) {
+//             const sym = acc.currency ? window.getCurrencySymbol(acc.currency) : window.getCurrencySymbol(window.userSettings?.currency || '₱');
+//             const isFav = acc.favorite;
+//             const balColor = acc.balance < 0 ? 'var(--accent-red)' : 'var(--text-secondary)';
+            
+//             // FIX: Injected the ▼ arrow alongside the balance so it looks like a real dropdown
+//             box.innerHTML = `
+//                 <span style="font-weight: 600; color: ${isFav ? '#FFD700' : 'var(--text)'}">${isFav ? '★ ' : ''}${acc.name}</span>
+//                 <div style="display: flex; align-items: center; gap: 8px;">
+//                     <span style="font-family: monospace; font-size: 13px; color: ${balColor};">${acc.balance < 0 ? '-' : ''}${window.formatMoneyWithSymbol(Math.abs(acc.balance), sym)}</span>
+//                     <span style="font-size: 10px; color: var(--text-secondary);">▼</span>
+//                 </div>
+//             `;
+//         }
+//     };
+
+//     const renderOpts = () => {
+//         dropdown.innerHTML = '';
+        
+//         const noneOpt = document.createElement('div');
+//         noneOpt.innerHTML = `<span style="color: var(--text-secondary)">-- None --</span>`;
+//         noneOpt.style.cssText = 'padding: 12px 16px; cursor: pointer; border-bottom: 1px solid var(--border);';
+//         noneOpt.onclick = () => {
+//             selectEl.value = '';
+//             selectEl.dispatchEvent(new Event('change'));
+//             dropdown.style.display = 'none';
+//         };
+//         dropdown.appendChild(noneOpt);
+
+//         sortedAccounts.forEach(acc => {
+//             const sym = acc.currency ? window.getCurrencySymbol(acc.currency) : window.getCurrencySymbol(window.userSettings?.currency || '₱');
+//             const opt = document.createElement('div');
+//             opt.style.cssText = 'display: flex; justify-content: space-between; padding: 12px 16px; cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.2s;';
+//             opt.onmouseover = () => opt.style.background = 'var(--surface-hover, rgba(0,0,0,0.05))';
+//             opt.onmouseout = () => opt.style.background = 'transparent';
+
+//             const balColor = acc.balance < 0 ? 'var(--accent-red)' : 'var(--text-secondary)';
+
+//             opt.innerHTML = `
+//                 <span style="font-weight: 600; color: ${acc.favorite ? '#FFD700' : 'var(--text)'}">${acc.favorite ? '★ ' : ''}${acc.name}</span>
+//                 <span style="font-family: monospace; font-size: 13px; color: ${balColor};">${acc.balance < 0 ? '-' : ''}${window.formatMoneyWithSymbol(Math.abs(acc.balance), sym)}</span>
+//             `;
+//             opt.onclick = () => {
+//                 selectEl.value = acc.id;
+//                 selectEl.dispatchEvent(new Event('change'));
+//                 dropdown.style.display = 'none';
+//             };
+//             dropdown.appendChild(opt);
+//         });
+//     };
+
+//     box.onclick = (e) => {
+//         e.stopPropagation();
+//         const wasOpen = dropdown.style.display === 'block';
+//         document.querySelectorAll('.custom-select-dropdown').forEach(el => el.style.display = 'none');
+//         if (!wasOpen) dropdown.style.display = 'block';
+//     };
+
+//     // Very important: listen to the hidden select changes (fired by our Autocomplete system!)
+//     selectEl.addEventListener('change', updateBox);
+    
+//     updateBox();
+//     renderOpts();
+//     wrapper.appendChild(box);
+//     wrapper.appendChild(dropdown);
+//     selectEl.parentNode.insertBefore(wrapper, selectEl.nextSibling);
+// };
 
 // Global listener to close the custom dropdowns when clicking outside
 document.addEventListener('click', () => {
@@ -2685,6 +2864,9 @@ window.bootUI = () => {
     window.renderAccounts();
     window.setupReceiptListeners();
     if(window.renderTripsView) window.renderTripsView();
+
+    // Recalculate header padding AFTER the UI has finalized (auth buttons hidden)
+    setTimeout(window.adjustAppPadding, 50);
 };
 
 // ==========================================
@@ -4644,15 +4826,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (x < rect.width / 2) window.navigateInsights(-1);
         else window.navigateInsights(1);
     });
-    
+
     const mobileMenuBtn = document.getElementById('mobile-menu-btn');
     const sidebar = document.getElementById('main-sidebar');
     const backdrop = document.getElementById('sidebar-backdrop');
     
     if (mobileMenuBtn && sidebar && backdrop) {
         mobileMenuBtn.addEventListener('click', () => {
-            sidebar.classList.add('mobile-open');
-            backdrop.classList.add('active');
+            if (sidebar.classList.contains('mobile-open')) {
+                sidebar.classList.remove('mobile-open');
+                backdrop.classList.remove('active');
+            } else {
+                sidebar.classList.add('mobile-open');
+                backdrop.classList.add('active');
+            }
         });
         
         backdrop.addEventListener('click', () => {
@@ -5013,4 +5200,43 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(window.hideGlobalLoader, 1000);
     });
 
+    // ==========================================
+    // MOBILE HARDWARE BACK BUTTON INTERCEPTOR
+    // ==========================================
+    window.history.replaceState({ appState: 'root' }, "");
+    window.history.pushState({ appState: 'forward' }, "");
+
+    window.addEventListener('popstate', (e) => {
+        const activeModals = Array.from(document.querySelectorAll('.modal-overlay.active'));
+        const sidebar = document.getElementById('main-sidebar');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        
+        if (activeModals.length > 0) {
+            // Find visually topmost modal (sort by z-index or DOM order)
+            activeModals.sort((a, b) => (parseInt(window.getComputedStyle(a).zIndex) || 0) - (parseInt(window.getComputedStyle(b).zIndex) || 0));
+            const topmost = activeModals[activeModals.length - 1];
+            
+            topmost.classList.remove('active');
+
+            // Replenish the forward state so the NEXT back press is caught
+            window.history.pushState({ appState: 'forward' }, "");
+            
+        } else if (sidebar && sidebar.classList.contains('mobile-open')) {
+            // Close the sidebar if it's open
+            sidebar.classList.remove('mobile-open');
+            if (backdrop) backdrop.classList.remove('active');
+            
+            window.history.pushState({ appState: 'forward' }, "");
+            
+        } else {
+            // No modals or sidebars open. Check what view we are on.
+            const activeView = document.querySelector('.view.active');
+            if (activeView && activeView.id !== 'dashboard' && window.currentUser) {
+                // Not on dashboard? Route back to dashboard.
+                window.switchView('dashboard');
+                window.history.pushState({ appState: 'forward' }, "");
+            }
+            // If already on Dashboard, do nothing and let the browser minimize/close the app naturally
+        }
+    });
 });

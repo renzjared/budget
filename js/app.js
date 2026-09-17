@@ -2111,9 +2111,15 @@ let totalIncome = 0; let totalExpense = 0; let expensesList = [];
         const container = document.getElementById('sankey_diagram');
         if (!container) return;
 
-        if (typeof google === 'undefined' || !google.visualization) {
-            google.charts.load('current', { packages: ['sankey'] });
-            google.charts.setOnLoadCallback(renderSankeyFlow);
+        // Strict check: Ensure the library AND the specific constructors are fully initialized
+        if (typeof google === 'undefined' || !google.visualization || typeof google.visualization.DataTable !== 'function' || typeof google.visualization.Sankey !== 'function') {
+            if (window.google && window.google.charts) {
+                google.charts.load('current', { packages: ['sankey'] });
+                google.charts.setOnLoadCallback(renderSankeyFlow);
+            } else {
+                // If the Google script hasn't even hit the DOM yet, retry in 500ms
+                setTimeout(renderSankeyFlow, 500);
+            }
             return;
         }
 
@@ -2920,6 +2926,7 @@ window.openTravelSetupModal = (tripId = null) => {
         if (trip) {
             document.getElementById('editing-trip-id').value = tripId;
             document.getElementById('trip-name').value = trip.name || '';
+            document.getElementById('trip-cover-image').value = trip.cover_image || ''; // NEW
             document.getElementById('trip-budget-type').value = trip.budget_source_type || 'fixed';
             
             document.getElementById('trip-goal-group').style.display = trip.budget_source_type === 'goal' ? 'block' : 'none';
@@ -2935,6 +2942,7 @@ window.openTravelSetupModal = (tripId = null) => {
         saveBtn.innerText = "Save & Start Travel Mode";
         document.getElementById('editing-trip-id').value = '';
         document.getElementById('trip-name').value = '';
+        document.getElementById('trip-cover-image').value = ''; // NEW
         document.getElementById('trip-budget-type').value = 'fixed';
         document.getElementById('trip-fixed-amount-group').style.display = 'block';
         document.getElementById('trip-goal-group').style.display = 'none';
@@ -3099,9 +3107,37 @@ window.renderTripsView = (forceShowPast = false) => {
         return;
     }
 
-    const pastTrips = window.tripsData.filter(t => t.status !== 'active' || forceShowPast).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+const pastTrips = window.tripsData.filter(t => t.status !== 'active' || forceShowPast).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
     
-    let html = '';
+    // Inject dynamic CSS for the hover animations and mobile layout
+    let html = `
+    <style>
+        .trip-card-new { transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.3s ease; }
+        .trip-card-new:hover { transform: scale(1.02); box-shadow: 0 16px 40px rgba(0,0,0,0.4); }
+        .trip-card-new .trip-name { transition: transform 0.3s ease; transform-origin: left bottom; display: inline-block; }
+        .trip-card-new:hover .trip-name { transform: scale(1.03); }
+        .trip-action-ring { 
+            border: 1px solid rgba(255,255,255,0.3) !important; 
+            border-radius: 50% !important; 
+            width: 36px !important; 
+            height: 36px !important; 
+            display: flex !important; 
+            justify-content: center !important; 
+            align-items: center !important; 
+            color: #fff !important; 
+            background: rgba(0,0,0,0.4) !important; 
+            backdrop-filter: blur(4px) !important; 
+            transition: background 0.2s, border-color 0.2s !important; 
+        }
+        .trip-action-ring:hover { background: rgba(0,0,0,0.7) !important; border-color: rgba(255,255,255,0.8) !important; }
+        
+        @media (max-width: 600px) {
+            .trip-card-bottom-row { flex-direction: column; align-items: flex-start !important; gap: 16px; }
+            .trip-card-bottom-row > div:last-child { width: 100%; display: grid; grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+    `;
+
     if (forceShowPast && activeTrip) {
         html += `<button class="text-btn" onclick="window.renderTripsView(false)" style="margin-bottom: 24px;">← Back to Active Trip</button>`;
     }
@@ -3109,30 +3145,79 @@ window.renderTripsView = (forceShowPast = false) => {
     if (pastTrips.length === 0) {
         html += `<p class="text-muted" style="text-align: center; padding: 40px;">No trip history found.</p>`;
     } else {
-        html += `<div style="display: flex; flex-direction: column; gap: 16px;">` + pastTrips.map(trip => {
+        html += `<div style="display: flex; flex-direction: column; gap: 24px;">` + pastTrips.map((trip, idx) => {
             const txs = window.appData.filter(t => t.trip_id === trip.id);
             const spent = txs.filter(t => t.type !== 'TRANSFER' && !(t.type || '').toUpperCase().includes('INCOM'))
                              .reduce((sum, t) => sum - (parseFloat(t.amount) || 0), 0);
-            const isActiveLabel = trip.status === 'active' ? `<span style="color:var(--primary); font-size:12px; font-weight:700; margin-left:8px;">(Active)</span>` : '';
             
+            const isActiveLabel = trip.status === 'active' ? `<span style="color:var(--primary); font-size:14px; font-weight:800; margin-left:8px; vertical-align: middle;">• Active</span>` : '';
+            
+            // Compute accurate Budget status
+            let limit = 0;
+            if (trip.budget_source_type === 'fixed') limit = parseFloat(trip.fixed_budget_amount) || 0;
+            else if (trip.budget_source_type === 'goal') {
+                const goal = window.userGoals.find(g => g.id === trip.budget_source_id);
+                limit = goal ? parseFloat(goal.target_amount) : 0;
+            } else {
+                limit = txs.filter(t => (t.type || '').toUpperCase().includes('INCOM'))
+                           .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+            }
+            
+            let budgetStatusText = '';
+            if (trip.status === 'active') {
+                const remaining = limit - spent;
+                if (remaining >= 0) {
+                    budgetStatusText = `${window.formatMoney(remaining, true)} Remaining`;
+                } else {
+                    budgetStatusText = `${window.formatMoney(Math.abs(remaining), true)} Overbudget`;
+                }
+            } else {
+                budgetStatusText = `Total Spent: ${window.formatMoney(spent, true)}`;
+            }
+
+            // Minimalist Landscape Fallbacks from Unsplash
+            const fallbackBgs = [
+                'https://images.pexels.com/photos/417074/pexels-photo-417074.jpeg?auto=compress&cs=tinysrgb&w=800',
+                'https://images.pexels.com/photos/1647962/pexels-photo-1647962.jpeg?auto=compress&cs=tinysrgb&w=800',
+                'https://images.pexels.com/photos/132037/pexels-photo-132037.jpeg?auto=compress&cs=tinysrgb&w=800',
+                'https://images.pexels.com/photos/814499/pexels-photo-814499.jpeg?auto=compress&cs=tinysrgb&w=800'
+            ];
+            const bgImage = trip.cover_image || fallbackBgs[idx % 4];
+
             return `
-                <div class="card" style="display: flex; flex-direction: column; gap: 16px; padding: 20px; border-left: 4px solid var(--primary);">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                        <div>
-                            <h3 style="margin-bottom: 4px;">${trip.name} ${isActiveLabel}</h3>
-                            <p class="text-muted" style="font-size: 13px;">${window.getTripDates(trip.id)}</p>
-                        </div>
-                        <div style="text-align: right;">
-                            <p class="text-muted" style="font-size: 12px; margin-bottom: 2px;">Total Spent</p>
-                            <h4 style="font-size: 18px; color: var(--primary);">${window.formatMoney(spent, true)}</h4>
-                        </div>
-                    </div>
+                <div class="trip-card-new" style="position: relative; width: 100%; height: 260px; border-radius: 20px; overflow: hidden; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); background-color: var(--surface);" onclick="window.openTripDetails('${trip.id}')">
                     
-                    <div style="display: flex; gap: 8px; border-top: 1px solid var(--border); padding-top: 16px; flex-wrap: wrap;">
-                        <button class="primary-btn" style="flex: 1; min-width: 120px; font-size: 13px;" onclick="window.openTripInsights('${trip.id}')">✨ View Insights</button>
-                        <button class="secondary-btn" style="flex: 1; min-width: 120px; font-size: 13px;" onclick="window.openTripDetails('${trip.id}')">📊 Budget & Logs</button>
-                        <button class="icon-btn" style="color: var(--text-secondary);" onclick="window.openTravelSetupModal('${trip.id}')" title="Edit Setup">✎</button>
-                        <button class="icon-btn" style="color: var(--accent-red);" onclick="window.openDeleteTripModal('${trip.id}', '${trip.name.replace(/'/g, "\\'")}')" title="Delete">✕</button>
+                    <!-- Background Image -->
+                    <div style="position: absolute; inset: 0; background-image: url('${bgImage}'); background-size: cover; background-position: center; z-index: 1;"></div>
+
+                    <!-- Heavy Bottom Gradient for Text Contrast -->
+                    <div style="position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.1) 100%); z-index: 2;"></div>
+
+                    <!-- Top Right: Action Rings -->
+                    <div style="position: absolute; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 10;">
+                        <button class="icon-btn trip-action-ring" onclick="event.stopPropagation(); window.openTravelSetupModal('${trip.id}')" title="Edit Setup">✎</button>
+                        <button class="icon-btn trip-action-ring" style="color: #ff6b6b !important;" onclick="event.stopPropagation(); window.openDeleteTripModal('${trip.id}', '${trip.name.replace(/'/g, "\\'")}')" title="Delete">✕</button>
+                    </div>
+
+                    <!-- Bottom Content Flexbox -->
+                    <div class="trip-card-bottom-row" style="position: absolute; bottom: 24px; left: 24px; right: 24px; display: flex; justify-content: space-between; align-items: flex-end; z-index: 10;">
+                        
+                        <!-- Left: Trip Info -->
+                        <div style="flex: 1; padding-right: 16px;">
+                            <h3 class="trip-name" style="margin: 0 0 6px 0; color: #fff; font-size: 26px; font-weight: 800; text-shadow: 0 2px 8px rgba(0,0,0,0.9);">${trip.name}${isActiveLabel}</h3>
+                            <p style="margin: 0; color: rgba(255,255,255,0.9); font-size: 13px; font-weight: 500; text-shadow: 0 1px 4px rgba(0,0,0,0.9); display: flex; align-items: center; gap: 8px;">
+                                <span>${window.getTripDates(trip.id)}</span>
+                                <span style="opacity: 0.5;">•</span>
+                                <span style="font-weight: 700; color: ${trip.status === 'active' && (limit - spent) < 0 ? '#ff6b6b' : 'var(--primary)'};">${budgetStatusText}</span>
+                            </p>
+                        </div>
+
+                        <!-- Right: Action Buttons (Fixed stopPropagation) -->
+                        <div style="display: flex; gap: 12px; flex-shrink: 0;">
+                            <button class="secondary-btn" style="background: rgba(255,255,255,0.15); backdrop-filter: blur(8px); color: #fff; border: 1px solid rgba(255,255,255,0.3); font-size: 13px; padding: 10px 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);" onclick="event.stopPropagation(); window.openTripDetails('${trip.id}')">📊 Budget & Logs</button>
+                            <button class="primary-btn" style="font-size: 13px; padding: 10px 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.4);" onclick="event.stopPropagation(); window.openTripInsights('${trip.id}')">✨ View Insights</button>
+                        </div>
+
                     </div>
                 </div>
             `;
@@ -4885,6 +4970,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('start-trip-btn')?.addEventListener('click', async () => {
         const editingId = document.getElementById('editing-trip-id').value;
         const name = document.getElementById('trip-name').value.trim();
+        const coverImage = document.getElementById('trip-cover-image').value.trim(); // NEW
         const bType = document.getElementById('trip-budget-type').value;
         const fixedAmt = document.getElementById('trip-amount').value;
         const goalId = document.getElementById('trip-goal-id').value;
@@ -4898,6 +4984,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const payload = {
             user_id: window.currentUser.id,
             name: name,
+            cover_image: coverImage || null, // NEW: Save to database
             budget_source_type: bType,
             budget_source_id: (bType === 'goal' && goalId) ? goalId : null,
             fixed_budget_amount: bType === 'fixed' ? (parseFloat(fixedAmt) || 0) : 0,

@@ -1306,7 +1306,17 @@
             
             <div id="travel-setup-view">
                 <input type="hidden" id="editing-trip-id" value="">
-                <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Trip Name</label><input type="text" id="trip-name" class="form-input" placeholder="e.g., Japan 2026"></div>
+                
+                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-bottom: 16px;">
+                    <div class="form-group" style="margin: 0;">
+                        <label class="text-muted">Trip Name</label>
+                        <input type="text" id="trip-name" class="form-input" placeholder="e.g., Japan 2026">
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label class="text-muted">Cover Image URL</label>
+                        <input type="text" id="trip-cover-image" class="form-input" placeholder="https://...">
+                    </div>
+                </div>
                 
                 <div class="form-group" style="margin-bottom: 16px;">
                     <label class="text-muted">Budget Source</label>
@@ -1343,6 +1353,46 @@
                 </div>
 
                 <button id="start-trip-btn" class="primary-btn" style="width: 100%; margin-top: 12px;">Save & Start Travel Mode</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TRIP DETAILS MODAL (BUDGET & LOGS) -->
+    <div id="trip-details-overlay" class="modal-overlay" style="z-index: 9999;">
+        <div class="account-modal-content card" style="max-height: 90vh; display: flex; flex-direction: column;">
+            <header style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-shrink: 0;">
+                <div>
+                    <h2 id="details-trip-name" style="margin-bottom: 4px;">Trip Name</h2>
+                    <p id="details-trip-dates" class="text-muted" style="font-size: 13px; margin: 0;"></p>
+                </div>
+                <button class="close-modal-btn" onclick="document.getElementById('trip-details-overlay').classList.remove('active')">✕</button>
+            </header>
+
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 24px; flex-shrink: 0;">
+                <div style="background: var(--surface-hover); padding: 16px; border-radius: 12px;">
+                    <p class="text-muted" style="font-size: 11px; text-transform: uppercase; margin-bottom: 4px;">Budget</p>
+                    <h3 id="details-trip-budget" style="margin: 0; font-size: 18px;">₱0.00</h3>
+                </div>
+                <div style="background: var(--surface-hover); padding: 16px; border-radius: 12px;">
+                    <p class="text-muted" style="font-size: 11px; text-transform: uppercase; margin-bottom: 4px;">Total Spent</p>
+                    <h3 id="details-trip-spent" style="margin: 0; font-size: 18px;">₱0.00</h3>
+                </div>
+                <div style="background: var(--surface-hover); padding: 16px; border-radius: 12px;">
+                    <p class="text-muted" style="font-size: 11px; text-transform: uppercase; margin-bottom: 4px;">Remaining</p>
+                    <h3 id="details-trip-left" style="margin: 0; font-size: 18px;">₱0.00</h3>
+                </div>
+                <div style="background: var(--surface-hover); padding: 16px; border-radius: 12px;">
+                    <p class="text-muted" style="font-size: 11px; text-transform: uppercase; margin-bottom: 4px;">Daily Average</p>
+                    <h3 id="details-trip-avg" style="margin: 0; font-size: 18px;">₱0.00</h3>
+                </div>
+            </div>
+
+            <div style="overflow-y: auto; flex: 1; padding-right: 8px;">
+                <h4 style="margin-bottom: 12px; font-size: 14px;">Category Progress</h4>
+                <div id="details-trip-categories" style="margin-bottom: 24px;"></div>
+
+                <h4 style="margin-bottom: 12px; font-size: 14px;">Transaction Logs</h4>
+                <ul id="details-trip-logs" class="minimal-list interactive-list"></ul>
             </div>
         </div>
     </div>

@@ -3107,7 +3107,8 @@ window.renderTripsView = (forceShowPast = false) => {
         return;
     }
 
-const pastTrips = window.tripsData.filter(t => t.status !== 'active' || forceShowPast).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+    // FIX: Filter strictly by ID, not by the string status, to prevent orphaned trips from hiding
+    const pastTrips = window.tripsData.filter(t => t.id !== window.userSettings.activeTripId || forceShowPast).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
     
     // Inject dynamic CSS for the hover animations and mobile layout
     let html = `
@@ -3150,9 +3151,9 @@ const pastTrips = window.tripsData.filter(t => t.status !== 'active' || forceSho
             const spent = txs.filter(t => t.type !== 'TRANSFER' && !(t.type || '').toUpperCase().includes('INCOM'))
                              .reduce((sum, t) => sum - (parseFloat(t.amount) || 0), 0);
             
-            const isActiveLabel = trip.status === 'active' ? `<span style="color:var(--primary); font-size:14px; font-weight:800; margin-left:8px; vertical-align: middle;">• Active</span>` : '';
+            // FIX: Ensure UI labels accurately reflect the global Active Trip ID
+            const isActiveLabel = trip.id === window.userSettings.activeTripId ? `<span style="color:var(--primary); font-size:14px; font-weight:800; margin-left:8px; vertical-align: middle;">• Active</span>` : '';
             
-            // Compute accurate Budget status
             let limit = 0;
             if (trip.budget_source_type === 'fixed') limit = parseFloat(trip.fixed_budget_amount) || 0;
             else if (trip.budget_source_type === 'goal') {
@@ -3164,7 +3165,8 @@ const pastTrips = window.tripsData.filter(t => t.status !== 'active' || forceSho
             }
             
             let budgetStatusText = '';
-            if (trip.status === 'active') {
+            // FIX: Ensure UI labels accurately reflect the global Active Trip ID
+            if (trip.id === window.userSettings.activeTripId) {
                 const remaining = limit - spent;
                 if (remaining >= 0) {
                     budgetStatusText = `${window.formatMoney(remaining, true)} Remaining`;
@@ -3175,7 +3177,7 @@ const pastTrips = window.tripsData.filter(t => t.status !== 'active' || forceSho
                 budgetStatusText = `Total Spent: ${window.formatMoney(spent, true)}`;
             }
 
-            // Minimalist Landscape Fallbacks from Unsplash
+            // Minimalist Landscape Fallbacks (Pexels)
             const fallbackBgs = [
                 'https://images.pexels.com/photos/417074/pexels-photo-417074.jpeg?auto=compress&cs=tinysrgb&w=800',
                 'https://images.pexels.com/photos/1647962/pexels-photo-1647962.jpeg?auto=compress&cs=tinysrgb&w=800',
@@ -4970,7 +4972,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('start-trip-btn')?.addEventListener('click', async () => {
         const editingId = document.getElementById('editing-trip-id').value;
         const name = document.getElementById('trip-name').value.trim();
-        const coverImage = document.getElementById('trip-cover-image').value.trim(); // NEW
+        const coverImageEl = document.getElementById('trip-cover-image');
+        const coverImage = coverImageEl ? coverImageEl.value.trim() : null;
         const bType = document.getElementById('trip-budget-type').value;
         const fixedAmt = document.getElementById('trip-amount').value;
         const goalId = document.getElementById('trip-goal-id').value;
@@ -4981,14 +4984,21 @@ document.addEventListener('DOMContentLoaded', () => {
             return alert("Category percentages must add up to exactly 100%.");
         }
 
+        // FIX: Preserve the trip's status if we are just editing an old trip!
+        let currentStatus = 'active';
+        if (editingId) {
+            const existingTrip = window.tripsData.find(t => t.id === editingId);
+            if (existingTrip) currentStatus = existingTrip.status;
+        }
+
         const payload = {
             user_id: window.currentUser.id,
             name: name,
-            cover_image: coverImage || null, // NEW: Save to database
+            cover_image: coverImage || null,
             budget_source_type: bType,
             budget_source_id: (bType === 'goal' && goalId) ? goalId : null,
             fixed_budget_amount: bType === 'fixed' ? (parseFloat(fixedAmt) || 0) : 0,
-            status: 'active',
+            status: currentStatus,
             categories: window.tempTripCategories
         };
 

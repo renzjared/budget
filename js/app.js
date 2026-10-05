@@ -899,7 +899,7 @@ window.createBulkEntryUI = (config) => {
             if (saveButton.parentElement !== content) saveButton.parentElement.dataset.bulkHidden = 'true';
         }
     }
-    toggle.addEventListener('click', () => {
+    panel.toggleBulkMode = () => {
         const active = panel.style.display === 'none';
         panel.style.display = active ? 'block' : 'none';
         toggle.textContent = active ? 'Single Entry' : 'Bulk Add';
@@ -908,7 +908,7 @@ window.createBulkEntryUI = (config) => {
             element.style.display = active ? 'none' : '';
         });
         if (active) refreshCategories();
-    });
+    };
     panel.querySelector('[data-bulk-add]').addEventListener('click', addRow);
     panel.querySelector('[data-bulk-save]').addEventListener('click', () => config.onSave(rows));
     addRow();
@@ -4199,18 +4199,8 @@ window.saveBulkTransactions = async (type, rows, settings) => {
     if (toggle && document.getElementById(settings.panelId)?.style.display !== 'none') toggle.click();
 };
 
-// ==========================================
-// 2. DOM EVENT LISTENERS
-// ==========================================
-
-document.addEventListener('DOMContentLoaded', () => {
-
-    window.setupAutocomplete('exp-name', 'name');
-    window.setupAutocomplete('exp-merchant', 'merchant');
-    window.setupAutocomplete('inc-name', 'name');
-    window.setupAutocomplete('edit-tx-name', 'name');
-    window.setupAutocomplete('edit-tx-merchant', 'merchant');
-    window.createBulkEntryUI({
+window.bulkEntryConfigurations = {
+    expense: {
         idPrefix: 'exp-bulk',
         overlayId: 'expense-overlay',
         panelId: 'expense-bulk-panel',
@@ -4233,8 +4223,8 @@ document.addEventListener('DOMContentLoaded', () => {
             tripSelectId: 'exp-trip-id', overlayId: 'expense-overlay',
             panelId: 'expense-bulk-panel', toggleId: 'exp-bulk-toggle'
         })
-    });
-    window.createBulkEntryUI({
+    },
+    income: {
         idPrefix: 'inc-bulk',
         overlayId: 'income-overlay',
         panelId: 'income-bulk-panel',
@@ -4256,8 +4246,8 @@ document.addEventListener('DOMContentLoaded', () => {
             tripSelectId: 'inc-trip-id', overlayId: 'income-overlay',
             panelId: 'income-bulk-panel', toggleId: 'inc-bulk-toggle'
         })
-    });
-    window.createBulkEntryUI({
+    },
+    transfer: {
         idPrefix: 'transfer-bulk',
         overlayId: 'transfer-overlay',
         panelId: 'transfer-bulk-panel',
@@ -4277,7 +4267,53 @@ document.addEventListener('DOMContentLoaded', () => {
             overlayId: 'transfer-overlay', panelId: 'transfer-bulk-panel',
             toggleId: 'transfer-bulk-toggle'
         })
-    });
+    },
+    ledgerItem: {
+        idPrefix: 'ledger-item-bulk',
+        overlayId: 'ledger-item-overlay',
+        panelId: 'ledger-item-bulk-panel',
+        toggleId: 'ledger-item-bulk-toggle',
+        rowsId: 'ledger-item-bulk-rows',
+        bulkMaxWidth: 'min(760px, 96vw)',
+        saveButtonId: 'ledger-item-save-btn',
+        hiddenIds: ['ledger-item-name', 'ledger-item-amount', 'ledger-item-notes'],
+        fields: [
+            { key: 'name', label: 'Description', suggestion: 'name' },
+            { key: 'amount', label: 'Amount', type: 'amount' },
+            { key: 'notes', label: 'Notes', suggestion: 'notes' }
+        ],
+        onSave: rows => window.LedgersEngine.saveBulkItems(rows)
+    }
+};
+
+window.toggleBulkEntry = (type) => {
+    const config = window.bulkEntryConfigurations[type];
+    if (!config) {
+        console.error(`Unknown bulk-entry type: ${type}`);
+        window.showToast?.('Could not open bulk entry.', true);
+        return;
+    }
+    let panel = document.getElementById(config.panelId);
+    if (!panel) panel = window.createBulkEntryUI(config);
+    if (!panel?.toggleBulkMode) {
+        console.error(`Could not initialize bulk-entry panel: ${config.panelId}`);
+        window.showToast?.('Could not open bulk entry.', true);
+        return;
+    }
+    panel.toggleBulkMode();
+};
+
+// ==========================================
+// 2. DOM EVENT LISTENERS
+// ==========================================
+
+document.addEventListener('DOMContentLoaded', () => {
+
+    window.setupAutocomplete('exp-name', 'name');
+    window.setupAutocomplete('exp-merchant', 'merchant');
+    window.setupAutocomplete('inc-name', 'name');
+    window.setupAutocomplete('edit-tx-name', 'name');
+    window.setupAutocomplete('edit-tx-merchant', 'merchant');
 
     window.openTransferModal = () => {
         const overlay = document.getElementById('transfer-overlay');

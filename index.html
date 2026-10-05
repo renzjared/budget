@@ -1399,7 +1399,7 @@
 
     <div id="expense-overlay" class="modal-overlay">
         <div class="account-modal-content card">
-            <header style="display: flex; justify-content: space-between; margin-bottom: 24px;"><h3>Add Expense</h3><div style="display:flex; gap:12px; align-items:center;"><button id="exp-bulk-toggle" class="secondary-btn" type="button">Bulk Add</button><button class="close-modal-btn" onclick="closeExpenseModal()">✕</button></div></header>
+            <header style="display: flex; justify-content: space-between; margin-bottom: 24px;"><h3>Add Expense</h3><div style="display:flex; gap:12px; align-items:center;"><button id="exp-bulk-toggle" class="secondary-btn" type="button" onclick="window.toggleBulkEntry('expense')">Bulk Add</button><button class="close-modal-btn" onclick="closeExpenseModal()">✕</button></div></header>
             <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Description</label><input type="text" id="exp-name" class="form-input" placeholder="e.g., Grocery"></div>
             <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Amount</label>
                 <div style="display: flex; gap: 8px;">
@@ -1423,7 +1423,7 @@
 
     <div id="income-overlay" class="modal-overlay">
         <div class="account-modal-content card">
-            <header style="display: flex; justify-content: space-between; margin-bottom: 24px;"><h3>Add Income</h3><div style="display:flex; gap:12px; align-items:center;"><button id="inc-bulk-toggle" class="secondary-btn" type="button">Bulk Add</button><button class="close-modal-btn" onclick="closeIncomeModal()">✕</button></div></header>
+            <header style="display: flex; justify-content: space-between; margin-bottom: 24px;"><h3>Add Income</h3><div style="display:flex; gap:12px; align-items:center;"><button id="inc-bulk-toggle" class="secondary-btn" type="button" onclick="window.toggleBulkEntry('income')">Bulk Add</button><button class="close-modal-btn" onclick="closeIncomeModal()">✕</button></div></header>
             <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Description</label><input type="text" id="inc-name" class="form-input" placeholder="e.g., Salary"></div>
             
             <div class="form-group" style="margin-bottom: 16px;"><label class="text-muted">Amount</label>
@@ -1691,7 +1691,7 @@
 
     <div id="transfer-overlay" class="modal-overlay">
         <div class="account-modal-content card">
-            <header style="display: flex; justify-content: space-between; margin-bottom: 24px;"><h3>Transfer / Ledger</h3><div style="display:flex; gap:12px; align-items:center;"><button id="transfer-bulk-toggle" class="secondary-btn" type="button">Bulk Add</button><button class="close-modal-btn" onclick="window.closeTransferModal()">✕</button></div></header>
+            <header style="display: flex; justify-content: space-between; margin-bottom: 24px;"><h3>Transfer / Ledger</h3><div style="display:flex; gap:12px; align-items:center;"><button id="transfer-bulk-toggle" class="secondary-btn" type="button" onclick="window.toggleBulkEntry('transfer')">Bulk Add</button><button class="close-modal-btn" onclick="window.closeTransferModal()">✕</button></div></header>
             
             <p class="text-muted" style="font-size: 13px; margin-bottom: 16px;">Move money between accounts, or log loans/repayments to your Receivable ledgers.</p>
 

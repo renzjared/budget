@@ -238,7 +238,7 @@ window.LedgersEngine = {
                     <header style="display: flex; justify-content: space-between; margin-bottom: 24px;">
                         <h3 style="margin: 0;">Log Ledger Item</h3>
                         <div style="display:flex; gap:12px; align-items:center;">
-                            <button id="ledger-item-bulk-toggle" class="secondary-btn" type="button">Bulk Add</button>
+                            <button id="ledger-item-bulk-toggle" class="secondary-btn" type="button" onclick="window.toggleBulkEntry('ledgerItem')">Bulk Add</button>
                             <button class="close-modal-btn" onclick="document.getElementById('ledger-item-overlay').classList.remove('active')">✕</button>
                         </div>
                     </header>
@@ -662,22 +662,6 @@ window.LedgersEngine = {
         document.getElementById('ledger-item-notes').value = '';
         window.LedgersEngine.setItemDirection(1);
         window.setupAutocomplete?.('ledger-item-name', 'name');
-        window.createBulkEntryUI?.({
-            idPrefix: 'ledger-item-bulk',
-            overlayId: 'ledger-item-overlay',
-            panelId: 'ledger-item-bulk-panel',
-            toggleId: 'ledger-item-bulk-toggle',
-            rowsId: 'ledger-item-bulk-rows',
-            bulkMaxWidth: 'min(760px, 96vw)',
-            saveButtonId: 'ledger-item-save-btn',
-            hiddenIds: ['ledger-item-name', 'ledger-item-amount', 'ledger-item-notes'],
-            fields: [
-                { key: 'name', label: 'Description', suggestion: 'name' },
-                { key: 'amount', label: 'Amount', type: 'amount' },
-                { key: 'notes', label: 'Notes', suggestion: 'notes' }
-            ],
-            onSave: rows => window.LedgersEngine.saveBulkItems(rows)
-        });
         
         const selectEl = document.getElementById('ledger-item-account');
         

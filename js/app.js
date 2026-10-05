@@ -899,10 +899,20 @@ window.createBulkEntryUI = (config) => {
             if (saveButton.parentElement !== content) saveButton.parentElement.dataset.bulkHidden = 'true';
         }
     }
+    const title = document.getElementById(config.titleId);
+    const bulkIcon = '<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 9h18M9 9v11M15 9v11"></path></svg>';
+    const singleIcon = '<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"></rect><path d="M8 9h8M8 13h8M8 17h5"></path></svg>';
+    const setToggleMode = (bulkMode) => {
+        toggle.innerHTML = bulkMode ? singleIcon : bulkIcon;
+        toggle.setAttribute('aria-label', bulkMode ? 'Switch to single entry' : 'Switch to bulk entry');
+        toggle.title = bulkMode ? 'Switch to single entry' : 'Switch to bulk entry';
+        if (title) title.textContent = bulkMode ? config.bulkTitle : config.singleTitle;
+    };
+    setToggleMode(false);
     panel.toggleBulkMode = () => {
         const active = panel.style.display === 'none';
         panel.style.display = active ? 'block' : 'none';
-        toggle.textContent = active ? 'Single Entry' : 'Bulk Add';
+        setToggleMode(active);
         content.style.maxWidth = active ? (config.bulkMaxWidth || 'min(1100px, 96vw)') : '';
         content.querySelectorAll('[data-bulk-hidden="true"]').forEach(element => {
             element.style.display = active ? 'none' : '';
@@ -4065,14 +4075,14 @@ window.saveBulkTransactions = async (type, rows, settings) => {
         };
     }).filter(entry => entry.name || entry.amount || entry.merchant || entry.notes);
 
-    if (!entries.length) return alert('Add at least one transaction.');
+    if (!entries.length) return window.showMessageModal('No Transactions Added', 'Enter at least one transaction before saving.');
     for (const entry of entries) {
         const amount = Number(entry.amount);
         if (!entry.name || !entry.amount || !Number.isFinite(amount) || amount === 0) {
-            return alert('Each transaction needs a description and a non-zero amount.');
+            return window.showMessageModal('Transaction Incomplete', 'Each transaction needs a description and a non-zero amount.');
         }
         if (type === 'TRANSFER' && amount <= 0) {
-            return alert('Transfer amounts must be greater than zero.');
+            return window.showMessageModal('Invalid Transfer Amount', 'Transfer amounts must be greater than zero.');
         }
     }
 
@@ -4087,8 +4097,8 @@ window.saveBulkTransactions = async (type, rows, settings) => {
     const toId = settings.toId ? document.getElementById(settings.toId).value || null : null;
 
     if (type === 'TRANSFER') {
-        if (!fromId && !toId) return alert('You must select at least one internal account.');
-        if (fromId === toId) return alert('Cannot transfer to the same account.');
+        if (!fromId && !toId) return window.showMessageModal('Account Required', 'Select at least one internal account for the transfer.');
+        if (fromId === toId) return window.showMessageModal('Invalid Accounts', 'Choose different accounts for the transfer.');
         localStorage.setItem('lastTransferFrom', fromId || '');
         localStorage.setItem('lastTransferTo', toId || '');
     }
@@ -4202,6 +4212,9 @@ window.saveBulkTransactions = async (type, rows, settings) => {
 window.bulkEntryConfigurations = {
     expense: {
         idPrefix: 'exp-bulk',
+        titleId: 'exp-modal-title',
+        singleTitle: 'Add Expense',
+        bulkTitle: 'Add Bulk Expense',
         overlayId: 'expense-overlay',
         panelId: 'expense-bulk-panel',
         toggleId: 'exp-bulk-toggle',
@@ -4226,6 +4239,9 @@ window.bulkEntryConfigurations = {
     },
     income: {
         idPrefix: 'inc-bulk',
+        titleId: 'inc-modal-title',
+        singleTitle: 'Add Income',
+        bulkTitle: 'Add Bulk Income',
         overlayId: 'income-overlay',
         panelId: 'income-bulk-panel',
         toggleId: 'inc-bulk-toggle',
@@ -4249,6 +4265,9 @@ window.bulkEntryConfigurations = {
     },
     transfer: {
         idPrefix: 'transfer-bulk',
+        titleId: 'transfer-modal-title',
+        singleTitle: 'Transfer / Ledger',
+        bulkTitle: 'Add Bulk Transfer',
         overlayId: 'transfer-overlay',
         panelId: 'transfer-bulk-panel',
         toggleId: 'transfer-bulk-toggle',
@@ -4270,6 +4289,9 @@ window.bulkEntryConfigurations = {
     },
     ledgerItem: {
         idPrefix: 'ledger-item-bulk',
+        titleId: 'ledger-item-modal-title',
+        singleTitle: 'Log Ledger Item',
+        bulkTitle: 'Log Bulk Ledger Items',
         overlayId: 'ledger-item-overlay',
         panelId: 'ledger-item-bulk-panel',
         toggleId: 'ledger-item-bulk-toggle',
@@ -4770,8 +4792,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const tripId = isTrip ? document.getElementById('exp-trip-id')?.value : null;
 
         if (!name || !amount || isNaN(amount)) {
-            alert('Please fill in Name and Amount');
-            return;
+            return window.showMessageModal('Transaction Incomplete', 'Please enter a description and a non-zero amount.');
         }
 
         window.closeExpenseModal();
@@ -4865,8 +4886,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const tripId = isTrip ? document.getElementById('inc-trip-id')?.value : null;
 
         if (!name || !amount || isNaN(amount)) {
-            alert('Please fill in Name and Amount');
-            return;
+            return window.showMessageModal('Transaction Incomplete', 'Please enter a description and a non-zero amount.');
         }
 
         window.closeIncomeModal();
@@ -4955,9 +4975,9 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('lastTransferFrom', fromId || '');
         localStorage.setItem('lastTransferTo', toId || '');
 
-        if (!amount || isNaN(amount) || amount <= 0) return alert("Enter a valid amount.");
-        if (!fromId && !toId) return alert("You must select at least one internal account.");
-        if (fromId === toId) return alert("Cannot transfer to the same account.");
+        if (!amount || isNaN(amount) || amount <= 0) return window.showMessageModal('Invalid Transfer Amount', 'Enter a transfer amount greater than zero.');
+        if (!fromId && !toId) return window.showMessageModal('Account Required', 'Select at least one internal account for the transfer.');
+        if (fromId === toId) return window.showMessageModal('Invalid Accounts', 'Choose different accounts for the transfer.');
 
         window.closeTransferModal();
         window.showLoadingToast('Processing transfer...');

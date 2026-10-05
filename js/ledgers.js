@@ -236,9 +236,9 @@ window.LedgersEngine = {
             <div id="ledger-item-overlay" class="modal-overlay" style="z-index: 9999;">
                 <div class="account-modal-content card">
                     <header style="display: flex; justify-content: space-between; margin-bottom: 24px;">
-                        <h3 style="margin: 0;">Log Ledger Item</h3>
+                        <h3 id="ledger-item-modal-title" style="margin: 0;">Log Ledger Item</h3>
                         <div style="display:flex; gap:12px; align-items:center;">
-                            <button id="ledger-item-bulk-toggle" class="secondary-btn" type="button" onclick="window.toggleBulkEntry('ledgerItem')">Bulk Add</button>
+                            <button id="ledger-item-bulk-toggle" class="secondary-btn" type="button" aria-label="Switch to bulk entry" title="Switch to bulk entry" onclick="window.toggleBulkEntry('ledgerItem')" style="padding:8px 10px; display:grid; place-items:center;"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 9h18M9 9v11M15 9v11"></path></svg></button>
                             <button class="close-modal-btn" onclick="document.getElementById('ledger-item-overlay').classList.remove('active')">✕</button>
                         </div>
                     </header>
@@ -691,7 +691,9 @@ window.LedgersEngine = {
         const rawAmount = parseFloat(document.getElementById('ledger-item-amount').value);
         const notes = document.getElementById('ledger-item-notes').value.trim();
         const linkedAccId = document.getElementById('ledger-item-account').value;
-        if (!name || !rawAmount || isNaN(rawAmount)) return alert("Name and Amount required.");
+        if (!name || !rawAmount || isNaN(rawAmount)) {
+            return window.showMessageModal('Ledger Item Incomplete', 'Enter a description and a non-zero amount.');
+        }
 
         document.getElementById('ledger-item-overlay').classList.remove('active');
         if(window.showLoadingToast) window.showLoadingToast('Logging ledger item...');
@@ -743,11 +745,13 @@ window.LedgersEngine = {
             amount: row.querySelector('[data-bulk-column="amount"]')?.value || '',
             notes: row.querySelector('[data-bulk-column="notes"]')?.value.trim() || ''
         })).filter(entry => entry.name || entry.amount || entry.notes);
-        if (!entries.length) return alert('Add at least one ledger item.');
+        if (!entries.length) {
+            return window.showMessageModal('No Ledger Items Added', 'Enter at least one ledger item before saving.');
+        }
         for (const entry of entries) {
             const amount = Number(entry.amount);
             if (!entry.name || !entry.amount || !Number.isFinite(amount) || amount === 0) {
-                return alert('Each ledger item needs a description and a non-zero amount.');
+                return window.showMessageModal('Ledger Item Incomplete', 'Each ledger item needs a description and a non-zero amount.');
             }
         }
 

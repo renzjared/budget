@@ -125,6 +125,7 @@ window.showConfirmation = (title, message) => {
         titleEl.innerText = title;
         messageEl.innerText = message;
         modal.style.display = 'flex';
+        modal.classList.add('active');
         
         const handleOk = () => {
             cleanup();
@@ -138,6 +139,7 @@ window.showConfirmation = (title, message) => {
         
         const cleanup = () => {
             modal.style.display = 'none';
+            modal.classList.remove('active');
             okBtn.removeEventListener('click', handleOk);
             cancelBtn.removeEventListener('click', handleCancel);
             modal.removeEventListener('click', handleBackdropClick);
@@ -151,6 +153,49 @@ window.showConfirmation = (title, message) => {
         
         okBtn.addEventListener('click', handleOk);
         cancelBtn.addEventListener('click', handleCancel);
+        modal.addEventListener('click', handleBackdropClick);
+    });
+};
+
+window.showMessageModal = (title, message) => {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('confirm-modal-overlay');
+        const titleEl = document.getElementById('confirm-modal-title');
+        const messageEl = document.getElementById('confirm-modal-message');
+        const okBtn = document.getElementById('confirm-modal-ok');
+        const cancelBtn = document.getElementById('confirm-modal-cancel');
+        if (!modal || !titleEl || !messageEl || !okBtn || !cancelBtn) {
+            console.error('Message modal elements are missing.');
+            resolve(false);
+            return;
+        }
+
+        const originalOkLabel = okBtn.innerText;
+        const originalCancelDisplay = cancelBtn.style.display;
+        titleEl.innerText = title;
+        messageEl.innerText = message;
+        okBtn.innerText = 'OK';
+        cancelBtn.style.display = 'none';
+        modal.style.display = 'flex';
+        modal.classList.add('active');
+
+        const cleanup = () => {
+            modal.style.display = 'none';
+            modal.classList.remove('active');
+            okBtn.innerText = originalOkLabel;
+            cancelBtn.style.display = originalCancelDisplay;
+            okBtn.removeEventListener('click', handleOk);
+            modal.removeEventListener('click', handleBackdropClick);
+        };
+        const handleOk = () => {
+            cleanup();
+            resolve(true);
+        };
+        const handleBackdropClick = (event) => {
+            if (event.target === modal) handleOk();
+        };
+
+        okBtn.addEventListener('click', handleOk);
         modal.addEventListener('click', handleBackdropClick);
     });
 };

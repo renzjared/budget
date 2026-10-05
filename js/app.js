@@ -903,7 +903,9 @@ window.createBulkEntryUI = (config) => {
     const bulkIcon = '<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 9h18M9 9v11M15 9v11"></path></svg>';
     const singleIcon = '<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"></rect><path d="M8 9h8M8 13h8M8 17h5"></path></svg>';
     const setToggleMode = (bulkMode) => {
-        toggle.innerHTML = bulkMode ? singleIcon : bulkIcon;
+        const template = document.createElement('template');
+        template.innerHTML = bulkMode ? singleIcon : bulkIcon;
+        toggle.replaceChildren(template.content.cloneNode(true));
         toggle.setAttribute('aria-label', bulkMode ? 'Switch to single entry' : 'Switch to bulk entry');
         toggle.title = bulkMode ? 'Switch to single entry' : 'Switch to bulk entry';
         if (title) title.textContent = bulkMode ? config.bulkTitle : config.singleTitle;

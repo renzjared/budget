@@ -663,12 +663,23 @@ window.setupAutocomplete = (inputId, fieldType) => {
     if (input.dataset.autocompleteSetup === 'true') return;
     input.dataset.autocompleteSetup = 'true';
 
-    const parent = input.parentElement;
-    parent.style.position = 'relative';
-
     const dropdown = document.createElement('div');
     dropdown.className = 'autocomplete-dropdown';
-    parent.appendChild(dropdown);
+    dropdown._autocompleteInput = input;
+    document.body.appendChild(dropdown);
+    const positionDropdown = () => {
+        if (dropdown.style.display === 'none') return;
+        const rect = input.getBoundingClientRect();
+        const dropdownHeight = Math.min(dropdown.scrollHeight || 180, 180);
+        const belowSpace = window.innerHeight - rect.bottom;
+        const placeAbove = belowSpace < dropdownHeight + 8 && rect.top > belowSpace;
+        dropdown.style.left = `${Math.max(8, rect.left)}px`;
+        dropdown.style.width = `${Math.min(rect.width, window.innerWidth - Math.max(8, rect.left) - 8)}px`;
+        dropdown.style.top = placeAbove
+            ? `${Math.max(8, rect.top - dropdownHeight - 4)}px`
+            : `${rect.bottom + 4}px`;
+    };
+    dropdown._positionAutocomplete = positionDropdown;
 
     input.addEventListener('input', (e) => {
         const val = e.target.value.toLowerCase().trim();
@@ -723,28 +734,31 @@ window.setupAutocomplete = (inputId, fieldType) => {
                             const catInput = getRowField('category') || document.getElementById(`${prefix}-category`);
                             const merInput = getRowField('merchant') || document.getElementById(`${prefix}-merchant`);
                             const notesInput = getRowField('notes') || document.getElementById(`${prefix}-notes`);
-                            const curInput = document.getElementById(`${prefix}-currency`);
-                            const accInput = document.getElementById(`${prefix}-account`);
+                            const overlay = input.closest('.modal-overlay');
+                            const bulkConfig = row && Object.values(window.bulkEntryConfigurations || {})
+                                .find(config => config.overlayId === overlay?.id);
+                            const curInput = bulkConfig?.currencyId
+                                ? document.getElementById(bulkConfig.currencyId)
+                                : document.getElementById(`${prefix}-currency`);
+                            const accInput = bulkConfig?.accountId
+                                ? document.getElementById(bulkConfig.accountId)
+                                : document.getElementById(`${prefix}-account`);
+                            const fromInput = bulkConfig?.fromId ? document.getElementById(bulkConfig.fromId) : null;
+                            const toInput = bulkConfig?.toId ? document.getElementById(bulkConfig.toId) : null;
                             
-                            if (curInput && recentTx.original_currency) {
+                            if (curInput && recentTx.original_currency && Array.from(curInput.options).some(option => option.value === recentTx.original_currency)) {
                                 curInput.value = recentTx.original_currency;
                                 curInput.dispatchEvent(new Event('change'));
                             }
                             if (amtInput) {
-                                let fillAmt = (recentTx.original_amount !== undefined && recentTx.original_amount !== null)
-                                    ? Math.abs(recentTx.original_amount)
-                                    : Math.abs(recentTx.amount || 0);
-                                if (row && !input.closest('#ledger-item-bulk-panel')) {
-                                    const overlay = input.closest('.modal-overlay');
-                                    const currencyId = overlay?.id === 'expense-overlay' ? 'exp-currency'
-                                        : overlay?.id === 'income-overlay' ? 'inc-currency'
-                                            : 'transfer-currency';
-                                    const bulkCurrency = document.getElementById(currencyId)?.value;
-                                    const baseCurrency = window.getCurrencyCodeFromSymbol(window.userSettings?.currency || '₱');
-                                    fillAmt = bulkCurrency && bulkCurrency !== baseCurrency
-                                        ? Math.abs(window.convertCurrency(recentTx.amount || 0, baseCurrency, bulkCurrency))
-                                        : Math.abs(recentTx.amount || 0);
-                                }
+                                const originalAmount = recentTx.original_amount;
+                                const baseAmount = recentTx.amount || 0;
+                                const amountCurrency = recentTx.original_currency || window.getCurrencyCodeFromSymbol(window.userSettings?.currency || '₱');
+                                const inputCurrency = curInput?.value || amountCurrency;
+                                const amount = originalAmount !== undefined && originalAmount !== null
+                                    ? originalAmount
+                                    : (amountCurrency === inputCurrency ? baseAmount : window.convertCurrency(baseAmount, amountCurrency, inputCurrency));
+                                const fillAmt = Math.abs(amount);
                                 amtInput.value = fillAmt;
                             }
                             if (catInput && recentTx.category) {
@@ -762,8 +776,18 @@ window.setupAutocomplete = (inputId, fieldType) => {
                                     : (recentTx.notes || '');
                             }
                             if (accInput && recentTx.account_id) {
-                                accInput.value = recentTx.account_id;
-                                accInput.dispatchEvent(new Event('change'));
+                                if (Array.from(accInput.options).some(option => option.value === recentTx.account_id)) {
+                                    accInput.value = recentTx.account_id;
+                                    accInput.dispatchEvent(new Event('change'));
+                                }
+                            }
+                            if (fromInput && recentTx.account_id && Array.from(fromInput.options).some(option => option.value === recentTx.account_id)) {
+                                fromInput.value = recentTx.account_id;
+                                fromInput.dispatchEvent(new Event('change'));
+                            }
+                            if (toInput && recentTx.to_account_id && Array.from(toInput.options).some(option => option.value === recentTx.to_account_id)) {
+                                toInput.value = recentTx.to_account_id;
+                                toInput.dispatchEvent(new Event('change'));
                             }
                         }
                     }
@@ -771,6 +795,7 @@ window.setupAutocomplete = (inputId, fieldType) => {
                 dropdown.appendChild(div);
             });
             dropdown.style.display = 'block';
+            positionDropdown();
         } else {
             dropdown.style.display = 'none';
         }
@@ -779,10 +804,20 @@ window.setupAutocomplete = (inputId, fieldType) => {
     if (!window.autocompleteDismissListenerInstalled) {
         document.addEventListener('click', (e) => {
             document.querySelectorAll('.autocomplete-dropdown').forEach(menu => {
-                const owner = menu.parentElement;
-                if (owner && !owner.contains(e.target)) menu.style.display = 'none';
+                const ownerInput = menu._autocompleteInput;
+                if (ownerInput && e.target !== ownerInput && !menu.contains(e.target)) menu.style.display = 'none';
             });
         });
+        window.addEventListener('resize', () => {
+            document.querySelectorAll('.autocomplete-dropdown').forEach(menu => {
+                menu._positionAutocomplete?.();
+            });
+        });
+        window.addEventListener('scroll', () => {
+            document.querySelectorAll('.autocomplete-dropdown').forEach(menu => {
+                menu._positionAutocomplete?.();
+            });
+        }, true);
         window.autocompleteDismissListenerInstalled = true;
     }
 };
@@ -900,6 +935,9 @@ window.createBulkEntryUI = (config) => {
         }
     }
     const title = document.getElementById(config.titleId);
+    const currencySelect = config.currencyId ? document.getElementById(config.currencyId) : null;
+    const originalCurrencyParent = currencySelect?.parentElement;
+    const originalCurrencyNextSibling = currencySelect?.nextSibling;
     const bulkIcon = '<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 9h18M9 9v11M15 9v11"></path></svg>';
     const singleIcon = '<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"></rect><path d="M8 9h8M8 13h8M8 17h5"></path></svg>';
     const setToggleMode = (bulkMode) => {
@@ -915,6 +953,14 @@ window.createBulkEntryUI = (config) => {
         const active = panel.style.display === 'none';
         panel.style.display = active ? 'block' : 'none';
         setToggleMode(active);
+        if (currencySelect && active) {
+            toggle.parentElement.insertBefore(currencySelect, toggle);
+        } else if (currencySelect && originalCurrencyParent) {
+            originalCurrencyParent.insertBefore(
+                currencySelect,
+                originalCurrencyNextSibling?.parentElement === originalCurrencyParent ? originalCurrencyNextSibling : null
+            );
+        }
         content.style.maxWidth = active ? (config.bulkMaxWidth || 'min(1100px, 96vw)') : '';
         content.querySelectorAll('[data-bulk-hidden="true"]').forEach(element => {
             element.style.display = active ? 'none' : '';
@@ -4215,9 +4261,11 @@ window.bulkEntryConfigurations = {
     expense: {
         idPrefix: 'exp-bulk',
         titleId: 'exp-modal-title',
+        currencyId: 'exp-currency',
         singleTitle: 'Add Expense',
         bulkTitle: 'Add Bulk Expense',
         overlayId: 'expense-overlay',
+        accountId: 'exp-account',
         panelId: 'expense-bulk-panel',
         toggleId: 'exp-bulk-toggle',
         rowsId: 'expense-bulk-rows',
@@ -4242,9 +4290,11 @@ window.bulkEntryConfigurations = {
     income: {
         idPrefix: 'inc-bulk',
         titleId: 'inc-modal-title',
+        currencyId: 'inc-currency',
         singleTitle: 'Add Income',
         bulkTitle: 'Add Bulk Income',
         overlayId: 'income-overlay',
+        accountId: 'inc-account',
         panelId: 'income-bulk-panel',
         toggleId: 'inc-bulk-toggle',
         rowsId: 'income-bulk-rows',
@@ -4268,9 +4318,12 @@ window.bulkEntryConfigurations = {
     transfer: {
         idPrefix: 'transfer-bulk',
         titleId: 'transfer-modal-title',
+        currencyId: 'transfer-currency',
         singleTitle: 'Transfer / Ledger',
         bulkTitle: 'Add Bulk Transfer',
         overlayId: 'transfer-overlay',
+        fromId: 'transfer-from',
+        toId: 'transfer-to',
         panelId: 'transfer-bulk-panel',
         toggleId: 'transfer-bulk-toggle',
         rowsId: 'transfer-bulk-rows',
@@ -4295,6 +4348,7 @@ window.bulkEntryConfigurations = {
         singleTitle: 'Log Ledger Item',
         bulkTitle: 'Log Bulk Ledger Items',
         overlayId: 'ledger-item-overlay',
+        accountId: 'ledger-item-account',
         panelId: 'ledger-item-bulk-panel',
         toggleId: 'ledger-item-bulk-toggle',
         rowsId: 'ledger-item-bulk-rows',

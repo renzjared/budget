@@ -434,18 +434,18 @@ input:checked + .slider:before { transform: translateX(22px); }
 
 /* --- AUTOCOMPLETE DROPDOWN --- */
 .autocomplete-dropdown {
-    position: absolute;
-    top: 100%;
+    position: fixed;
+    top: 0;
     left: 0;
-    right: 0;
+    width: max-content;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
     box-shadow: var(--shadow-modal);
-    z-index: 1100;
+    z-index: 10020;
     max-height: 180px;
     overflow-y: auto;
-    margin-top: 4px;
+    margin-top: 0;
     display: none;
 }
 .autocomplete-item {

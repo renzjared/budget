@@ -660,6 +660,8 @@ window.renderQuickAddWidget = () => {
 window.setupAutocomplete = (inputId, fieldType) => {
     const input = document.getElementById(inputId);
     if (!input) return;
+    if (input.dataset.autocompleteSetup === 'true') return;
+    input.dataset.autocompleteSetup = 'true';
 
     const parent = input.parentElement;
     parent.style.position = 'relative';
@@ -683,7 +685,7 @@ window.setupAutocomplete = (inputId, fieldType) => {
         const txMap = new Map();
         
         recentTxs.forEach(tx => {
-            const text = tx[fieldType]; 
+            const text = typeof tx[fieldType] === 'string' ? tx[fieldType] : '';
             if (text && text.toLowerCase().includes(val)) {
                 if (!uniqueValues.has(text)) {
                     uniqueValues.add(text);
@@ -699,8 +701,13 @@ window.setupAutocomplete = (inputId, fieldType) => {
                 const div = document.createElement('div');
                 div.className = 'autocomplete-item';
                 
-                const regex = new RegExp(`(${val})`, "gi");
-                div.innerHTML = suggestion.replace(regex, "<strong style='color: var(--primary)'>$1</strong>");
+                const escapeHTML = (text) => text.replace(/[&<>"']/g, char => ({
+                    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+                })[char]);
+                const escapedSuggestion = escapeHTML(suggestion);
+                const escapedQuery = val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const regex = new RegExp(`(${escapedQuery})`, "gi");
+                div.innerHTML = escapedSuggestion.replace(regex, "<strong style='color: var(--primary)'>$1</strong>");
                 
                 div.addEventListener('click', () => {
                     input.value = suggestion;
@@ -709,11 +716,13 @@ window.setupAutocomplete = (inputId, fieldType) => {
                     if (fieldType === 'name') {
                         const recentTx = txMap.get(suggestion);
                         if (recentTx) {
-                            const prefix = inputId.replace('-name', ''); 
-                            
-                            const amtInput = document.getElementById(`${prefix}-amount`);
-                            const catInput = document.getElementById(`${prefix}-category`);
-                            const merInput = document.getElementById(`${prefix}-merchant`);
+                            const row = input.closest('[data-bulk-row]');
+                            const getRowField = (column) => row?.querySelector(`[data-bulk-column="${column}"]`);
+                            const prefix = inputId.replace(/-name(?:-\d+)?$/, '');
+                            const amtInput = getRowField('amount') || document.getElementById(`${prefix}-amount`);
+                            const catInput = getRowField('category') || document.getElementById(`${prefix}-category`);
+                            const merInput = getRowField('merchant') || document.getElementById(`${prefix}-merchant`);
+                            const notesInput = getRowField('notes') || document.getElementById(`${prefix}-notes`);
                             const curInput = document.getElementById(`${prefix}-currency`);
                             const accInput = document.getElementById(`${prefix}-account`);
                             
@@ -722,9 +731,20 @@ window.setupAutocomplete = (inputId, fieldType) => {
                                 curInput.dispatchEvent(new Event('change'));
                             }
                             if (amtInput) {
-                                const fillAmt = (recentTx.original_amount !== undefined && recentTx.original_amount !== null) 
-                                    ? Math.abs(recentTx.original_amount) 
+                                let fillAmt = (recentTx.original_amount !== undefined && recentTx.original_amount !== null)
+                                    ? Math.abs(recentTx.original_amount)
                                     : Math.abs(recentTx.amount || 0);
+                                if (row && !input.closest('#ledger-item-bulk-panel')) {
+                                    const overlay = input.closest('.modal-overlay');
+                                    const currencyId = overlay?.id === 'expense-overlay' ? 'exp-currency'
+                                        : overlay?.id === 'income-overlay' ? 'inc-currency'
+                                            : 'transfer-currency';
+                                    const bulkCurrency = document.getElementById(currencyId)?.value;
+                                    const baseCurrency = window.getCurrencyCodeFromSymbol(window.userSettings?.currency || '₱');
+                                    fillAmt = bulkCurrency && bulkCurrency !== baseCurrency
+                                        ? Math.abs(window.convertCurrency(recentTx.amount || 0, baseCurrency, bulkCurrency))
+                                        : Math.abs(recentTx.amount || 0);
+                                }
                                 amtInput.value = fillAmt;
                             }
                             if (catInput && recentTx.category) {
@@ -735,6 +755,11 @@ window.setupAutocomplete = (inputId, fieldType) => {
                             }
                             if (merInput && recentTx.merchant !== undefined) {
                                 merInput.value = recentTx.merchant;
+                            }
+                            if (notesInput) {
+                                notesInput.value = inputId === 'ledger-item-name' || input.closest('#ledger-item-bulk-panel')
+                                    ? (recentTx.merchant || '')
+                                    : (recentTx.notes || '');
                             }
                             if (accInput && recentTx.account_id) {
                                 accInput.value = recentTx.account_id;
@@ -751,11 +776,150 @@ window.setupAutocomplete = (inputId, fieldType) => {
         }
     });
 
-    document.addEventListener('click', (e) => {
-        if (e.target !== input && e.target !== dropdown) {
-            dropdown.style.display = 'none';
-        }
+    if (!window.autocompleteDismissListenerInstalled) {
+        document.addEventListener('click', (e) => {
+            document.querySelectorAll('.autocomplete-dropdown').forEach(menu => {
+                const owner = menu.parentElement;
+                if (owner && !owner.contains(e.target)) menu.style.display = 'none';
+            });
+        });
+        window.autocompleteDismissListenerInstalled = true;
+    }
+};
+
+window.createBulkEntryUI = (config) => {
+    const overlay = document.getElementById(config.overlayId);
+    const content = overlay?.querySelector('.account-modal-content');
+    const toggle = document.getElementById(config.toggleId);
+    if (!content || !toggle) return null;
+    if (document.getElementById(config.panelId)) return document.getElementById(config.panelId);
+
+    const panel = document.createElement('section');
+    panel.id = config.panelId;
+    panel.style.cssText = 'display:none; margin-top:8px;';
+    panel.innerHTML = `
+        <div style="overflow-x:auto; margin-bottom:12px;">
+            <table style="width:100%; border-collapse:collapse; min-width:${config.fields.length > 3 ? '640px' : '420px'};">
+                <thead><tr>${config.fields.map(field => `<th style="text-align:left; padding:8px; border-bottom:1px solid var(--border); font-size:12px; color:var(--text-secondary);">${field.label}</th>`).join('')}<th></th></tr></thead>
+                <tbody id="${config.rowsId}"></tbody>
+                <tfoot><tr><td colspan="${config.fields.length + 1}" style="padding:8px 4px;"><button type="button" class="secondary-btn" data-bulk-add>+ Add New</button></td></tr></tfoot>
+            </table>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:12px;">
+            <button type="button" class="primary-btn" data-bulk-save>Save Transactions</button>
+        </div>
+    `;
+    content.appendChild(panel);
+
+    const rows = panel.querySelector(`#${config.rowsId}`);
+    let rowCounter = 0;
+    const addRow = () => {
+        rowCounter += 1;
+        const row = document.createElement('tr');
+        row.dataset.bulkRow = 'true';
+        row.style.borderBottom = '1px solid var(--border)';
+        config.fields.forEach(field => {
+            const cell = document.createElement('td');
+            cell.style.cssText = 'padding:6px 4px; vertical-align:top;';
+            let input;
+            if (field.type === 'category') {
+                input = document.createElement('select');
+                input.className = 'form-input';
+                input.dataset.categorySource = field.sourceId;
+                input.style.minWidth = '120px';
+                const source = document.getElementById(field.sourceId);
+                if (source) {
+                    Array.from(source.options).forEach(option => {
+                        const clone = document.createElement('option');
+                        clone.value = option.value;
+                        clone.textContent = option.textContent;
+                        input.appendChild(clone);
+                    });
+                }
+            } else {
+                input = document.createElement('input');
+                input.type = field.type === 'amount' ? 'number' : 'text';
+                input.step = field.type === 'amount' ? '0.01' : '';
+                input.placeholder = field.placeholder || field.label;
+                input.className = 'form-input';
+                input.style.minWidth = field.type === 'amount' ? '100px' : '140px';
+                if (field.suggestion) input.dataset.suggestionField = field.suggestion;
+            }
+            input.dataset.bulkColumn = field.key;
+            input.id = `${config.idPrefix}-${field.key}-${rowCounter}`;
+            cell.appendChild(input);
+            row.appendChild(cell);
+            if (field.suggestion) window.setupAutocomplete(input.id, field.suggestion);
+        });
+        const removeCell = document.createElement('td');
+        removeCell.style.cssText = 'padding:6px 4px; vertical-align:top;';
+        const removeButton = document.createElement('button');
+        removeButton.type = 'button';
+        removeButton.className = 'secondary-btn';
+        removeButton.textContent = '×';
+        removeButton.title = 'Remove row';
+        removeButton.setAttribute('aria-label', 'Remove transaction row');
+        removeButton.addEventListener('click', () => row.remove());
+        removeCell.appendChild(removeButton);
+        row.appendChild(removeCell);
+        rows.appendChild(row);
+    };
+    const refreshCategories = () => {
+        panel.querySelectorAll('select[data-category-source]').forEach(select => {
+            const source = document.getElementById(select.dataset.categorySource);
+            if (!source) return;
+            const current = select.value;
+            select.innerHTML = '';
+            Array.from(source.options).forEach(option => {
+                const clone = document.createElement('option');
+                clone.value = option.value;
+                clone.textContent = option.textContent;
+                select.appendChild(clone);
+            });
+            if (Array.from(select.options).some(option => option.value === current)) select.value = current;
+        });
+    };
+    (config.categoryRefreshIds || []).forEach(id => {
+        document.getElementById(id)?.addEventListener('change', () => setTimeout(refreshCategories, 0));
     });
+    const inputOnlyIds = new Set(config.hideInputsOnly || []);
+    config.hiddenIds.forEach(id => {
+        const element = document.getElementById(id);
+        if (inputOnlyIds.has(id)) {
+            if (element) element.dataset.bulkHidden = 'true';
+            return;
+        }
+        const group = element?.closest('.form-group');
+        if (group) group.dataset.bulkHidden = 'true';
+    });
+    if (config.saveButtonId) {
+        const saveButton = document.getElementById(config.saveButtonId);
+        if (saveButton) {
+            saveButton.dataset.bulkHidden = 'true';
+            if (saveButton.parentElement !== content) saveButton.parentElement.dataset.bulkHidden = 'true';
+        }
+    }
+    toggle.addEventListener('click', () => {
+        const active = panel.style.display === 'none';
+        panel.style.display = active ? 'block' : 'none';
+        toggle.textContent = active ? 'Single Entry' : 'Bulk Add';
+        content.style.maxWidth = active ? (config.bulkMaxWidth || 'min(1100px, 96vw)') : '';
+        content.querySelectorAll('[data-bulk-hidden="true"]').forEach(element => {
+            element.style.display = active ? 'none' : '';
+        });
+        if (active) refreshCategories();
+    });
+    panel.querySelector('[data-bulk-add]').addEventListener('click', addRow);
+    panel.querySelector('[data-bulk-save]').addEventListener('click', () => config.onSave(rows));
+    addRow();
+    addRow();
+    panel.resetBulkRows = () => {
+        rows.innerHTML = '';
+        rowCounter = 0;
+        addRow();
+        addRow();
+    };
+    return panel;
 };
 
 window.applySettingsToUI = () => {
@@ -3889,6 +4053,152 @@ window.markAllRead = async () => {
     window.loadInbox();
 };
 
+window.saveBulkTransactions = async (type, rows, settings) => {
+    const entries = Array.from(rows.querySelectorAll('[data-bulk-row]')).map(row => {
+        const value = (column) => row.querySelector(`[data-bulk-column="${column}"]`)?.value.trim() || '';
+        return {
+            name: value('name'),
+            amount: value('amount'),
+            category: value('category'),
+            merchant: value('merchant'),
+            notes: value('notes')
+        };
+    }).filter(entry => entry.name || entry.amount || entry.merchant || entry.notes);
+
+    if (!entries.length) return alert('Add at least one transaction.');
+    for (const entry of entries) {
+        const amount = Number(entry.amount);
+        if (!entry.name || !entry.amount || !Number.isFinite(amount) || amount === 0) {
+            return alert('Each transaction needs a description and a non-zero amount.');
+        }
+        if (type === 'TRANSFER' && amount <= 0) {
+            return alert('Transfer amounts must be greater than zero.');
+        }
+    }
+
+    const currencySelectId = settings.currencyId;
+    const selectedCurrency = document.getElementById(currencySelectId).value;
+    const baseCurrency = window.getCurrencyCodeFromSymbol(window.userSettings?.currency || '₱');
+    const tripId = settings.tripCheckboxId && document.getElementById(settings.tripCheckboxId)?.checked
+        ? document.getElementById(settings.tripSelectId)?.value || null
+        : null;
+    const accountId = settings.accountId ? document.getElementById(settings.accountId).value || null : null;
+    const fromId = settings.fromId ? document.getElementById(settings.fromId).value || null : null;
+    const toId = settings.toId ? document.getElementById(settings.toId).value || null : null;
+
+    if (type === 'TRANSFER') {
+        if (!fromId && !toId) return alert('You must select at least one internal account.');
+        if (fromId === toId) return alert('Cannot transfer to the same account.');
+        localStorage.setItem('lastTransferFrom', fromId || '');
+        localStorage.setItem('lastTransferTo', toId || '');
+    }
+
+    localStorage.setItem('lastUsedCurrency', selectedCurrency);
+    const transactions = entries.map((entry, index) => {
+        const amount = Number(entry.amount);
+        const finalAmount = selectedCurrency === baseCurrency
+            ? amount
+            : window.convertCurrency(amount, selectedCurrency, baseCurrency);
+        const exchangeRate = finalAmount / amount;
+        const timestamp = new Date(Date.now() + index).toISOString();
+        const transaction = {
+            user_id: window.currentUser.id,
+            fingerprint: `${timestamp}_${type.toLowerCase()}_${entry.name}_${amount}`,
+            type,
+            category: type === 'TRANSFER' ? 'TRANSFER' : (entry.category || (type === 'INCOMING' ? 'INCOME' : 'UNCATEGORIZED')),
+            name: entry.name,
+            amount: type === 'EXPENDITURE' ? -finalAmount : finalAmount,
+            original_currency: selectedCurrency,
+            original_amount: type === 'EXPENDITURE' ? -amount : amount,
+            exchange_rate: exchangeRate,
+            notes: entry.notes,
+            timestamp
+        };
+        if (type === 'EXPENDITURE') {
+            transaction.merchant = entry.merchant;
+            transaction.account_id = accountId;
+            transaction.trip_id = tripId;
+        } else if (type === 'INCOMING') {
+            transaction.account_id = accountId;
+            transaction.trip_id = tripId;
+        } else {
+            transaction.account_id = fromId;
+            transaction.to_account_id = toId;
+        }
+        return transaction;
+    });
+
+    window.showLoadingToast(type === 'TRANSFER' ? 'Processing transfers...' : 'Logging transactions...');
+    const { error } = await window.supabase.from('transactions').insert(transactions);
+    if (error) {
+        console.error('Error saving bulk transactions:', error);
+        window.showToast('Error saving transactions', true);
+        return;
+    }
+    document.getElementById(settings.overlayId)?.classList.remove('active');
+
+    if (type === 'EXPENDITURE' || type === 'INCOMING') {
+        if (accountId) {
+            const account = window.accountsData.find(item => item.id === accountId);
+            if (account) {
+                const accountCurrency = account.currency || baseCurrency;
+                entries.forEach(entry => {
+                    let amount = Number(entry.amount);
+                    if (selectedCurrency !== accountCurrency) {
+                        amount = window.convertCurrency(amount, selectedCurrency, accountCurrency);
+                    }
+                    account.balance += type === 'EXPENDITURE' ? -amount : amount;
+                });
+                await window.saveAccountsToCloud();
+            }
+        }
+        if (tripId) {
+            const trip = window.tripsData?.find(item => item.id === tripId);
+            if (trip?.budget_source_type === 'goal') {
+                const goal = window.userGoals.find(item => item.id === trip.budget_source_id);
+                if (goal) {
+                    const total = transactions.reduce((sum, tx) => sum + tx.amount, 0);
+                    goal.current_amount += total;
+                    await window.saveGoalsToCloud();
+                    if (window.renderGoalsWidget) window.renderGoalsWidget();
+                }
+            }
+        }
+    } else {
+        transactions.forEach(tx => {
+            if (tx.account_id) {
+                const account = window.accountsData.find(item => item.id === tx.account_id);
+                if (account) {
+                    const accountCurrency = account.currency || baseCurrency;
+                    const amount = selectedCurrency === accountCurrency
+                        ? Math.abs(tx.original_amount)
+                        : window.convertCurrency(Math.abs(tx.original_amount), selectedCurrency, accountCurrency);
+                    account.balance -= amount;
+                }
+            }
+            if (tx.to_account_id) {
+                const account = window.accountsData.find(item => item.id === tx.to_account_id);
+                if (account) {
+                    const accountCurrency = account.currency || baseCurrency;
+                    const amount = selectedCurrency === accountCurrency
+                        ? Math.abs(tx.original_amount)
+                        : window.convertCurrency(Math.abs(tx.original_amount), selectedCurrency, accountCurrency);
+                    account.balance += amount;
+                }
+            }
+        });
+        if (fromId || toId) await window.saveAccountsToCloud();
+    }
+
+    await window.loadCloudData();
+    window.bootUI();
+    if (window.renderTripsView && window.userSettings.activeTripId) window.renderTripsView();
+    window.showToast(type === 'TRANSFER' ? 'Transfers complete!' : 'Transactions successfully logged!');
+    document.getElementById(settings.panelId)?.resetBulkRows?.();
+    const toggle = document.getElementById(settings.toggleId);
+    if (toggle && document.getElementById(settings.panelId)?.style.display !== 'none') toggle.click();
+};
+
 // ==========================================
 // 2. DOM EVENT LISTENERS
 // ==========================================
@@ -3900,6 +4210,74 @@ document.addEventListener('DOMContentLoaded', () => {
     window.setupAutocomplete('inc-name', 'name');
     window.setupAutocomplete('edit-tx-name', 'name');
     window.setupAutocomplete('edit-tx-merchant', 'merchant');
+    window.createBulkEntryUI({
+        idPrefix: 'exp-bulk',
+        overlayId: 'expense-overlay',
+        panelId: 'expense-bulk-panel',
+        toggleId: 'exp-bulk-toggle',
+        rowsId: 'expense-bulk-rows',
+        bulkMaxWidth: 'min(1100px, 96vw)',
+        saveButtonId: 'save-expense-btn',
+        hiddenIds: ['exp-name', 'exp-category', 'exp-merchant', 'exp-notes', 'exp-amount'],
+        hideInputsOnly: ['exp-amount'],
+        fields: [
+            { key: 'name', label: 'Description', suggestion: 'name' },
+            { key: 'amount', label: 'Amount', type: 'amount' },
+            { key: 'category', label: 'Category', type: 'category', sourceId: 'exp-category' },
+            { key: 'merchant', label: 'Merchant', suggestion: 'merchant' },
+            { key: 'notes', label: 'Notes', suggestion: 'notes' }
+        ],
+        categoryRefreshIds: ['exp-is-trip', 'exp-trip-id'],
+        onSave: rows => window.saveBulkTransactions('EXPENDITURE', rows, {
+            currencyId: 'exp-currency', accountId: 'exp-account', tripCheckboxId: 'exp-is-trip',
+            tripSelectId: 'exp-trip-id', overlayId: 'expense-overlay',
+            panelId: 'expense-bulk-panel', toggleId: 'exp-bulk-toggle'
+        })
+    });
+    window.createBulkEntryUI({
+        idPrefix: 'inc-bulk',
+        overlayId: 'income-overlay',
+        panelId: 'income-bulk-panel',
+        toggleId: 'inc-bulk-toggle',
+        rowsId: 'income-bulk-rows',
+        bulkMaxWidth: 'min(900px, 96vw)',
+        saveButtonId: 'save-income-btn',
+        hiddenIds: ['inc-name', 'inc-category', 'inc-notes', 'inc-amount'],
+        hideInputsOnly: ['inc-amount'],
+        fields: [
+            { key: 'name', label: 'Description', suggestion: 'name' },
+            { key: 'amount', label: 'Amount', type: 'amount' },
+            { key: 'category', label: 'Category', type: 'category', sourceId: 'inc-category' },
+            { key: 'notes', label: 'Notes', suggestion: 'notes' }
+        ],
+        categoryRefreshIds: ['inc-is-trip', 'inc-trip-id'],
+        onSave: rows => window.saveBulkTransactions('INCOMING', rows, {
+            currencyId: 'inc-currency', accountId: 'inc-account', tripCheckboxId: 'inc-is-trip',
+            tripSelectId: 'inc-trip-id', overlayId: 'income-overlay',
+            panelId: 'income-bulk-panel', toggleId: 'inc-bulk-toggle'
+        })
+    });
+    window.createBulkEntryUI({
+        idPrefix: 'transfer-bulk',
+        overlayId: 'transfer-overlay',
+        panelId: 'transfer-bulk-panel',
+        toggleId: 'transfer-bulk-toggle',
+        rowsId: 'transfer-bulk-rows',
+        bulkMaxWidth: 'min(760px, 96vw)',
+        saveButtonId: 'save-transfer-btn',
+        hiddenIds: ['transfer-notes', 'transfer-amount'],
+        hideInputsOnly: ['transfer-amount'],
+        fields: [
+            { key: 'name', label: 'Description', suggestion: 'name' },
+            { key: 'amount', label: 'Amount', type: 'amount' },
+            { key: 'notes', label: 'Notes', suggestion: 'notes' }
+        ],
+        onSave: rows => window.saveBulkTransactions('TRANSFER', rows, {
+            currencyId: 'transfer-currency', fromId: 'transfer-from', toId: 'transfer-to',
+            overlayId: 'transfer-overlay', panelId: 'transfer-bulk-panel',
+            toggleId: 'transfer-bulk-toggle'
+        })
+    });
 
     window.openTransferModal = () => {
         const overlay = document.getElementById('transfer-overlay');

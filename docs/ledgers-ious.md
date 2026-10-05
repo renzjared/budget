@@ -13,6 +13,8 @@ When you cover a bill or borrow money, you log an Item.
 2. Choose the direction: **I Lent Them** (they owe you) or **They Lent Me** (you owe them).
 3. Enter the description and the cost.
 4. **Funding Source (Optional):** If you paid for their lunch using your GCash account, you can select GCash here. The app will automatically deduct the money from your GCash balance while simultaneously recording the debt in the Ledger.
+5. Use **Bulk Add** to record several items in one table. The table starts with two rows; select **+ Add New** to add another. Suggested transaction descriptions can fill the amount, and a matched transaction's merchant is copied into the item's Notes.
+6. A negative amount reverses the selected **I Lent Them / They Lent Me** direction, just as it does for a single item.
 
 ## 3. Logging Payments (The Settlement)
 When someone pays you back (or you pay them back), you log a Payment.

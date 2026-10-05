@@ -12,6 +12,11 @@ When typing in the **Description** or **Merchant** fields, the app scans your la
 * If it finds a match, a dropdown will appear.
 * Clicking the suggestion will auto-fill the text **and** automatically select the Category, Account, and Currency you used the last time you made that specific purchase.
 
+## Bulk Entry
+Choose **Bulk Add** in the Expense, Income, or Transfer dialog to enter multiple transactions in a table. The table starts with two rows; use **+ Add New** to append more. Description, amount, merchant (expenses), notes, and categories where applicable support the same transaction suggestions as single entry. Currency, account, trip, and transfer endpoints are shared by all rows in that bulk save.
+
+Expense amounts keep the usual sign convention: positive values log an expense and negative values reverse its direction. Income values keep their entered sign. Transfer amounts must be positive.
+
 ## Multi-Currency Swiping
 If you are traveling or buying software online, you can change the currency directly in the Add Expense modal.
 1. Enter the exact foreign amount on the receipt.

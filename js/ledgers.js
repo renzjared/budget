@@ -237,7 +237,10 @@ window.LedgersEngine = {
                 <div class="account-modal-content card">
                     <header style="display: flex; justify-content: space-between; margin-bottom: 24px;">
                         <h3 style="margin: 0;">Log Ledger Item</h3>
-                        <button class="close-modal-btn" onclick="document.getElementById('ledger-item-overlay').classList.remove('active')">✕</button>
+                        <div style="display:flex; gap:12px; align-items:center;">
+                            <button id="ledger-item-bulk-toggle" class="secondary-btn" type="button">Bulk Add</button>
+                            <button class="close-modal-btn" onclick="document.getElementById('ledger-item-overlay').classList.remove('active')">✕</button>
+                        </div>
                     </header>
                     <div class="form-group" style="display: flex; gap: 8px; margin-bottom: 16px;">
                         <button id="btn-lent-them" class="primary-btn" style="flex: 1;" onclick="window.LedgersEngine.setItemDirection(1)">I Lent Them</button>
@@ -261,7 +264,7 @@ window.LedgersEngine = {
                     </div>
                     <div style="display: flex; gap: 12px; margin-top: 24px;">
                         <button class="secondary-btn" style="flex: 1;" onclick="document.getElementById('ledger-item-overlay').classList.remove('active')">Cancel</button>
-                        <button class="primary-btn" style="flex: 1;" onclick="window.LedgersEngine.saveItem()">Save Item</button>
+                        <button id="ledger-item-save-btn" class="primary-btn" style="flex: 1;" onclick="window.LedgersEngine.saveItem()">Save Item</button>
                     </div>
                 </div>
             </div>
@@ -658,6 +661,23 @@ window.LedgersEngine = {
         document.getElementById('ledger-item-amount').value = '';
         document.getElementById('ledger-item-notes').value = '';
         window.LedgersEngine.setItemDirection(1);
+        window.setupAutocomplete?.('ledger-item-name', 'name');
+        window.createBulkEntryUI?.({
+            idPrefix: 'ledger-item-bulk',
+            overlayId: 'ledger-item-overlay',
+            panelId: 'ledger-item-bulk-panel',
+            toggleId: 'ledger-item-bulk-toggle',
+            rowsId: 'ledger-item-bulk-rows',
+            bulkMaxWidth: 'min(760px, 96vw)',
+            saveButtonId: 'ledger-item-save-btn',
+            hiddenIds: ['ledger-item-name', 'ledger-item-amount', 'ledger-item-notes'],
+            fields: [
+                { key: 'name', label: 'Description', suggestion: 'name' },
+                { key: 'amount', label: 'Amount', type: 'amount' },
+                { key: 'notes', label: 'Notes', suggestion: 'notes' }
+            ],
+            onSave: rows => window.LedgersEngine.saveBulkItems(rows)
+        });
         
         const selectEl = document.getElementById('ledger-item-account');
         
@@ -727,6 +747,65 @@ window.LedgersEngine = {
         window.LedgersEngine.openDetails(id);
         window.bootUI();
         if (window.showToast) window.showToast('Ledger item logged!');
+    },
+
+    saveBulkItems: async (rows) => {
+        const id = window.LedgersEngine.activeLedgerId;
+        const ledger = window.accountsData.find(a => a.id === id);
+        if (!ledger) return;
+
+        const entries = Array.from(rows.querySelectorAll('[data-bulk-row]')).map(row => ({
+            name: row.querySelector('[data-bulk-column="name"]')?.value.trim() || '',
+            amount: row.querySelector('[data-bulk-column="amount"]')?.value || '',
+            notes: row.querySelector('[data-bulk-column="notes"]')?.value.trim() || ''
+        })).filter(entry => entry.name || entry.amount || entry.notes);
+        if (!entries.length) return alert('Add at least one ledger item.');
+        for (const entry of entries) {
+            const amount = Number(entry.amount);
+            if (!entry.name || !entry.amount || !Number.isFinite(amount) || amount === 0) {
+                return alert('Each ledger item needs a description and a non-zero amount.');
+            }
+        }
+
+        const linkedAccId = document.getElementById('ledger-item-account').value || null;
+        const linkedAccount = linkedAccId && window.accountsData.find(a => a.id === linkedAccId);
+        const direction = window.LedgersEngine.itemDirection;
+        const timestamp = new Date().toISOString();
+        const transactions = entries.map((entry, index) => ({
+            user_id: window.currentUser.id,
+            fingerprint: `${timestamp}_ledgeritem_${index}_${entry.name}_${entry.amount}`,
+            type: 'LEDGER_ITEM',
+            category: 'LEDGER',
+            name: entry.name,
+            amount: Number(entry.amount) * direction,
+            notes: entry.notes,
+            account_id: id,
+            to_account_id: linkedAccId,
+            timestamp: new Date(Date.now() + index).toISOString()
+        }));
+
+        if (window.showLoadingToast) window.showLoadingToast('Logging ledger items...');
+        const { error } = await window.supabase.from('transactions').insert(transactions);
+        if (error) {
+            console.error('Error saving bulk ledger items:', error);
+            window.showToast ? window.showToast('Error saving ledger items', true) : alert('Error saving ledger items.');
+            return;
+        }
+
+        document.getElementById('ledger-item-overlay').classList.remove('active');
+        ledger.balance += transactions.reduce((sum, tx) => sum + tx.amount, 0);
+        if (linkedAccount) {
+            linkedAccount.balance -= transactions.reduce((sum, tx) => sum + tx.amount, 0);
+        }
+        await window.saveAccountsToCloud();
+        await window.loadCloudData();
+        window.LedgersEngine.renderList();
+        window.LedgersEngine.openDetails(id);
+        window.bootUI();
+        if (window.showToast) window.showToast('Ledger items logged!');
+        document.getElementById('ledger-item-bulk-panel')?.resetBulkRows?.();
+        const toggle = document.getElementById('ledger-item-bulk-toggle');
+        if (toggle && document.getElementById('ledger-item-bulk-panel')?.style.display !== 'none') toggle.click();
     },
 
     setPaymentDirection: (dir) => {

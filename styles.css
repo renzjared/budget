@@ -156,6 +156,7 @@ input:checked + .slider:before { transform: translateX(22px); }
     background-color: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center;
     z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
 }
+.modal-overlay#edit-transaction-overlay { z-index: 10010; }
 .modal-overlay.active { opacity: 1; pointer-events: auto; }
 .close-modal-btn { background: none; border: none; font-size: 20px; color: var(--text-secondary); cursor: pointer; align-self: flex-end; }
 
@@ -820,4 +821,3 @@ body.travel-theme {
         max-height: 250px;
     }
 }
-
